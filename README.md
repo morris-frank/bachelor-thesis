@@ -1,3 +1,3 @@
-#Files for the bachelor thesis of Maurice Frank
+# Files for the bachelor thesis of Maurice Frank
 
-_There might be coming some stuff here ^^_
+_ There might be coming some stuff here :D _
