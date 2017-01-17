@@ -13,7 +13,7 @@ install:
 	[ ! -d .venv ] && virtualenv --system-site-packages --python=python3.5 --prompt=BA .venv; \
 	[ ! -d lib ] && mkdir lib; \
 	[ ! -d lib/caffe-tensorflow ] && git clone https://github.com/ethereon/caffe-tensorflow lib/caffe-tensorflow; \
-	source .venv/bin/activate; \
+	source ./.venv/bin/activate; \
 	pip install --upgrade "$$TF_BINARY_URL"; \
 	pip install -r requirements.txt; \
 	)
