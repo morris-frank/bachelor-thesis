@@ -22,8 +22,3 @@ install:
 clean:
 	rm -fr .venv; \
 	rm -fr lib; \
-
-test:
-	( \
-
-	)
