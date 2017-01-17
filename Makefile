@@ -10,7 +10,7 @@ all:
 
 install:
 	( \
-	[ ! -d .venv ] && virtualenv --system-site-packages --python=python3.5 --prompt=BA .venv; \
+	[ ! -d .venv ] && virtualenv --python=python3.5 --prompt=BA .venv; \
 	[ ! -d lib ] && mkdir lib; \
 	[ ! -d lib/caffe-tensorflow ] && git clone https://github.com/ethereon/caffe-tensorflow lib/caffe-tensorflow; \
 	. ./.venv/bin/activate; \
