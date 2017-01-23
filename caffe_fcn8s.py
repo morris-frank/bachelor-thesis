@@ -32,15 +32,19 @@ def savePlaneWingSegmentation():
     flist.each(reduceSavePascalPart)
 
 
-def main():
+def runcaffe():
     model   = 'data/models/fcn8s/deploy.prototxt'
     weights = 'data/models/fcn8s/fcn8s-heavy-pascal.caffemodel'
     seglist = 'data/datasets/voc2010/ImageSets/Segmentation/val.txt'
-    gpu = 0
-
+    gpu = 2
     runner = FCNPartRunner()
     runner.createNet(model, weights, gpu)
     runner.addListFile(seglist)
+    return runner
+
+
+def main():
+    pass
 
 
 if __name__ == '__main__':

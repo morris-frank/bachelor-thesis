@@ -1,0 +1,17 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+build/
+lib/
+.venv/
+
+
+# Extra thesis stuff
+*.caffemodel
+*.npy
+data/datasets/
