@@ -6,7 +6,7 @@ layer {
   python_param {
     module: "voc_layers"
     layer: "SBDDSegDataLayer"
-    param_str: "{\'sbdd_dir\': \'../data/sbdd/dataset\', \'seed\': 1337, \'split\': \'train\', \'mean\': (104.00699, 116.66877, 122.67892)}"
+    param_str: "{\'sbdd_dir\': \'../data/sbdd/dataset\', \'mean\': (104.00699, 116.66877, 122.67892), \'seed\': 1337, \'split\': \'train\'}"
   }
 }
 layer {
@@ -486,7 +486,7 @@ layer {
     decay_mult: 0
   }
   convolution_param {
-    num_output: 21
+    num_output: 2
     pad: 0
     kernel_size: 1
   }
@@ -500,7 +500,7 @@ layer {
     lr_mult: 0
   }
   convolution_param {
-    num_output: 21
+    num_output: 2
     bias_term: false
     kernel_size: 4
     stride: 2
@@ -520,7 +520,7 @@ layer {
     decay_mult: 0
   }
   convolution_param {
-    num_output: 21
+    num_output: 2
     pad: 0
     kernel_size: 1
   }
@@ -555,7 +555,7 @@ layer {
     lr_mult: 0
   }
   convolution_param {
-    num_output: 21
+    num_output: 2
     bias_term: false
     kernel_size: 4
     stride: 2
@@ -575,7 +575,7 @@ layer {
     decay_mult: 0
   }
   convolution_param {
-    num_output: 21
+    num_output: 2
     pad: 0
     kernel_size: 1
   }
@@ -610,7 +610,7 @@ layer {
     lr_mult: 0
   }
   convolution_param {
-    num_output: 21
+    num_output: 2
     bias_term: false
     kernel_size: 16
     stride: 8

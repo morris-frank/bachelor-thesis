@@ -1,3 +1,7 @@
+'''
+    Based on code from Evan Shelhamer
+    fcn.berkeleyvision.org
+'''
 from caffe import layers as L, params as P
 import warnings
 

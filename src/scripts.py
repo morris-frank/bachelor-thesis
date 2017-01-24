@@ -1,8 +1,9 @@
-from scipy.misc import imsave
 from .FCNPartRunner import FCNPartRunner
 from .PascalPart import PascalPart
 from .SetList import SetList
+from scipy.misc import imsave
 from tqdm import tqdm
+from . import caffe as bacaffe
 import caffe
 import numpy as np
 import os.path

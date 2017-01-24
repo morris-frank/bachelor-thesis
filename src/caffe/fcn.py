@@ -1,9 +1,14 @@
+'''
+    Based on code from Evan Shelhamer
+    fcn.berkeleyvision.org
+'''
 import caffe
 from caffe import layers as L, params as P
 from caffe.coord_map import crop
 from .utils import *
 
 def fcn8s(split):
+    nclasses = 2
     n = caffe.NetSpec()
     pydata_params = dict(split=split, mean=(104.00699, 116.66877, 122.67892),
             seed=1337)
@@ -45,30 +50,30 @@ def fcn8s(split):
     n.drop6 = L.Dropout(n.relu6, dropout_ratio=0.5, in_place=True)
     n.fc7, n.relu7 = conv_relu(n.drop6, 4096, ks=1, pad=0)
     n.drop7 = L.Dropout(n.relu7, dropout_ratio=0.5, in_place=True)
-    n.score_fr = L.Convolution(n.drop7, num_output=21, kernel_size=1, pad=0,
+    n.score_fr = L.Convolution(n.drop7, num_output=nclasses, kernel_size=1, pad=0,
         param=[dict(lr_mult=1, decay_mult=1), dict(lr_mult=2, decay_mult=0)])
     n.upscore2 = L.Deconvolution(n.score_fr,
-        convolution_param=dict(num_output=21, kernel_size=4, stride=2,
+        convolution_param=dict(num_output=nclasses, kernel_size=4, stride=2,
             bias_term=False),
         param=[dict(lr_mult=0)])
 
-    n.score_pool4 = L.Convolution(n.pool4, num_output=21, kernel_size=1, pad=0,
+    n.score_pool4 = L.Convolution(n.pool4, num_output=nclasses, kernel_size=1, pad=0,
         param=[dict(lr_mult=1, decay_mult=1), dict(lr_mult=2, decay_mult=0)])
     n.score_pool4c = crop(n.score_pool4, n.upscore2)
     n.fuse_pool4 = L.Eltwise(n.upscore2, n.score_pool4c,
             operation=P.Eltwise.SUM)
     n.upscore_pool4 = L.Deconvolution(n.fuse_pool4,
-        convolution_param=dict(num_output=21, kernel_size=4, stride=2,
+        convolution_param=dict(num_output=nclasses, kernel_size=4, stride=2,
             bias_term=False),
         param=[dict(lr_mult=0)])
 
-    n.score_pool3 = L.Convolution(n.pool3, num_output=21, kernel_size=1, pad=0,
+    n.score_pool3 = L.Convolution(n.pool3, num_output=nclasses, kernel_size=1, pad=0,
         param=[dict(lr_mult=1, decay_mult=1), dict(lr_mult=2, decay_mult=0)])
     n.score_pool3c = crop(n.score_pool3, n.upscore_pool4)
     n.fuse_pool3 = L.Eltwise(n.upscore_pool4, n.score_pool3c,
             operation=P.Eltwise.SUM)
     n.upscore8 = L.Deconvolution(n.fuse_pool3,
-        convolution_param=dict(num_output=21, kernel_size=16, stride=8,
+        convolution_param=dict(num_output=nclasses, kernel_size=16, stride=8,
             bias_term=False),
         param=[dict(lr_mult=0)])
 
