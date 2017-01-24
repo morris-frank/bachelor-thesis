@@ -1,5 +1,5 @@
 import os.path
-from src.PascalPart import PascalPart
+from .PascalPart import PascalPart
 from tqdm import tqdm
 import warnings
 

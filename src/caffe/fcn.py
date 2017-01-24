@@ -1,17 +1,9 @@
 import caffe
 from caffe import layers as L, params as P
 from caffe.coord_map import crop
+from .utils import *
 
-def conv_relu(bottom, nout, ks=3, stride=1, pad=1):
-    conv = L.Convolution(bottom, kernel_size=ks, stride=stride,
-        num_output=nout, pad=pad,
-        param=[dict(lr_mult=1, decay_mult=1), dict(lr_mult=2, decay_mult=0)])
-    return conv, L.ReLU(conv, in_place=True)
-
-def max_pool(bottom, ks=2, stride=2):
-    return L.Pooling(bottom, pool=P.Pooling.MAX, kernel_size=ks, stride=stride)
-
-def fcn(split):
+def fcn8s(split):
     n = caffe.NetSpec()
     pydata_params = dict(split=split, mean=(104.00699, 116.66877, 122.67892),
             seed=1337)
@@ -85,13 +77,3 @@ def fcn(split):
             loss_param=dict(normalize=False, ignore_label=255))
 
     return n.to_proto()
-
-def make_net():
-    with open('train.prototxt', 'w') as f:
-        f.write(str(fcn('train')))
-
-    with open('val.prototxt', 'w') as f:
-        f.write(str(fcn('seg11valid')))
-
-if __name__ == '__main__':
-    make_net()

@@ -1,2 +1,2 @@
-from src import *
-from caffe_fcn8s import *
+from .src import *
+import src.scripts as scripts

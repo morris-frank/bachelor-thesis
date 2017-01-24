@@ -1,5 +1,5 @@
 import caffe
-from src.SetList import SetList
+from .SetList import SetList
 
 class FCNPartRunner(object):
     """docstring for FCNPartRunner."""

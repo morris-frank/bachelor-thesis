@@ -15,3 +15,5 @@ lib/
 *.caffemodel
 *.npy
 data/datasets/
+*.pkl
+*.mat
