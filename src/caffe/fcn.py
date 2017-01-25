@@ -10,15 +10,18 @@ from .utils import *
 def fcn8s(split):
     nclasses = 2
     n = caffe.NetSpec()
-    pydata_params = dict(split=split, mean=(104.00699, 116.66877, 122.67892),
+    splitfile = 'data/datasets/pascalparts/set_wings.txt'
+    pydata_params = dict(split=splitfile, mean=(104.00699, 116.66877, 122.67892),
             seed=1337)
     if split == 'train':
-        pydata_params['sbdd_dir'] = '../data/sbdd/dataset'
+        pydata_params['img_dir'] = 'data/datasets/voc2010/JPEGImages/'
+        pydata_params['label_dir'] = 'data/datasets/pascalparts/Annotations_Part_Planes/planes/'
         pylayer = 'SBDDSegDataLayer'
     else:
-        pydata_params['voc_dir'] = '../data/pascal/VOC2011'
+        pydata_params['img_dir'] = 'data/datasets/voc2010/JPEGImages/'
+        pydata_params['label_dir'] = 'data/datasets/pascalparts/Annotations_Part_Planes/planes/'
         pylayer = 'VOCSegDataLayer'
-    n.data, n.label = L.Python(module='voc_layers', layer=pylayer,
+    n.data, n.label = L.Python(module='ba.src.caffe.voc_layers', layer=pylayer,
             ntop=2, param_str=str(pydata_params))
 
     # the base net
@@ -50,34 +53,40 @@ def fcn8s(split):
     n.drop6 = L.Dropout(n.relu6, dropout_ratio=0.5, in_place=True)
     n.fc7, n.relu7 = conv_relu(n.drop6, 4096, ks=1, pad=0)
     n.drop7 = L.Dropout(n.relu7, dropout_ratio=0.5, in_place=True)
-    n.score_fr = L.Convolution(n.drop7, num_output=nclasses, kernel_size=1, pad=0,
+    #From scratch:
+    n.score_fr_ = L.Convolution(n.drop7, num_output=nclasses, kernel_size=1, pad=0,
         param=[dict(lr_mult=1, decay_mult=1), dict(lr_mult=2, decay_mult=0)])
-    n.upscore2 = L.Deconvolution(n.score_fr,
+    #From scratch:
+    n.upscore2_ = L.Deconvolution(n.score_fr_,
         convolution_param=dict(num_output=nclasses, kernel_size=4, stride=2,
             bias_term=False),
         param=[dict(lr_mult=0)])
 
-    n.score_pool4 = L.Convolution(n.pool4, num_output=nclasses, kernel_size=1, pad=0,
+    #From scratch:
+    n.score_pool4_ = L.Convolution(n.pool4, num_output=nclasses, kernel_size=1, pad=0,
         param=[dict(lr_mult=1, decay_mult=1), dict(lr_mult=2, decay_mult=0)])
-    n.score_pool4c = crop(n.score_pool4, n.upscore2)
-    n.fuse_pool4 = L.Eltwise(n.upscore2, n.score_pool4c,
+    n.score_pool4c = crop(n.score_pool4_, n.upscore2_)
+    n.fuse_pool4 = L.Eltwise(n.upscore2_, n.score_pool4c,
             operation=P.Eltwise.SUM)
-    n.upscore_pool4 = L.Deconvolution(n.fuse_pool4,
+    #From scratch:
+    n.upscore_pool4_ = L.Deconvolution(n.fuse_pool4,
         convolution_param=dict(num_output=nclasses, kernel_size=4, stride=2,
             bias_term=False),
         param=[dict(lr_mult=0)])
 
-    n.score_pool3 = L.Convolution(n.pool3, num_output=nclasses, kernel_size=1, pad=0,
+    #From scratch
+    n.score_pool3_ = L.Convolution(n.pool3, num_output=nclasses, kernel_size=1, pad=0,
         param=[dict(lr_mult=1, decay_mult=1), dict(lr_mult=2, decay_mult=0)])
-    n.score_pool3c = crop(n.score_pool3, n.upscore_pool4)
-    n.fuse_pool3 = L.Eltwise(n.upscore_pool4, n.score_pool3c,
+    n.score_pool3c = crop(n.score_pool3_, n.upscore_pool4_)
+    n.fuse_pool3 = L.Eltwise(n.upscore_pool4_, n.score_pool3c,
             operation=P.Eltwise.SUM)
-    n.upscore8 = L.Deconvolution(n.fuse_pool3,
+    # From scratch
+    n.upscore8_ = L.Deconvolution(n.fuse_pool3,
         convolution_param=dict(num_output=nclasses, kernel_size=16, stride=8,
             bias_term=False),
         param=[dict(lr_mult=0)])
 
-    n.score = crop(n.upscore8, n.data)
+    n.score = crop(n.upscore8_, n.data)
     n.loss = L.SoftmaxWithLoss(n.score, n.label,
             loss_param=dict(normalize=False, ignore_label=255))
 
