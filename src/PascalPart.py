@@ -7,7 +7,6 @@ from tqdm import tqdm
 class PascalPart(object):
     """docstring for PascalPart."""
     def __init__(self, source=''):
-        super(PascalPart, self).__init__()
         self.source = source
         if source != '':
             self.load()

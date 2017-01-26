@@ -1,9 +1,9 @@
-from .FCNPartRunner import FCNPartRunner
+from .netrunner import FCNPartRunner
 from .PascalPart import PascalPart
-from .SetList import SetList
+from .set import SetList
 from scipy.misc import imsave, imread
 from tqdm import tqdm
-from . import caffe as bacaffe
+from . import caffeine
 import caffe
 import numpy as np
 import os.path

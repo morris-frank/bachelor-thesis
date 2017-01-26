@@ -4,25 +4,36 @@ from tqdm import tqdm
 import numpy as np
 import warnings
 from scipy.misc import imread
+from random import shuffle
+
 
 class SetList(object):
     """docstring for SetList."""
+    list = []
+    mean = []
+
     def __init__(self, source=''):
-        super(SetList, self).__init__()
         self.source = source
+        self.target = source
         if source != '':
             self.load()
+
+    def __len__(self):
+        return len(self.list)
 
     def load(self):
         open(self.source, 'a').close()
         with open(self.source) as f:
-            self.list = f.read().splitlines()
+            self.list = [l for l in f.readlines() if l.strip()]
 
     def save(self):
-        with open(self.source, 'w') as f:
+        with open(self.target, 'w') as f:
             for row in self.list:
                 f.write("{}\n".format(row))
-                print('List {} written...'.format(self.source))
+                print('List {} written...'.format(self.target))
+
+    def shuffle(self):
+        self.list = shuffle(self.list)
 
     def addPreSuffix(self, prefix, suffix):
         self.list = [prefix + x + suffix for x in self.list]
@@ -32,6 +43,7 @@ class SetList(object):
 
     def calculate_mean(self):
         self.mean = [[],[],[]]
+        print('Calculating mean pixel...')
         for row in tqdm(self.list):
             im = imread(row)
             self.mean[0].append(np.mean(im[...,0]))
@@ -41,7 +53,7 @@ class SetList(object):
         return self.mean
 
     def genPartList(self, classname, parts):
-        print('generate Parts list for {} in {}'.format(parts, classname))
+        print('Generating Parts list for {} in {}'.format(parts, classname))
         bn, en = os.path.splitext(self.source)
         plist = SetList('_'.join([bn, classname]) + '_' + '_'.join(parts) + en)
         for i in tqdm(range(len(self.list) - 1)):

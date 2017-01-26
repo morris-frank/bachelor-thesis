@@ -9,23 +9,25 @@ from caffe.coord_map import crop
 from .utils import *
 
 
-def fcn8s(split):
+def fcn8s(params):
     nclasses = 2
     n = caffe.NetSpec()
-    splitfile = 'data/datasets/pascalparts/' + split + '.txt'
+    splitfile = params['splitfile']
+    # splitfile = 'data/datasets/pascalparts/' + split + '.txt'
     # Old mean
     # 104.00699, 116.66877, 122.67892
-    pydata_params = dict(split=splitfile, mean=(124.93331, 135.89949, 143.30450),
+    # (124.93331, 135.89949, 143.30450)
+    pydata_params = dict(split=splitfile, mean=params['mean'],
         seed=1337)
-    if split == 'train':
-        pydata_params['img_dir'] = 'data/datasets/voc2010/JPEGImages/'
-        pydata_params['label_dir'] = 'data/datasets/pascalparts/Annotations_Part_Planes/lwing_rwing/'
+    if 'train' in splitfile:
+        pydata_params['img_dir'] = params['img_dir']
+        pydata_params['label_dir'] = params['label_dir']
         pylayer = 'SBDDSegDataLayer'
         n.data, n.label = L.Python(module='ba.src.caffe.voc_layers', layer=pylayer,
         ntop=2, param_str=str(pydata_params))
-    elif split == 'val':
-        pydata_params['img_dir'] = 'data/datasets/voc2010/JPEGImages/'
-        pydata_params['label_dir'] = 'data/datasets/pascalparts/Annotations_Part_Planes/lwing_rwing/'
+    elif 'val' in splitfile:
+        pydata_params['img_dir'] = params['img_dir']
+        pydata_params['label_dir'] = params['label_dir']
         pylayer = 'VOCSegDataLayer'
         n.data, n.label = L.Python(module='ba.src.caffe.voc_layers', layer=pylayer,
         ntop=2, param_str=str(pydata_params))
@@ -95,7 +97,8 @@ def fcn8s(split):
         param=[dict(lr_mult=0)])
 
     n.score = crop(n.upscore8_, n.data)
-    if split != 'deploy':
+
+    if 'deploy' not in split:
         n.loss = L.SoftmaxWithLoss(n.score, n.label,
                 loss_param=dict(normalize=False, ignore_label=255))
 

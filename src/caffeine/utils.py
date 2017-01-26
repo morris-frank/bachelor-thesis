@@ -14,15 +14,15 @@ def conv_relu(bottom, nout, ks=3, stride=1, pad=1):
 def max_pool(bottom, ks=2, stride=2):
     return L.Pooling(bottom, pool=P.Pooling.MAX, kernel_size=ks, stride=stride)
 
-def make_net(callback_net, path='./'):
-    if not callable(callback_net):
-        warnings.warn('Not callable object')
-        return
-    with open(path + 'train.prototxt', 'w') as f:
-        f.write(str(callback_net('train')))
-
-    with open(path + 'val.prototxt', 'w') as f:
-        f.write(str(callback_net('val')))
-
-    # with open(path + 'deploy.prototxt', 'w') as f:
-    #     f.write(str(callback_net('deploy')))
+# def make_net(callback_net, path='./'):
+#     if not callable(callback_net):
+#         warnings.warn('Not callable object')
+#         return
+#     with open(path + 'train.prototxt', 'w') as f:
+#         f.write(str(callback_net('train')))
+#
+#     with open(path + 'val.prototxt', 'w') as f:
+#         f.write(str(callback_net('val')))
+#
+#     # with open(path + 'deploy.prototxt', 'w') as f:
+#     #     f.write(str(callback_net('deploy')))
