@@ -32,7 +32,7 @@ def reduceSavePascalPart(path):
     pp = PascalPart(path)
     pp.reduce(parts)
     pp.source = pp.source[:-16] + '_Exports/' + pp.source[-15:]
-    pp.save(image=True, parts=True, segmentation=True)
+    pp.save(image=True, parts=True, sum=True)
 
 
 def genPlaneWingList():

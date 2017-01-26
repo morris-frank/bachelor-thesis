@@ -3,26 +3,34 @@
     fcn.berkeleyvision.org
 '''
 import caffe
-from caffe import layers as L, params as P
+from caffe import layers as L
+from caffe import params as P
 from caffe.coord_map import crop
 from .utils import *
+
 
 def fcn8s(split):
     nclasses = 2
     n = caffe.NetSpec()
-    splitfile = 'data/datasets/pascalparts/set_wings.txt'
-    pydata_params = dict(split=splitfile, mean=(104.00699, 116.66877, 122.67892),
-            seed=1337)
+    splitfile = 'data/datasets/pascalparts/' + split + '.txt'
+    # Old mean
+    # 104.00699, 116.66877, 122.67892
+    pydata_params = dict(split=splitfile, mean=(124.93331, 135.89949, 143.30450),
+        seed=1337)
     if split == 'train':
         pydata_params['img_dir'] = 'data/datasets/voc2010/JPEGImages/'
-        pydata_params['label_dir'] = 'data/datasets/pascalparts/Annotations_Part_Planes/planes/'
+        pydata_params['label_dir'] = 'data/datasets/pascalparts/Annotations_Part_Planes/lwing_rwing/'
         pylayer = 'SBDDSegDataLayer'
-    else:
+        n.data, n.label = L.Python(module='ba.src.caffe.voc_layers', layer=pylayer,
+        ntop=2, param_str=str(pydata_params))
+    elif split == 'val':
         pydata_params['img_dir'] = 'data/datasets/voc2010/JPEGImages/'
-        pydata_params['label_dir'] = 'data/datasets/pascalparts/Annotations_Part_Planes/planes/'
+        pydata_params['label_dir'] = 'data/datasets/pascalparts/Annotations_Part_Planes/lwing_rwing/'
         pylayer = 'VOCSegDataLayer'
-    n.data, n.label = L.Python(module='ba.src.caffe.voc_layers', layer=pylayer,
-            ntop=2, param_str=str(pydata_params))
+        n.data, n.label = L.Python(module='ba.src.caffe.voc_layers', layer=pylayer,
+        ntop=2, param_str=str(pydata_params))
+    else:
+        n.data = L.Input()
 
     # the base net
     n.conv1_1, n.relu1_1 = conv_relu(n.data, 64, pad=100)
@@ -87,7 +95,8 @@ def fcn8s(split):
         param=[dict(lr_mult=0)])
 
     n.score = crop(n.upscore8_, n.data)
-    n.loss = L.SoftmaxWithLoss(n.score, n.label,
-            loss_param=dict(normalize=False, ignore_label=255))
+    if split != 'deploy':
+        n.loss = L.SoftmaxWithLoss(n.score, n.label,
+                loss_param=dict(normalize=False, ignore_label=255))
 
     return n.to_proto()

@@ -1,7 +1,9 @@
 import os.path
 from .PascalPart import PascalPart
 from tqdm import tqdm
+import numpy as np
 import warnings
+from scipy.misc import imread
 
 class SetList(object):
     """docstring for SetList."""
@@ -28,6 +30,16 @@ class SetList(object):
     def rmPreSuffix(self, prefix, suffix):
         self.list = [x[len(prefix):-len(suffix)] for x in self.list]
 
+    def calculate_mean(self):
+        self.mean = [[],[],[]]
+        for row in tqdm(self.list):
+            im = imread(row)
+            self.mean[0].append(np.mean(im[...,0]))
+            self.mean[1].append(np.mean(im[...,1]))
+            self.mean[2].append(np.mean(im[...,2]))
+        self.mean = np.mean(self.mean, axis=1)
+        return self.mean
+
     def genPartList(self, classname, parts):
         print('generate Parts list for {} in {}'.format(parts, classname))
         bn, en = os.path.splitext(self.source)
@@ -49,5 +61,5 @@ class SetList(object):
             warnings.warn('Not callable object')
             return
         print('Calling each object in SetList....')
-        for i in tqdm(range(len(self.list) - 1)):
-            callback(self.list[i])
+        for row in tqdm(self.list):
+            callback(row)

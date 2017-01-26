@@ -28,7 +28,8 @@ surgery.interp(solver.net, interp_layers)
 # scoring
 # val = np.loadtxt('../data/segvalid11.txt', dtype=str)
 
-for _ in range(25):
-    solver.step(100)
+for _ in range(20):
+    solver.step(2)
 #    # score.seg_tests(solver, False, val, layer='score')
 #
+solver.snapshot()

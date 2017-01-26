@@ -6,7 +6,7 @@ layer {
   python_param {
     module: "ba.src.caffe.voc_layers"
     layer: "VOCSegDataLayer"
-    param_str: "{\'img_dir\': \'data/datasets/voc2010/JPEGImages/\', \'split\': \'data/datasets/pascalparts/set_wings.txt\', \'label_dir\': \'data/datasets/pascalparts/Annotations_Part_Planes/planes/\', \'seed\': 1337, \'mean\': (104.00699, 116.66877, 122.67892)}"
+    param_str: "{\'img_dir\': \'data/datasets/voc2010/JPEGImages/\', \'seed\': 1337, \'mean\': (124.93331, 135.89949, 143.3045), \'split\': \'data/datasets/pascalparts/val.txt\', \'label_dir\': \'data/datasets/pascalparts/Annotations_Part_Planes/lwing_rwing/\'}"
   }
 }
 layer {

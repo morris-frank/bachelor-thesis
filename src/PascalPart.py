@@ -26,15 +26,21 @@ class PascalPart(object):
             for part in mat[3][0]:
                 self.parts[part[0][0]] = part[1].astype('float')
 
-    def save(self, image=True, parts=True, segmentation=True):
+    def save(self, image=True, parts=True, sum=False, segmentation=False):
         bn, en = os.path.splitext(self.source)
         itemsave = imsave if image else np.save
         ext = '.png' if image else ''
         if segmentation:
             itemsave(bn + ext, self.segmentation)
         if parts:
-            for part in self.parts:
-                itemsave(bn + '_' + part + ext, self.parts[part])
+            if sum:
+                sumOfParts = self.segmentation * 0
+                for part in self.parts:
+                    sumOfParts += self.parts[part]
+                itemsave(bn + '_' + '_'.join(self.parts) + ext, sumOfParts)
+            else:
+                for part in self.parts:
+                    itemsave(bn + '_' + part + ext, self.parts[part])
 
     def get(self, part):
         if part in self.parts:

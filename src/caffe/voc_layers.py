@@ -57,6 +57,9 @@ class VOCSegDataLayer(caffe.Layer):
         #         self.split)
         split_f = self.split
         self.indices = open(split_f, 'r').read().splitlines()
+        print(self.split)
+        print(params['split'])
+        print(self.indices)
         self.idx = 0
 
         # make eval deterministic

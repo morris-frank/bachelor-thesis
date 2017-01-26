@@ -23,3 +23,6 @@ def make_net(callback_net, path='./'):
 
     with open(path + 'val.prototxt', 'w') as f:
         f.write(str(callback_net('val')))
+
+    # with open(path + 'deploy.prototxt', 'w') as f:
+    #     f.write(str(callback_net('deploy')))
