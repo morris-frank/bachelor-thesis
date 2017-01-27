@@ -1,0 +1,3 @@
+#!/bin/bash
+
+python runtrain.py 2>&1 | tee log.txt

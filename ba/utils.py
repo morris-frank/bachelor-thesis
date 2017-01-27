@@ -35,8 +35,8 @@ def query_boolean(question, default='yes'):
             print(choice)
             return valid[choice]
         else:
-            print('Please respond with 'yes' or 'no' '
-                  '(or 'y' or 'n').')
+            print('Please respond with "yes" or "no" '
+                  '(or "y" or "n").')
 
 
 def query_overwrite(path):

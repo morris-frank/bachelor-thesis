@@ -1,5 +1,5 @@
 import caffe
-import ba.ba.caffeine.surgery as surgery
+import ba.caffeine.surgery as surgery
 
 import numpy as np
 import os
@@ -22,14 +22,14 @@ solver = caffe.SGDSolver('data/models/fcn8s/solver.prototxt')
 solver.net.copy_from(weights)
 
 # surgeries
-interp_layers = [k for k in solver.net.params.keys() if 'up' in k]
-surgery.interp(solver.net, interp_layers)
+#interp_layers = [k for k in solver.net.params.keys() if 'up' in k]
+#surgery.interp(solver.net, interp_layers)
 
 # scoring
 # val = np.loadtxt('../data/segvalid11.txt', dtype=str)
 
-for _ in range(20):
-    solver.step(2)
+#for _ in range(20):
+#    solver.step(2)
 #    # score.seg_tests(solver, False, val, layer='score')
 #
-solver.snapshot()
+#solver.snapshot()

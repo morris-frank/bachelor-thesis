@@ -4,7 +4,7 @@ layer {
   top: "data"
   top: "label"
   python_param {
-    module: "ba.src.caffe.voc_layers"
+    module: "ba.caffeine.voc_layers"
     layer: "SBDDSegDataLayer"
     param_str: "{\'img_dir\': \'data/datasets/voc2010/JPEGImages/\', \'seed\': 1337, \'mean\': (124.93331, 135.89949, 143.3045), \'split\': \'data/datasets/pascalparts/train.txt\', \'label_dir\': \'data/datasets/pascalparts/Annotations_Part_Planes/lwing_rwing/\'}"
   }
