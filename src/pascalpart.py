@@ -177,7 +177,8 @@ class PascalPart(object):
             itemsave(bn + ext, self.segmentation)
         if parts:
             if sum:
-                sumOfParts = self.segmentation * 0
+                sumOfParts = next(iter(self.parts.values())) * 0
+                # sumOfParts = self.segmentation * 0
                 for part in self.parts:
                     sumOfParts += self.parts[part]
                 itemsave(bn + ext, sumOfParts)
@@ -188,8 +189,8 @@ class PascalPart(object):
     def get(self, part):
         if part in self.parts:
             return self.parts[part]
-        else:
-            return self.segmentation * 0
+        # else:
+        #     return self.segmentation * 0
 
     def reduce(self, parts=None):
         if parts is None or parts == []:
