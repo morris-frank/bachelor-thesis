@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 
 def reduceSaveCallback(imgid, params):
-    item = PascalPart(params['dir'] + imgid)
+    item = PascalPart(params['dir'] + imgid + '.mat')
     item.reduce(params['parts'])
     doparts = params['parts']
     if doparts:
@@ -193,8 +193,9 @@ class PascalPart(object):
         #     return self.segmentation * 0
 
     def reduce(self, parts=None):
-        if len(parts) > 1 and len(self.parts) > 1:
+        if len(parts) > 0 and len(self.parts) > 0:
             newparts = {}
             for part in parts:
-                newparts[part] = self.get(part)
+                if part in self.parts:
+                    newparts[part] = self.get(part)
             self.parts = newparts
