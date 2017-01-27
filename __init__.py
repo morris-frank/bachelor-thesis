@@ -1,2 +1,2 @@
-from .src import *
-import src.scripts as scripts
+from .ba import *
+import ba.scripts as scripts

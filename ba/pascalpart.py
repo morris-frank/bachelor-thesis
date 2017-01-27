@@ -1,5 +1,5 @@
-from .set import SetList
-from src.utils import query_overwrite, touch
+from ba.set import SetList
+import ba.utils
 from glob import glob
 import numpy as np
 import os.path
@@ -7,13 +7,13 @@ import scipy.io as sio
 from scipy.misc import imsave
 import tempfile
 from tqdm import tqdm
+from functools import partial
 
 
 def reduceSaveCallback(imgid, params):
     item = PascalPart(params['dir'] + imgid + '.mat')
     item.reduce(params['parts'])
-    doparts = params['parts']
-    if doparts:
+    if len(item.parts) > 0:
         item.source = params['parts_target'] + imgid
         item.save(image=True, parts=True, sum=True, segmentation=False)
     if params['class']:
@@ -24,15 +24,15 @@ def reduceSaveCallback(imgid, params):
 class PascalPartSet(object):
     """docstring for PascalPartSet."""
     builddir = 'data/models/tmp/'
-    targets = {}
-    rlist = None
-    clist = None
-    plist = None
     sourceext = '.mat'
 
     def __init__(self, tag_, dir_='.', parts_=[], classes_=[]):
         self.dir = dir_
         self.tag = tag_
+        self.targets = {}
+        self.rlist = None
+        self.clist = None
+        self.plist = None
         self.setParts(parts_)
         self.setClasses(classes_)
         self.genTargets()
@@ -66,7 +66,7 @@ class PascalPartSet(object):
             self.targets['classes_seg'] = segroot + '_'.join([''] + self.classes) + '/'
 
     def genRootList(self):
-        overwrite = query_overwrite(self.targets['root'])
+        overwrite = ba.utils.query_overwrite(self.targets['root'])
         self.rlist = SetList(self.targets['root'])
         if not overwrite:
             return self.rlist
@@ -86,8 +86,8 @@ class PascalPartSet(object):
             return False
         if not self.rlist:
             self.genRootList()
-        overwrite = query_overwrite(self.targets['classes'])
-        touch(self.targets['classes'], clear=overwrite)
+        overwrite = ba.utils.query_overwrite(self.targets['classes'])
+        ba.utils.touch(self.targets['classes'], clear=overwrite)
         self.clist = SetList(self.targets['classes'])
         if not overwrite:
             return self.clist
@@ -113,8 +113,8 @@ class PascalPartSet(object):
             rootlist = self.rlist
         else:
             rootlist = self.clist
-        overwrite = query_overwrite(self.targets['parts'])
-        touch(self.targets['parts'], clear=overwrite)
+        overwrite = ba.utils.query_overwrite(self.targets['parts'])
+        ba.utils.touch(self.targets['parts'], clear=overwrite)
         self.plist = SetList(self.targets['parts'])
         if not overwrite:
             return self.plist
@@ -131,26 +131,26 @@ class PascalPartSet(object):
 
     def saveSegmentations(self):
         doClasses = len(self.classes) > 0
-        touch(self.targets['parts_seg'])
+        ba.utils.touch(self.targets['parts_seg'])
         if doClasses:
-            touch(self.targets['classes_seg'])
+            ba.utils.touch(self.targets['classes_seg'])
             rootlist = self.clist
         else:
             rootlist = self.plist
-        params = {}
-        params['dir'] = self.dir
-        params['parts'] = self.parts
-        params['parts_target'] = self.targets['parts_seg']
-        params['class_target'] = self.targets['classes_seg']
-        params['class'] = doClasses
+        params_ = {}
+        params_['dir'] = self.dir
+        params_['parts'] = self.parts
+        params_['parts_target'] = self.targets['parts_seg']
+        params_['class_target'] = self.targets['classes_seg']
+        params_['class'] = doClasses
         print('Generating and extracting the segmentations...')
-        rootlist.each(lambda imgid, params=params: reduceSaveCallback(imgid, params))
+        rootlist.each(partial(reduceSaveCallback, params=params_))
 
 
 class PascalPart(object):
     """docstring for PascalPart."""
-    parts = {}
     def __init__(self, source=''):
+        self.parts = {}
         self.source = source
         if source != '':
             self.load()
@@ -186,16 +186,10 @@ class PascalPart(object):
                     # TODO(saveEach): What??? saving all on hte same imagE??
                     itemsave(bn + ext, self.parts[part])
 
-    def get(self, part):
-        if part in self.parts:
-            return self.parts[part]
-        # else:
-        #     return self.segmentation * 0
-
-    def reduce(self, parts=None):
+    def reduce(self, parts=[]):
+        newparts = {}
         if len(parts) > 0 and len(self.parts) > 0:
-            newparts = {}
             for part in parts:
                 if part in self.parts:
-                    newparts[part] = self.get(part)
-            self.parts = newparts
+                    newparts[part] = self.parts[part]
+        self.parts = newparts

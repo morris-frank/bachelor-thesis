@@ -1,8 +1,8 @@
-from .set import SetList
+from ba.set import SetList
 from PIL import Image
 from scipy.misc import imsave
 from tqdm import tqdm
-from . import caffeine
+import ba.caffeine
 import caffe
 import copy
 import numpy as np
@@ -13,11 +13,10 @@ import warnings
 
 class NetRunner(object):
     """docstring for NetRunner."""
-    epochs = 1
-    baselr = 1
 
     def __init__(self):
-        pass
+        self.epochs = 1
+        self.baselr = 1
 
     def createNet(self, model, weights, gpu):
         caffe.set_device(gpu)
@@ -55,13 +54,8 @@ class NetRunner(object):
 
 
 class FCNPartRunner(NetRunner):
-    samples = []
-    net_generator = caffeine.fcn.fcn8s
     builddir = 'data/models/tmp/'
-    imgdir = 'data/datasets/voc2010/JPEGImages/'
     results = 'data/results/'
-    weights = ''
-    target = {}
 
     def __init__(self, tag, traintxt, valtxt, samples=0, random=True):
         super().__init__()
@@ -69,6 +63,11 @@ class FCNPartRunner(NetRunner):
         self.random = random
         self.trainlist = SetList(traintxt)
         self.vallist = SetList(valtxt)
+        self.samples = []
+        self.net_generator = caffeine.fcn.fcn8s
+        self.imgdir = 'data/datasets/voc2010/JPEGImages/'
+        self.weights = ''
+        self.target = {}
         if self.random:
             self.vallist.shuffle()
         self.selectSamples(samples)

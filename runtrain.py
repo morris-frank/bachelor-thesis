@@ -1,5 +1,5 @@
 import caffe
-import ba.src.caffeine.surgery as surgery
+import ba.ba.caffeine.surgery as surgery
 
 import numpy as np
 import os
