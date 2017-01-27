@@ -6,7 +6,7 @@ from . import caffeine
 import caffe
 import copy
 import numpy as np
-import os.path
+import os
 import tempfile
 import warnings
 
@@ -112,8 +112,7 @@ class FCNPartRunner(NetRunner):
 
     def prepare(self):
         #Create build and snapshot direcotry:
-        if not os.path.exists(self.target['snapshots']):
-            os.makedirs(self.target['snapshots'])
+        os.makedirs(self.target['snapshots'], exist_ok=True)
         self.samples.save()
         self.vallist.target = self.target['valset']
         self.vallist.save()

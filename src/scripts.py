@@ -1,5 +1,5 @@
 from .netrunner import FCNPartRunner
-from .PascalPart import PascalPart
+from .pascalpart import PascalPart
 from .set import SetList
 from scipy.misc import imsave, imread
 from tqdm import tqdm
@@ -35,10 +35,10 @@ def reduceSavePascalPart(path):
     pp.save(image=True, parts=True, sum=True)
 
 
-def genPlaneWingList():
-    flist = SetList('data/datasets/pascalparts/set.txt')
-    flist.addPreSuffix('data/datasets/pascalparts/Annotations_Part/', '.mat')
-    lwlist = flist.genPartList('aeroplane', ['lwing', 'rwing'])
-    lwlist.rmPreSuffix('data/datasets/pascalparts/Annotations_Part/', '.mat')
-    lwlist.save()
-    return lwlist
+# def genPlaneWingList():
+#     flist = SetList('data/datasets/pascalparts/set.txt')
+#     flist.addPreSuffix('data/datasets/pascalparts/Annotations_Part/', '.mat')
+#     lwlist = flist.genPartList('aeroplane', ['lwing', 'rwing'])
+#     lwlist.rmPreSuffix('data/datasets/pascalparts/Annotations_Part/', '.mat')
+#     lwlist.save()
+#     return lwlist

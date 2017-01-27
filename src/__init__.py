@@ -1,4 +1,5 @@
 from . import caffeine
 from .netrunner import FCNPartRunner
-from .PascalPart import PascalPart
+from .pascalpart import PascalPart
+from .pascalpart import PascalPartSet
 from .set import SetList
