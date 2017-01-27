@@ -10,12 +10,13 @@ from tqdm import tqdm
 
 
 def reduceSaveCallback(imgid, params):
-    item = PascalPart(params['dir'] + imgid + params['sourceext'])
+    item = PascalPart(params['dir'] + imgid)
     item.reduce(params['parts'])
     doparts = params['parts']
     if doparts:
         item.source = params['parts_target'] + imgid
-        item.save(image=True, parts=True, sum=True, segmentation=False)
+        if item.parts != {}:
+            item.save(image=True, parts=True, sum=True, segmentation=False)
     if params['class']:
         item.source = params['class_target'] + imgid
         item.save(image=True, parts=False, sum=False, segmentation=True)
@@ -54,7 +55,7 @@ class PascalPartSet(object):
 
     def genTargets(self):
         txtroot = self.builddir + self.tag
-        segroot = self.dir + self.tag
+        segroot = self.builddir + 'segmentations/' + self.tag
         self.targets['root'] = txtroot + '.txt'
         self.targets['parts'] = self.targets['root']
         self.targets['classes'] = self.targets['root']
@@ -139,7 +140,6 @@ class PascalPartSet(object):
             rootlist = self.plist
         params = {}
         params['dir'] = self.dir
-        params['sourceext'] = self.sourceext
         params['parts'] = self.parts
         params['parts_target'] = self.targets['parts_seg']
         params['class_target'] = self.targets['classes_seg']
@@ -150,6 +150,7 @@ class PascalPartSet(object):
 
 class PascalPart(object):
     """docstring for PascalPart."""
+    parts = {}
     def __init__(self, source=''):
         self.source = source
         if source != '':
@@ -164,7 +165,6 @@ class PascalPart(object):
             return False
         self.classname = mat[0][0]
         self.segmentation = mat[2].astype('float')
-        self.parts = {}
         if mat[3].size and mat[3][0].size:
             for part in mat[3][0]:
                 self.parts[part[0][0]] = part[1].astype('float')
