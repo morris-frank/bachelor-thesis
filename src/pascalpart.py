@@ -83,7 +83,7 @@ class PascalPartSet(object):
 
     def genClassList(self):
         if self.classes == []:
-            return
+            return False
         if not self.rlist:
             self.genRootList()
         overwrite = query_overwrite(self.targets['classes'])
@@ -104,7 +104,7 @@ class PascalPartSet(object):
 
     def genPartList(self):
         if self.parts == []:
-            return
+            return False
         if not self.rlist:
             self.genRootList()
         if not self.clist:
@@ -193,9 +193,8 @@ class PascalPart(object):
         #     return self.segmentation * 0
 
     def reduce(self, parts=None):
-        if len(parts) < 1 or len(self.parts) < 1:
-            return
-        newparts = {}
-        for part in parts:
-            newparts[part] = self.get(part)
-        self.parts = newparts
+        if len(parts) > 1 and len(self.parts) > 1:
+            newparts = {}
+            for part in parts:
+                newparts[part] = self.get(part)
+            self.parts = newparts
