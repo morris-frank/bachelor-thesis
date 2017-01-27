@@ -183,7 +183,7 @@ class PascalPart(object):
                 itemsave(bn + ext, sumOfParts)
             else:
                 for part in self.parts:
-                    # TODO: What??? saving all on hte same imagE??
+                    # TODO(saveEach): What??? saving all on hte same imagE??
                     itemsave(bn + ext, self.parts[part])
 
     def get(self, part):
@@ -193,7 +193,9 @@ class PascalPart(object):
         #     return self.segmentation * 0
 
     def reduce(self, parts=None):
-        if parts is None or len(parts) < 1:
+        if parts is None
+           or len(parts) < 1
+           or len(self.parts) < 1:
             return
         newparts = {}
         for part in parts:
