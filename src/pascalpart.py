@@ -193,9 +193,7 @@ class PascalPart(object):
         #     return self.segmentation * 0
 
     def reduce(self, parts=None):
-        if parts is None
-           or len(parts) < 1
-           or len(self.parts) < 1:
+        if len(parts) < 1 or len(self.parts) < 1:
             return
         newparts = {}
         for part in parts:
