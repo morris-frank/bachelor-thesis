@@ -9,6 +9,18 @@ import tempfile
 from tqdm import tqdm
 
 
+def reduceSaveCallback(imgid, params):
+    item = PascalPart(params['dir'] + imgid + params['sourceext'])
+    item.reduce(params['parts'])
+    doparts = params['parts']
+    if doparts:
+        item.source = params['parts_target'] + imgid
+        item.save(image=True, parts=True, sum=True, segmentation=False)
+    if params['class']:
+        item.source = params['class_target'] + imgid
+        item.save(image=True, parts=False, sum=False, segmentation=True)
+
+
 class PascalPartSet(object):
     """docstring for PascalPartSet."""
     builddir = 'data/models/tmp/'
@@ -47,11 +59,11 @@ class PascalPartSet(object):
         self.targets['parts'] = self.targets['root']
         self.targets['classes'] = self.targets['root']
         if self.parts is not None:
-            self.targets['parts'] = txtroot + '_'.join([''] + self.parts) + '.txt'
-            self.targets['parts_seg'] = segroot + '_'.join([''] + self.parts) + '/'
+            self.targets['parts'] = txtroot + '_'.join([''] + self.classes + self.parts) + '.txt'
+            self.targets['parts_seg'] = segroot + '_'.join([''] + self.classes + self.parts) + '/'
         if self.classes is not None:
             self.targets['classes'] = txtroot + '_'.join([''] + self.classes) + '.txt'
-            self.targets['classes_seg'] = segroot + '_'.join([''] + self.parts) + '/'
+            self.targets['classes_seg'] = segroot + '_'.join([''] + self.classes) + '/'
 
     def genRootList(self):
         overwrite = query_overwrite(self.targets['root'])
@@ -95,43 +107,45 @@ class PascalPartSet(object):
             return
         if not self.rlist:
             self.genRootList()
+        if not self.clist:
+            self.genClassList()
+        if self.classes == []:
+            rootlist = self.rlist
+        else:
+            rootlist = self.clist
         overwrite = query_overwrite(self.targets['parts'])
         touch(self.targets['parts'], clear=overwrite)
         self.plist = SetList(self.targets['parts'])
         if not overwrite:
             return self.plist
-        self.rlist.addPreSuffix(self.dir, self.sourceext)
+        rootlist.addPreSuffix(self.dir, self.sourceext)
         print('Generating PartList {}...'.format(self.targets['parts']))
-        for row in tqdm(self.rlist.list):
+        for row in tqdm(rootlist.list):
             item = PascalPart(row)
             if any(part in item.parts for part in self.parts):
                 self.plist.list.append(row)
-        self.rlist.rmPreSuffix(self.dir, self.sourceext)
+        rootlist.rmPreSuffix(self.dir, self.sourceext)
         self.plist.rmPreSuffix(self.dir, self.sourceext)
         self.plist.save()
         return self.plist
 
     def saveSegmentations(self):
         doClasses = len(self.classes) > 0
-        doParts = len(self.parts) > 0
+        touch(self.targets['parts_seg'])
         if doClasses:
-            os.makedirs(self.target['classes_seg'], exist_ok=True)
-            self.clist.each(self.reduceSaveClassCallback)
-        if doParts:
-            os.makedirs(self.target['parts_seg'], exist_ok=True)
-            self.plist.each(self.reduceSavePartCallback)
-
-    def reduceSavePartCallback(imgid, parts_):
-        item = PascalPart(self.dir + imgid + self.sourceext)
-        item.reduce(parts_)
-        item.source = self.target['parts_seg'] + imgid
-        item.save(image=False, parts=True, sum=True)
-
-    def reduceSaveClassCallback(imgid, parts_):
-        item = PascalPart(self.dir + imgid + self.sourceext)
-        item.reduce(parts_)
-        item.source = self.target['classes_seg'] + imgid
-        item.save(image=True, parts=False, sum=False)
+            touch(self.targets['classes_seg'])
+            rootlist = self.clist
+        else:
+            rootlist = self.plist
+        params = {}
+        params['dir'] = self.dir
+        params['sourceext'] = self.sourceext
+        params['parts'] = self.parts
+        params['parts_target'] = self.targets['parts_seg']
+        params['class_target'] = self.targets['classes_seg']
+        params['class'] = doClasses
+        print('Generating and extracting the segmentations...')
+        rootlist.each(lambda imgid, params=params: reduceSaveCallback(imgid, params))
 
 
 class PascalPart(object):
@@ -177,7 +191,9 @@ class PascalPart(object):
         else:
             return self.segmentation * 0
 
-    def reduce(self, parts):
+    def reduce(self, parts=None):
+        if parts is None or parts == []:
+            return
         newparts = {}
         for part in parts:
             newparts[part] = self.get(part)

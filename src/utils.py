@@ -45,6 +45,7 @@ def query_overwrite(path):
 
 def touch(path, clear=False):
    os.makedirs(os.path.dirname(path), exist_ok=True)
-   open(path, 'a').close()
-   if clear:
-       open(path, 'w').close()
+   if not os.path.isdir(path):
+       open(path, 'a').close()
+       if clear:
+           open(path, 'w').close()
