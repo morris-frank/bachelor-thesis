@@ -1,4 +1,5 @@
 from .set import SetList
+from src.utils import query_overwrite, touch
 from glob import glob
 import numpy as np
 import os.path
@@ -22,7 +23,7 @@ class PascalPartSet(object):
         self.tag = tag_
         self.setParts(parts_)
         self.setClasses(classes_)
-        self.targets()
+        self.genTargets()
         self.genRootList()
         self.genClassList()
         self.genPartList()
@@ -39,20 +40,24 @@ class PascalPartSet(object):
         else:
             self.classes = classes_
 
-    def targets(self):
+    def genTargets(self):
         txtroot = self.builddir + self.tag
         segroot = self.dir + self.tag
         self.targets['root'] = txtroot + '.txt'
         self.targets['parts'] = self.targets['root']
         self.targets['classes'] = self.targets['root']
         if self.parts is not None:
-            self.targets['parts'] = txtroot + '_'.join(self.parts) + '.txt
-            self.targets['parts_seg'] = segroot + '_'.join(self.parts) + '/'
+            self.targets['parts'] = txtroot + '_'.join([''] + self.parts) + '.txt'
+            self.targets['parts_seg'] = segroot + '_'.join([''] + self.parts) + '/'
         if self.classes is not None:
-            self.targets['classes'] = txtroot + '_'.join(self.classes) + '.txt
-            self.targets['classes_seg'] = segroot + '_'.join(self.parts) + '/'
+            self.targets['classes'] = txtroot + '_'.join([''] + self.classes) + '.txt'
+            self.targets['classes_seg'] = segroot + '_'.join([''] + self.parts) + '/'
 
     def genRootList(self):
+        overwrite = query_overwrite(self.targets['root'])
+        self.rlist = SetList(self.targets['root'])
+        if not overwrite:
+            return self.rlist
         # Get most prominent extension:
         exts = [os.path.splitext(x)[1][1:] for x in glob(self.dir + '*')]
         exts = [x for x in exts if x]
@@ -60,7 +65,6 @@ class PascalPartSet(object):
         files = glob(self.dir + '*' + self.ext)
         # Remove path and extension:
         files = [row[len(self.dir):-len(self.sourceext)] for row in files]
-        self.rlist = SetList(self.targets['root'])
         self.rlist.list = files
         self.rlist.save()
         return self.rlist
@@ -70,12 +74,18 @@ class PascalPartSet(object):
             return
         if not self.rlist:
             self.genRootList()
+        overwrite = query_overwrite(self.targets['classes'])
+        touch(self.targets['classes'], clear=overwrite)
         self.clist = SetList(self.targets['classes'])
-        self.clist.addPreSuffix(self.dir, self.sourceext)
-        for row in tqdm(self.rlist):
+        if not overwrite:
+            return self.clist
+        self.rlist.addPreSuffix(self.dir, self.sourceext)
+        print('Generating ClassList {}...'.format(self.targets['classes']))
+        for row in tqdm(self.rlist.list):
             item = PascalPart(row)
             if item.classname in self.classes:
-                self.clist.content.append(row)
+                self.clist.list.append(row)
+        self.rlist.rmPreSuffix(self.dir, self.sourceext)
         self.clist.rmPreSuffix(self.dir, self.sourceext)
         self.clist.save()
         return self.clist
@@ -85,12 +95,18 @@ class PascalPartSet(object):
             return
         if not self.rlist:
             self.genRootList()
+        overwrite = query_overwrite(self.targets['parts'])
+        touch(self.targets['parts'], clear=overwrite)
         self.plist = SetList(self.targets['parts'])
-        self.plist.addPreSuffix(self.dir, self.sourceext)
-        for row in tqdm(self.rlist):
+        if not overwrite:
+            return self.plist
+        self.rlist.addPreSuffix(self.dir, self.sourceext)
+        print('Generating PartList {}...'.format(self.targets['parts']))
+        for row in tqdm(self.rlist.list):
             item = PascalPart(row)
             if any(part in item.parts for part in self.parts):
-                self.plist.content.append(row)
+                self.plist.list.append(row)
+        self.rlist.rmPreSuffix(self.dir, self.sourceext)
         self.plist.rmPreSuffix(self.dir, self.sourceext)
         self.plist.save()
         return self.plist

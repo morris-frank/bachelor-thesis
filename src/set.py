@@ -1,10 +1,10 @@
-import os.path
-from .pascalpart import PascalPart
+import os
 from tqdm import tqdm
 import numpy as np
 import warnings
 from scipy.misc import imread
 from random import shuffle
+from src.utils import touch
 
 
 class SetList(object):
@@ -22,9 +22,9 @@ class SetList(object):
         return len(self.list)
 
     def load(self):
-        open(self.source, 'a').close()
+        touch(self.source)
         with open(self.source) as f:
-            self.list = [l for l in f.readlines() if l.strip()]
+            self.list = [l[:-1] for l in f.readlines() if l.strip()]
 
     def save(self):
         with open(self.target, 'w') as f:

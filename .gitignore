@@ -20,3 +20,4 @@ data/results/
 *snapshot*
 *.pkl
 *.mat
+*tmp/
