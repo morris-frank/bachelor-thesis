@@ -7,6 +7,7 @@ import caffe
 import copy
 import numpy as np
 import os
+import sys
 import tempfile
 import warnings
 
@@ -59,7 +60,7 @@ class FCNPartRunner(NetRunner):
     builddir = 'data/models/tmp/'
     imgdir = 'data/datasets/voc2010/JPEGImages/'
     results = 'data/results/'
-    weights = 'data/models/fcn8s/fcn8s-heavy-pascal.caffemodel'
+    weights = ''
     target = {}
 
     def __init__(self, tag, traintxt, valtxt, samples=0, random=True):
@@ -70,11 +71,6 @@ class FCNPartRunner(NetRunner):
         self.vallist = SetList(valtxt)
         if self.random:
             self.vallist.shuffle()
-        self.targets()
-        if samples > len(self.trainlist):
-            warnings.Warning('More samples selected then possible...')
-            samples = len(self.trainlist)
-        samples = len(self.trainlist) if samples < 1 else samples
         self.selectSamples(samples)
 
     def targets(self, builddir=None):
@@ -90,11 +86,14 @@ class FCNPartRunner(NetRunner):
         return
 
     def selectSamples(self, count):
+        if count > len(self.trainlist) or count < 1:
+            warnings.Warning('More samples selected then possible...\n'
+                             'Or less then one sample -> now doing all...')
+            count = len(self.trainlist)
         self.samples = copy.copy(self.trainlist)
         if self.random:
             self.samples.shuffle()
         self.samples.list = self.samples.list[:count]
-        self.samples.target = self.target['trainset']
 
     def FCNparams(self, split):
         params = []
@@ -111,8 +110,11 @@ class FCNPartRunner(NetRunner):
             f.write(str(self.net_generator(self.FCNparams(split))))
 
     def prepare(self):
+        if self.target == {}:
+            self.targets()
         #Create build and snapshot direcotry:
         os.makedirs(self.target['snapshots'], exist_ok=True)
+        self.samples.target = self.target['trainset']
         self.samples.save()
         self.vallist.target = self.target['valset']
         self.vallist.save()
@@ -129,8 +131,8 @@ class FCNPartRunner(NetRunner):
                 "test_net: '" + val_net + "\n"
                 "test_iter: " + len(self.trainlist) + "\n"
                 "test_interval: " + 99999999999 + "\n"
-                "display: 100\n"
-                "average_loss: 20\n"
+                "display: " + len(self.trainlist) + "\n"
+                "average_loss: " + len(self.trainlist) + "\n"
                 "lr_policy: 'fixed'\n"
                 "base_lr: " + str(self.baselr) + "\n"
                 "momentum: 0.99\n"
