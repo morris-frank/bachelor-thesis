@@ -9,6 +9,7 @@ __pycache__/
 build/
 lib/
 .venv/
+.idea/
 
 
 # Extra thesis stuff
