@@ -15,8 +15,7 @@ def reduceSaveCallback(imgid, params):
     doparts = params['parts']
     if doparts:
         item.source = params['parts_target'] + imgid
-        if item.parts != {}:
-            item.save(image=True, parts=True, sum=True, segmentation=False)
+        item.save(image=True, parts=True, sum=True, segmentation=False)
     if params['class']:
         item.source = params['class_target'] + imgid
         item.save(image=True, parts=False, sum=False, segmentation=True)
@@ -175,7 +174,7 @@ class PascalPart(object):
         ext = '.png' if image else ''
         if segmentation:
             itemsave(bn + ext, self.segmentation)
-        if parts:
+        if parts and len(self.parts) > 0:
             if sum:
                 sumOfParts = next(iter(self.parts.values())) * 0
                 # sumOfParts = self.segmentation * 0
@@ -184,6 +183,7 @@ class PascalPart(object):
                 itemsave(bn + ext, sumOfParts)
             else:
                 for part in self.parts:
+                    # TODO: What??? saving all on hte same imagE??
                     itemsave(bn + ext, self.parts[part])
 
     def get(self, part):
@@ -193,7 +193,7 @@ class PascalPart(object):
         #     return self.segmentation * 0
 
     def reduce(self, parts=None):
-        if parts is None or parts == []:
+        if parts is None or len(parts) < 1:
             return
         newparts = {}
         for part in parts:
