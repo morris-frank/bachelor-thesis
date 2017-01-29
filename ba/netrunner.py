@@ -64,7 +64,7 @@ class FCNPartRunner(NetRunner):
         self.trainlist = SetList(traintxt)
         self.vallist = SetList(valtxt)
         self.samples = []
-        self.net_generator = caffeine.fcn.fcn8s
+        self.net_generator = ba.caffeine.fcn.fcn8s
         self.imgdir = 'data/datasets/voc2010/JPEGImages/'
         self.weights = ''
         self.target = {}
@@ -148,7 +148,7 @@ class FCNPartRunner(NetRunner):
         self.prepare()
         self.createSolver(self.target['solver'], self.weights, self.gpu)
         interp_layers = [k for k in solver.net.params.keys() if 'up' in k]
-        caffeine.surgery.interp(self.solver.net, interp_layers)
+        ba.caffeine.surgery.interp(self.solver.net, interp_layers)
         for _ in range(self.epochs):
             solver.step(len(self.samples))
         self.solver.snapshot()
