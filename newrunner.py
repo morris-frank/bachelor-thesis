@@ -4,7 +4,7 @@ import ba.caffeine.fcn
 
 sourcedir = 'data/datasets/pascalparts/Annotations_Part/'
 
-ppset = ba.PascalPartSet('pascpart', sourcedir, 'tail', 'aeroplane')
+ppset = ba.PascalPartSet('pascpart', sourcedir, 'stern', 'aeroplane')
 ppset.saveSegmentations()
 
 traintxt = ppset.targets['parts']

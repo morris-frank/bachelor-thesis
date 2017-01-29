@@ -10,6 +10,7 @@ import os
 import sys
 from functools import partial
 import tempfile
+import ba.utils
 import warnings
 
 
@@ -36,6 +37,7 @@ class NetRunner(object):
 
     def loadimg(self, path, mean):
         im = Image.open(path)
+        self.tmpim = im
         in_ = np.array(im, dtype=np.float32)
         in_ = in_[:, :, ::-1]
         in_ -= np.array(mean)
@@ -101,8 +103,10 @@ class FCNPartRunner(NetRunner):
         params['label_dir'] = self.labeldir
         params['splitfile'] = self.target[split + 'set']
         if not self.samples.mean:
+            print('Calcultaing mean..')
             self.samples.calculate_mean()
         params['mean'] = self.samples.mean
+        np.save(self.target['dir'] + 'mean.npy', self.samples.mean)
         return params
 
     def write(self, split):
@@ -113,7 +117,7 @@ class FCNPartRunner(NetRunner):
         if self.target == {}:
             self.targets()
         # Create build and snapshot direcotry:
-        os.makedirs(self.target['snapshots'], exist_ok=True)
+        ba.utils.touch(self.target['snapshots'])
         if 'train' in split:
             self.samples.target = self.target['trainset']
             self.samples.save()
@@ -176,11 +180,17 @@ class FCNPartRunner(NetRunner):
                 return
         self.prepare('deploy')
         self.createNet(self.target['deploy'], self.weights, self.gpu)
+        ba.utils.touch(self.target['segmentations'])
+        ba.utils.touch(self.target['heatmaps'])
         print('Forwarding all in {}'.format(list_))
         for idx in tqdm(self.list.list):
             bn = os.path.splitext(idx)[0]
+            bn_seg = self.target['segmentations'] + bn
+            bn_hm = self.target['heatmaps'] + bn
             self.forward(self.loadimg(idx))
             score = self.net.blobs['score'].data[0][1,...]
             heatmap = self.net.blobs[heatmaplayer].data[0][1,...]
-            imsave(self.target['segmentations'] + bn + '.png', score)
-            imsave(self.target['heatmaps'] + bn + '.png', heatmap)
+            imsave(bn_seg + '.png', score)
+            imsave(bn_hm + '.png', heatmap)
+            ba.utils.apply_overlay(self.tmpim, score, bn_seg + '_overlay.png')
+            ba.utils.apply_overlay(self.tmpim, score, bn_hm + '_overlay.png')
