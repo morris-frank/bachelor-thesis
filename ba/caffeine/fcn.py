@@ -13,22 +13,12 @@ def fcn8s(params):
     nclasses = 2
     n = caffe.NetSpec()
     splitfile = params['splitfile']
-    # splitfile = 'data/datasets/pascalparts/' + split + '.txt'
-    # Old mean
-    # 104.00699, 116.66877, 122.67892
-    # (124.93331, 135.89949, 143.30450)
     pydata_params = dict(split=splitfile, mean=params['mean'],
         seed=1337)
-    if 'train' in splitfile:
-        pydata_params['img_dir'] = params['img_dir']
-        pydata_params['label_dir'] = params['label_dir']
-        pylayer = 'SBDDSegDataLayer'
-        n.data, n.label = L.Python(module='ba.src.caffe.voc_layers', layer=pylayer,
-        ntop=2, param_str=str(pydata_params))
-    elif 'val' in splitfile:
-        pydata_params['img_dir'] = params['img_dir']
-        pydata_params['label_dir'] = params['label_dir']
-        pylayer = 'VOCSegDataLayer'
+    pylayer = 'SegDataLayer'
+    pydata_params['img_dir'] = params['img_dir']
+    pydata_params['label_dir'] = params['label_dir']
+    if 'train' in splitfile or 'var' in splitfile:
         n.data, n.label = L.Python(module='ba.src.caffe.voc_layers', layer=pylayer,
         ntop=2, param_str=str(pydata_params))
     else:
