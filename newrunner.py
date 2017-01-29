@@ -16,3 +16,5 @@ fcn.net_generator = ba.caffeine.fcn.fcn8s
 fcn.baselr = 10e-4
 fcn.prepare() # ?? Everythong alright then continue....
 fcn.train()
+
+fcn.solver = Null

@@ -8,8 +8,10 @@ import copy
 import numpy as np
 import os
 import sys
+from functools import partial
 import tempfile
 import warnings
+
 
 class NetRunner(object):
     """docstring for NetRunner."""
@@ -35,9 +37,9 @@ class NetRunner(object):
     def loadimg(self, path, mean):
         im = Image.open(path)
         in_ = np.array(im, dtype=np.float32)
-        in_ = in_[:,:,::-1]
+        in_ = in_[:, :, ::-1]
         in_ -= np.array(mean)
-        in_ = in_.transpose((2,0,1))
+        in_ = in_.transpose((2, 0, 1))
         return in_
 
     def forward(self, in_):
@@ -46,11 +48,6 @@ class NetRunner(object):
         # run net and take argmax for prediction
         self.net.forward()
         return self.net.blobs['score'].data[0].argmax(axis=0)
-
-    def forwardList(self, postfix=''):
-        for i in tqdm(self.list.list):
-            o = self.forward(self.loadimg(i))
-            imsave(i + postfix + '.out.png', o)
 
 
 class FCNPartRunner(NetRunner):
@@ -76,12 +73,16 @@ class FCNPartRunner(NetRunner):
         if builddir is None:
             builddir = self.builddir
         self.target['dir'] = os.path.normpath(builddir + '/' + tag) + '/'
+        self.target['outdir'] = os.path.normpath(self.results + '/' + tag) + '/'
         self.target['snapshots'] = self.target['dir'] + 'snapshots/'
         self.target['solver'] = self.target['dir'] + 'solver.prototxt/'
         self.target['train'] = self.target['dir'] + 'train.prototxt/'
         self.target['val'] = self.target['dir'] + 'val.prototxt/'
+        self.target['deploy'] = self.target['dir'] + 'deploy.prototxt/'
         self.target['trainset'] = self.target['dir'] + 'train.txt/'
         self.target['valset'] = self.target['dir'] + 'val.txt/'
+        self.target['segmentations'] = self.target['outdir'] + 'segmentations/'
+        self.target['heatmaps'] = self.target['outdir'] + 'heatmaps/'
         return
 
     def selectSamples(self, count):
@@ -108,18 +109,21 @@ class FCNPartRunner(NetRunner):
         with open(self.target[split], 'w') as f:
             f.write(str(self.net_generator(self.FCNparams(split))))
 
-    def prepare(self):
+    def prepare(self, split='train_test_deploy'):
         if self.target == {}:
             self.targets()
-        #Create build and snapshot direcotry:
+        # Create build and snapshot direcotry:
         os.makedirs(self.target['snapshots'], exist_ok=True)
-        self.samples.target = self.target['trainset']
-        self.samples.save()
-        self.vallist.target = self.target['valset']
-        self.vallist.save()
-        self.write('train')
-        self.write('val')
-        self.writeSolver()
+        if 'train' in split:
+            self.samples.target = self.target['trainset']
+            self.samples.save()
+            self.write('train')
+        if 'test' in split:
+            self.vallist.target = self.target['valset']
+            self.vallist.save()
+            self.write('val')
+        if 'deploy' in split:
+            self.write('deploy')
 
     def writeSolver(self):
         train_net = self.target['train']
@@ -145,10 +149,38 @@ class FCNPartRunner(NetRunner):
             ))
 
     def train(self):
-        self.prepare()
+        self.prepare('train')
+        self.writeSolver()
         self.createSolver(self.target['solver'], self.weights, self.gpu)
         interp_layers = [k for k in solver.net.params.keys() if 'up' in k]
         ba.caffeine.surgery.interp(self.solver.net, interp_layers)
         for _ in range(self.epochs):
             solver.step(len(self.samples))
         self.solver.snapshot()
+
+    def test(self):
+        self.prepare('test')
+        pass
+
+    def forwardList(self, list_=None, mean=None, heatmaplayer='upscore8_'):
+        if list_ is None:
+            self.list = self.vallist
+            list_  = self.vallist.source
+        else:
+            self.addListFile(list_)
+        if mean is None:
+            if self.samples.mean != []:
+                print('Using mean from samples')
+            else:
+                print('No mean.....')
+                return
+        self.prepare('deploy')
+        self.createNet(self.target['deploy'], self.weights, self.gpu)
+        print('Forwarding all in {}'.format(list_))
+        for idx in tqdm(self.list.list):
+            bn = os.path.splitext(idx)[0]
+            self.forward(self.loadimg(idx))
+            score = self.net.blobs['score'].data[0][1,...]
+            heatmap = self.net.blobs[heatmaplayer].data[0][1,...]
+            imsave(self.target['segmentations'] + bn + '.png', score)
+            imsave(self.target['heatmaps'] + bn + '.png', heatmap)
