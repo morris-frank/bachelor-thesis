@@ -1,5 +1,28 @@
 import os.path
 import sys
+import matplotlib as mpl
+mpl.use('Agg')
+import matplotlib.pyplot as plt
+
+
+def apply_overlay(image, overlay, path, label=''):
+    '''Overlay overlay onto image and add label as text
+    and save to path (full path with extension!)
+
+    Args:
+        image (image): The image to use as 'background'.
+        overlay (image): The image to overly over the image.
+        path (str): The path to save the result to.
+        label (str, optional): A label for the heatmap. 
+    '''
+    fig = plt.figure(frameon=False)
+    plt.imshow(image, interpolation='none')
+    plt.imshow(overlay, cmap='plasma', alpha=0.7, interpolation='none')
+    if label != '':
+        red_patch = mpatches.Patch(color='yellow', label=label)
+        plt.legend(handles=[red_patch])
+    fig.savefig(path)
+    plt.close(fig)
 
 
 def query_boolean(question, default='yes'):
