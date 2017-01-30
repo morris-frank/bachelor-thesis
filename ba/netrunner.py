@@ -3,6 +3,7 @@ from PIL import Image
 from scipy.misc import imsave
 from tqdm import tqdm
 import ba.caffeine
+import ba.caffeine.surgery
 import caffe
 import copy
 import numpy as np
@@ -30,7 +31,7 @@ class NetRunner(object):
         caffe.set_device(gpu)
         caffe.set_mode_gpu()
         self.solver = caffe.SGDSolver(solverpath)
-        solver.net.copy_from(weights)
+        self.solver.net.copy_from(weights)
 
     def addListFile(self, fpath):
         self.list = SetList(fpath)
@@ -53,7 +54,7 @@ class NetRunner(object):
 
 
 class FCNPartRunner(NetRunner):
-    builddir = 'data/models/tmp/'
+    builddir = 'data/models/'
     results = 'data/results/'
 
     def __init__(self, tag, traintxt, valtxt, samples=0, random=True):
@@ -74,23 +75,24 @@ class FCNPartRunner(NetRunner):
     def targets(self, builddir=None):
         if builddir is None:
             builddir = self.builddir
-        self.target['dir'] = os.path.normpath(builddir + '/' + tag) + '/'
-        self.target['outdir'] = os.path.normpath(self.results + '/' + tag) + '/'
+        self.target['dir'] = os.path.normpath(builddir + '/' + self.name) + '/'
+        self.target['outdir'] = os.path.normpath(self.results + '/' + self.name) + '/'
         self.target['snapshots'] = self.target['dir'] + 'snapshots/'
-        self.target['solver'] = self.target['dir'] + 'solver.prototxt/'
-        self.target['train'] = self.target['dir'] + 'train.prototxt/'
-        self.target['val'] = self.target['dir'] + 'val.prototxt/'
-        self.target['deploy'] = self.target['dir'] + 'deploy.prototxt/'
-        self.target['trainset'] = self.target['dir'] + 'train.txt/'
-        self.target['valset'] = self.target['dir'] + 'val.txt/'
+        self.target['solver'] = self.target['dir'] + 'solver.prototxt'
+        self.target['train'] = self.target['dir'] + 'train.prototxt'
+        self.target['val'] = self.target['dir'] + 'val.prototxt'
+        self.target['deploy'] = self.target['dir'] + 'deploy.prototxt'
+        self.target['trainset'] = self.target['dir'] + 'train.txt'
+        self.target['valset'] = self.target['dir'] + 'val.txt'
+        self.target['deployset'] = self.target['dir'] + 'deploytest.txt'
         self.target['segmentations'] = self.target['outdir'] + 'segmentations/'
         self.target['heatmaps'] = self.target['outdir'] + 'heatmaps/'
         return
 
     def selectSamples(self, count):
         if count > len(self.trainlist) or count < 1:
-            warnings.Warning('More samples selected then possible...\n'
-                             'Or less then one sample -> now doing all...')
+            warnings.warn('More samples selected then possible...\n'
+                          'Or less then one sample -> now doing all...')
             count = len(self.trainlist)
         self.samples = copy.copy(self.trainlist)
         if self.random:
@@ -98,14 +100,15 @@ class FCNPartRunner(NetRunner):
         self.samples.list = self.samples.list[:count]
 
     def FCNparams(self, split):
-        params = []
+        params = {}
         params['img_dir'] = self.imgdir
         params['label_dir'] = self.labeldir
         params['splitfile'] = self.target[split + 'set']
-        if not self.samples.mean:
-            print('Calcultaing mean..')
+        self.samples.addPreSuffix(self.imgdir, '.jpg')
+        if self.samples.mean == []:
             self.samples.calculate_mean()
-        params['mean'] = self.samples.mean
+        self.samples.rmPreSuffix(self.imgdir, '.jpg')
+        params['mean'] = tuple(self.samples.mean)
         np.save(self.target['dir'] + 'mean.npy', self.samples.mean)
         return params
 
@@ -132,23 +135,24 @@ class FCNPartRunner(NetRunner):
     def writeSolver(self):
         train_net = self.target['train']
         val_net = self.target['val']
+        prefix = self.target['snapshots'] + 'train'
+        avloss = np.min([20, len(self.trainlist)])
         with open(self.target['solver'], 'w') as f:
             f.write((
-                "train_net: '" + train_net + "\n"
-                "test_net: '" + val_net + "\n"
-                "test_iter: " + len(self.trainlist) + "\n"
-                "test_interval: " + 99999999999 + "\n"
-                "display: " + len(self.trainlist) + "\n"
-                "average_loss: " + len(self.trainlist) + "\n"
+                "train_net: '" + train_net + "'\n"
+                "test_net: '" + val_net + "'\n"
+                "test_iter: " + str(len(self.trainlist)) + "\n"
+                "test_interval: " + str(999999) + "\n"
+                "display: " + str(avloss) + "\n"
+                "average_loss: " + str(avloss) + "\n"
                 "lr_policy: 'fixed'\n"
                 "base_lr: " + str(self.baselr) + "\n"
                 "momentum: 0.99\n"
-                "iter_size: 1"
+                "iter_size: 1\n"
                 "max_iter: 100000\n"
                 "weight_decay: 0.0005\n"
-                "snapshot: " + len(self.trainlist) + "\n"
-                "snapshot_prefix: "
-                "'" + self.target['snapshots'] + "train" + "'\n"
+                "snapshot: " + str(len(self.trainlist)) + "\n"
+                "snapshot_prefix: '" + str(prefix) + "'\n"
                 "test_initialization: false\n"
             ))
 
@@ -156,41 +160,41 @@ class FCNPartRunner(NetRunner):
         self.prepare('train')
         self.writeSolver()
         self.createSolver(self.target['solver'], self.weights, self.gpu)
-        interp_layers = [k for k in solver.net.params.keys() if 'up' in k]
+        interp_layers = [k for k in self.solver.net.params.keys() if 'up' in k]
         ba.caffeine.surgery.interp(self.solver.net, interp_layers)
         for _ in range(self.epochs):
-            solver.step(len(self.samples))
+            self.solver.step(len(self.samples))
         self.solver.snapshot()
 
     def test(self):
         self.prepare('test')
         pass
 
-    def forwardList(self, list_=None, mean=None, heatmaplayer='upscore8_'):
+    def forwardList(self, list_=None, mean=None):
         if list_ is None:
             self.list = self.vallist
             list_  = self.vallist.source
         else:
-            self.addListFile(list_)
+            self.list = list_
         if mean is None:
             if self.samples.mean != []:
+                mean = self.samples.mean
                 print('Using mean from samples')
             else:
                 print('No mean.....')
                 return
         self.prepare('deploy')
         self.createNet(self.target['deploy'], self.weights, self.gpu)
-        ba.utils.touch(self.target['segmentations'])
         ba.utils.touch(self.target['heatmaps'])
+        ba.utils.touch(self.target['heatmaps'][:-1] + '_overlays/')
         print('Forwarding all in {}'.format(list_))
+        self.list.addPreSuffix(self.imgdir, '.jpg')
         for idx in tqdm(self.list.list):
-            bn = os.path.splitext(idx)[0]
-            bn_seg = self.target['segmentations'] + bn
+            bn = os.path.basename(os.path.splitext(idx)[0])
             bn_hm = self.target['heatmaps'] + bn
-            self.forward(self.loadimg(idx))
+            bn_ov = self.target['heatmaps'][:-1] + '_overlays/' + bn
+            self.forward(self.loadimg(idx, mean=mean))
             score = self.net.blobs['score'].data[0][1,...]
-            heatmap = self.net.blobs[heatmaplayer].data[0][1,...]
-            imsave(bn_seg + '.png', score)
-            imsave(bn_hm + '.png', heatmap)
-            ba.utils.apply_overlay(self.tmpim, score, bn_seg + '_overlay.png')
-            ba.utils.apply_overlay(self.tmpim, score, bn_hm + '_overlay.png')
+            imsave(bn_hm + '.png', score)
+            ba.utils.apply_overlay(self.tmpim, score, bn_ov + '.png')
+        self.list.rmPreSuffix(self.imgdir, '.jpg')

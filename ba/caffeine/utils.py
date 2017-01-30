@@ -5,10 +5,10 @@
 from caffe import layers as L, params as P
 import warnings
 
-def conv_relu(bottom, nout, ks=3, stride=1, pad=1):
+def conv_relu(bottom, nout, ks=3, stride=1, pad=1, lrmult=False):
     conv = L.Convolution(bottom, kernel_size=ks, stride=stride,
         num_output=nout, pad=pad,
-        param=[dict(lr_mult=1, decay_mult=1), dict(lr_mult=2, decay_mult=0)])
+        param=[dict(lr_mult=1*lrmult, decay_mult=1), dict(lr_mult=2*lrmult, decay_mult=0)])
     return conv, L.ReLU(conv, in_place=True)
 
 def max_pool(bottom, ks=2, stride=2):

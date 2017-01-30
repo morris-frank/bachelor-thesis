@@ -8,7 +8,7 @@ __pycache__/
 
 build/
 lib/
-.venv/
+.venv*/
 .idea/
 
 
@@ -17,7 +17,9 @@ lib/
 *.npy
 data/datasets/
 data/results/
+data/log/
 *snapshot*
 *.pkl
 *.mat
 *tmp/
+*log*

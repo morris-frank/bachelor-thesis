@@ -3,7 +3,7 @@ from tqdm import tqdm
 import numpy as np
 import warnings
 from scipy.misc import imread
-from random import shuffle
+import random
 import ba.utils
 
 
@@ -41,7 +41,7 @@ class SetList(object):
     def shuffle(self):
         '''Shuffles the list
         '''
-        self.list = shuffle(self.list)
+        random.shuffle(self.list)
 
     def addPreSuffix(self, prefix='', suffix=''):
         '''Adds a prefix and a suffix to every element of the list.

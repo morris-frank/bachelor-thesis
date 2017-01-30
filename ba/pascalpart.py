@@ -131,18 +131,18 @@ class PascalPartSet(object):
 
     def saveSegmentations(self):
         doClasses = len(self.classes) > 0
+        params_ = {}
         if not ba.utils.query_overwrite(self.targets['parts_seg']):
             params_['parts'] = []
         else:
             ba.utils.touch(self.targets['parts_seg'])
             params_['parts'] = self.parts
         if doClasses:
-            doClasses = ba.utils.query_overwrite(self.targets['parts_seg'])
+            doClasses = ba.utils.query_overwrite(self.targets['classes_seg'])
             ba.utils.touch(self.targets['classes_seg'])
             rootlist = self.clist
         else:
             rootlist = self.plist
-        params_ = {}
         params_['dir'] = self.dir
         params_['parts_target'] = self.targets['parts_seg']
         params_['class_target'] = self.targets['classes_seg']

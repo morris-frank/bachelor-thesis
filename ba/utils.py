@@ -13,15 +13,18 @@ def apply_overlay(image, overlay, path, label=''):
         image (image): The image to use as 'background'.
         overlay (image): The image to overly over the image.
         path (str): The path to save the result to.
-        label (str, optional): A label for the heatmap. 
+        label (str, optional): A label for the heatmap.
     '''
     fig = plt.figure(frameon=False)
+    ax = plt.Axes(fig, [0.,0.,1.,1.])
+    ax.set_axis_off()
+    fig.add_axes(ax)
     plt.imshow(image, interpolation='none')
-    plt.imshow(overlay, cmap='plasma', alpha=0.7, interpolation='none')
+    plt.imshow(overlay, cmap='viridis', alpha=0.7, interpolation='none')
     if label != '':
         red_patch = mpatches.Patch(color='yellow', label=label)
         plt.legend(handles=[red_patch])
-    fig.savefig(path)
+    fig.savefig(path, bbox_inches='tight', pad_inches=0)
     plt.close(fig)
 
 
