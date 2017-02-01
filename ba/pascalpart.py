@@ -4,11 +4,19 @@ from glob import glob
 import numpy as np
 import os.path
 import scipy.io as sio
+import scipy.ndimage
 from scipy.misc import imsave
+from scipy.misc import imread
 import tempfile
 from tqdm import tqdm
 from functools import partial
 
+
+def getSingularBB(img):
+    slices = scipy.ndimage.find_objects(img)
+    # TODO: Yeah so, that cant be rught: :P
+    slice_ = slices[-1]
+    return img[slice_], slice_
 
 def reduceSaveCallback(imgid, params):
     item = PascalPart(params['dir'] + imgid + '.mat')
@@ -20,10 +28,25 @@ def reduceSaveCallback(imgid, params):
         item.source = params['class_target'] + imgid
         item.save(image=True, parts=False, sum=False, segmentation=True)
 
+def reduceBBSaveCallback(imgid, params):
+    item = PascalPart(params['dir'] + imgid + '.mat')
+    item.reduce(params['parts'])
+    parts_seg = item.targets['parts_seg'][:-1] + '_bb/'
+    classes_seg = item.targets['classes_seg'][:-1] + '_bb/'
+    im = PascalPart(params['imdir'] + imgid + '.jpg')
+    if len(item.parts) > 0:
+        item.source = params['parts_target'] + imgid
+        slice_ = item.saveBB(image=True, parts=True, sum=True, segmentation=False)
+        imsave(parts_seg + imgid + '.png', im[slice_])
+    if params['class']:
+        item.source = params['class_target'] + imgid
+        slice_ = item.saveBB(image=True, parts=False, sum=False, segmentation=True)
+        imsave(classes_seg + imgid + '.png', im[slice_])
+
 
 class PascalPartSet(object):
     """docstring for PascalPartSet."""
-    builddir = 'data/models/tmp/'
+    builddir = 'data/tmp/'
     sourceext = '.mat'
 
     def __init__(self, tag_, dir_='.', parts_=[], classes_=[]):
@@ -150,6 +173,30 @@ class PascalPartSet(object):
         print('Generating and extracting the segmentations...')
         rootlist.each(partial(reduceSaveCallback, params=params_))
 
+    def saveBoundingBoxes(self, imgdir):
+        doClasses = len(self.classes) > 0
+        params_ = {}
+        parts_seg = self.targets['parts_seg'][:-1] + '_bb/'
+        classes_seg = self.targets['classes_seg'][:-1] + '_bb/'
+        if not ba.utils.query_overwrite(parts_seg):
+            params_['parts'] = []
+        else:
+            ba.utils.touch(parts_seg)
+            params_['parts'] = self.parts
+        if doClasses:
+            doClasses = ba.utils.query_overwrite(classes_seg)
+            ba.utils.touch(classes_seg)
+            rootlist = self.clist
+        else:
+            rootlist = self.plist
+        params_['dir'] = self.dir
+        params_['imgdir'] = imgdir
+        params_['parts_target'] = parts_seg
+        params_['class_target'] = classes_seg
+        params_['class'] = doClasses
+        print('Generating and extracting the segmentation bounding boxes...')
+        rootlist.each(partial(reduceBBSaveCallback, params=params_))
+
 
 class PascalPart(object):
     """docstring for PascalPart."""
@@ -189,6 +236,23 @@ class PascalPart(object):
                 for part in self.parts:
                     # TODO(saveEach): What??? saving all on hte same imagE??
                     itemsave(bn + ext, self.parts[part])
+
+    def saveBB(self, image=True, parts=True, sum=False, segmentation=False):
+        bn = os.path.splitext(self.source)[0]
+        itemsave = imsave if image else np.save
+        ext = '.png' if image else ''
+        if segmentation:
+            bb = getSingularBB(self.segmentation)
+            itemsave(bn + ext, bb)
+        if parts and len(self.parts) > 0:
+            if sum:
+                sumOfParts = next(iter(self.parts.values())) * 0
+                # sumOfParts = self.segmentation * 0
+                for part in self.parts:
+                    sumOfParts += self.parts[part]
+                bb, slice_ = getSingularBB(sumOfParts)
+                itemsave(bn + ext, bb)
+                return slice_
 
     def reduce(self, parts=[]):
         newparts = {}

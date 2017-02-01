@@ -21,6 +21,9 @@ class SetList(object):
     def __len__(self):
         return len(self.list)
 
+    def __str__(self):
+        return '{}[{}] → {}'.format(self.source, len(self.list), self.target)
+
     def load(self):
         '''Loads the contents of self.source into the list.
         It does replace the whole content and does not append to it.

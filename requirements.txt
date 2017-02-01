@@ -1,3 +1,8 @@
+#Not needed or per hand:
+#pkg-resources==0.0.0
+#tensorflow==1.0.0a0
+
+#----
 cycler==0.10.0
 dask==0.13.0
 decorator==4.0.11
@@ -15,7 +20,6 @@ pep8==1.5.7
 pexpect==4.2.1
 pickleshare==0.7.4
 Pillow==4.0.0
-pkg-resources==0.0.0
 prompt-toolkit==1.0.9
 protobuf==3.1.0.post1
 ptyprocess==0.5.1
@@ -31,7 +35,6 @@ scikit-image==0.12.3
 scipy==0.18.1
 simplegeneric==0.8.1
 six==1.10.0
-tensorflow==1.0.0a0
 toolz==0.8.2
 tqdm==4.11.0
 traitlets==4.3.1

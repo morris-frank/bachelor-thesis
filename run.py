@@ -16,7 +16,7 @@ fcn.weights = 'data/models/fcn8s/fcn8s-heavy-pascal.caffemodel'
 fcn.net_generator = ba.caffeine.fcn.fcn8s
 fcn.baselr = 10e-14
 fcn.epochs = 20
-fcn.gpu = 0
+fcn.gpu = 2
 fcn.labeldir = 'data/models/tmp/segmentations/pascpart_aeroplane_stern/'
 fcn.prepare() # ?? Everythong alright then continue....
 lastiter = fcn.epochs * len(fcn.trainlist)
@@ -30,8 +30,8 @@ else:
 	interp_layers = [k for k in fcn.solver.net.params.keys() if 'up' in k]
 	ba.caffeine.surgery.interp(fcn.solver.net, interp_layers)
 
-
-fcn.weights = 'data/models//airStern/snapshots/train_iter_{}.caffemodel'.format(lastiter)
-#fcn.solver = Null
-fcn.forwardList(list_=fcn.vallist)
-fcn.forwardList(list_=fcn.trainlist)
+if ba.utils.query_boolean('Wanna test?'):
+    fcn.weights = 'data/models//airStern/snapshots/train_iter_{}.caffemodel'.format(lastiter)
+    #fcn.solver = Null
+    fcn.forwardList(list_=fcn.vallist)
+    fcn.forwardList(list_=fcn.trainlist)

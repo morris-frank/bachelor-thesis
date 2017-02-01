@@ -20,7 +20,7 @@ def apply_overlay(image, overlay, path, label=''):
     ax.set_axis_off()
     fig.add_axes(ax)
     plt.imshow(image, interpolation='none')
-    plt.imshow(overlay, cmap='viridis', alpha=0.7, interpolation='none')
+    plt.imshow(overlay, cmap='viridis', alpha=0.5, interpolation='none')
     if label != '':
         red_patch = mpatches.Patch(color='yellow', label=label)
         plt.legend(handles=[red_patch])
