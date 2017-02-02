@@ -15,6 +15,8 @@ def fcn8s(params):
     splitfile = params['splitfile']
     pydata_params = dict(split=splitfile, mean=params['mean'],
         seed=1337)
+    if 'img_ext' in params:
+        pydata_params['img_ext'] = params['img_ext']
     pylayer = 'SegDataLayer'
     pydata_params['img_dir'] = params['img_dir']
     pydata_params['label_dir'] = params['label_dir']

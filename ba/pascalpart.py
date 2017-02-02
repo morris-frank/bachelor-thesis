@@ -1,5 +1,5 @@
-from ba.set import SetList
-import ba.utils
+from .set import SetList
+from . import utils
 from glob import glob
 import numpy as np
 import os.path
@@ -18,30 +18,30 @@ def getSingularBB(img):
     slice_ = slices[-1]
     return img[slice_], slice_
 
+
 def reduceSaveCallback(imgid, params):
     item = PascalPart(params['dir'] + imgid + '.mat')
     item.reduce(params['parts'])
     if len(item.parts) > 0:
         item.source = params['parts_target'] + imgid
-        item.save(image=True, parts=True, sum=True, segmentation=False)
+        item.save(sum=True)
     if params['class']:
         item.source = params['class_target'] + imgid
-        item.save(image=True, parts=False, sum=False, segmentation=True)
+        item.save(parts=False, segmentation=True)
+
 
 def reduceBBSaveCallback(imgid, params):
     item = PascalPart(params['dir'] + imgid + '.mat')
     item.reduce(params['parts'])
-    parts_seg = item.targets['parts_seg'][:-1] + '_bb/'
-    classes_seg = item.targets['classes_seg'][:-1] + '_bb/'
-    im = PascalPart(params['imdir'] + imgid + '.jpg')
+    im = imread(params['imdir'] + imgid + '.jpg')
     if len(item.parts) > 0:
-        item.source = params['parts_target'] + imgid
-        slice_ = item.saveBB(image=True, parts=True, sum=True, segmentation=False)
-        imsave(parts_seg + imgid + '.png', im[slice_])
+        item.source = params['parts_bb_target'] + imgid
+        slice_ = item.saveBB(sum=True)
+        imsave(params['parts_patch_target'] + imgid + '.png', im[slice_])
     if params['class']:
-        item.source = params['class_target'] + imgid
-        slice_ = item.saveBB(image=True, parts=False, sum=False, segmentation=True)
-        imsave(classes_seg + imgid + '.png', im[slice_])
+        item.source = params['classes_bb_target'] + imgid
+        slice_ = item.saveBB(parts=False, segmentation=True)
+        imsave(params['classes_patch_target'] + imgid + '.png', im[slice_])
 
 
 class PascalPartSet(object):
@@ -78,18 +78,20 @@ class PascalPartSet(object):
     def genTargets(self):
         txtroot = self.builddir + self.tag
         segroot = self.builddir + 'segmentations/' + self.tag
+        classstr = '_'.join([''] + self.classes)
+        classnpartstr = '_'.join([''] + self.classes + self.parts)
         self.targets['root'] = txtroot + '.txt'
         self.targets['parts'] = self.targets['root']
         self.targets['classes'] = self.targets['root']
         if self.parts is not None:
-            self.targets['parts'] = txtroot + '_'.join([''] + self.classes + self.parts) + '.txt'
-            self.targets['parts_seg'] = segroot + '_'.join([''] + self.classes + self.parts) + '/'
+            self.targets['parts'] = txtroot + classnpartstr + '.txt'
+            self.targets['parts_seg'] = segroot + classnpartstr + '/'
         if self.classes is not None:
-            self.targets['classes'] = txtroot + '_'.join([''] + self.classes) + '.txt'
-            self.targets['classes_seg'] = segroot + '_'.join([''] + self.classes) + '/'
+            self.targets['classes'] = txtroot + classstr + '.txt'
+            self.targets['classes_seg'] = segroot + classstr + '/'
 
     def genRootList(self):
-        overwrite = ba.utils.query_overwrite(self.targets['root'])
+        overwrite = utils.query_overwrite(self.targets['root'], default='no')
         self.rlist = SetList(self.targets['root'])
         if not overwrite:
             return self.rlist
@@ -109,8 +111,9 @@ class PascalPartSet(object):
             return False
         if not self.rlist:
             self.genRootList()
-        overwrite = ba.utils.query_overwrite(self.targets['classes'])
-        ba.utils.touch(self.targets['classes'], clear=overwrite)
+        overwrite = utils.query_overwrite(self.targets['classes'],
+                                             default='no')
+        utils.touch(self.targets['classes'], clear=overwrite)
         self.clist = SetList(self.targets['classes'])
         if not overwrite:
             return self.clist
@@ -136,8 +139,9 @@ class PascalPartSet(object):
             rootlist = self.rlist
         else:
             rootlist = self.clist
-        overwrite = ba.utils.query_overwrite(self.targets['parts'])
-        ba.utils.touch(self.targets['parts'], clear=overwrite)
+        overwrite = utils.query_overwrite(self.targets['parts'],
+                                             default='no')
+        utils.touch(self.targets['parts'], clear=overwrite)
         self.plist = SetList(self.targets['parts'])
         if not overwrite:
             return self.plist
@@ -155,14 +159,16 @@ class PascalPartSet(object):
     def saveSegmentations(self):
         doClasses = len(self.classes) > 0
         params_ = {}
-        if not ba.utils.query_overwrite(self.targets['parts_seg']):
+        if not utils.query_overwrite(self.targets['parts_seg'],
+                                        default='no'):
             params_['parts'] = []
         else:
-            ba.utils.touch(self.targets['parts_seg'])
+            utils.touch(self.targets['parts_seg'])
             params_['parts'] = self.parts
         if doClasses:
-            doClasses = ba.utils.query_overwrite(self.targets['classes_seg'])
-            ba.utils.touch(self.targets['classes_seg'])
+            doClasses = utils.query_overwrite(self.targets['classes_seg'],
+                                                 default='no')
+            utils.touch(self.targets['classes_seg'])
             rootlist = self.clist
         else:
             rootlist = self.plist
@@ -170,30 +176,39 @@ class PascalPartSet(object):
         params_['parts_target'] = self.targets['parts_seg']
         params_['class_target'] = self.targets['classes_seg']
         params_['class'] = doClasses
-        print('Generating and extracting the segmentations...')
-        rootlist.each(partial(reduceSaveCallback, params=params_))
+        if params_['parts'] != [] or doClasses:
+            print('Generating and extracting the segmentations...')
+            rootlist.each(partial(reduceSaveCallback, params=params_))
+        else:
+            print('Will not save any Segmentations...')
 
     def saveBoundingBoxes(self, imgdir):
-        doClasses = len(self.classes) > 0
-        params_ = {}
-        parts_seg = self.targets['parts_seg'][:-1] + '_bb/'
-        classes_seg = self.targets['classes_seg'][:-1] + '_bb/'
-        if not ba.utils.query_overwrite(parts_seg):
+        params_ = {'dir': self.dir,
+                   'imdir': imgdir,
+                   'parts_bb_target': None,
+                   'classes_bb_target': None,
+                   'parts_patch_target': None,
+                   'classes_patch_target': None,
+                   'class': len(self.classes) > 0
+                   }
+        params_['parts_bb_target'] = self.targets['parts_seg'][:-1] + '_bb/'
+        params_['classes_bb_target'] = self.targets['classes_seg'][:-1] + '_bb/'
+        params_['parts_patch_target'] = self.targets['parts_seg'][:-1] + '_bb_patches/'
+        params_['classes_patch_target'] = self.targets['classes_seg'][:-1] + '_bb_patches/'
+        if not utils.query_overwrite(params_['parts_bb_target'], default='no'):
             params_['parts'] = []
         else:
-            ba.utils.touch(parts_seg)
+            utils.touch(params_['parts_bb_target'])
+            utils.touch(params_['parts_patch_target'])
             params_['parts'] = self.parts
-        if doClasses:
-            doClasses = ba.utils.query_overwrite(classes_seg)
-            ba.utils.touch(classes_seg)
+        if params_['class']:
+            params_['class'] = utils.query_overwrite(params_['classes_bb_target'],
+                                                        default='no')
+            utils.touch(params_['classes_bb_target'])
+            utils.touch(params_['classes_patch_target'])
             rootlist = self.clist
         else:
             rootlist = self.plist
-        params_['dir'] = self.dir
-        params_['imgdir'] = imgdir
-        params_['parts_target'] = parts_seg
-        params_['class_target'] = classes_seg
-        params_['class'] = doClasses
         print('Generating and extracting the segmentation bounding boxes...')
         rootlist.each(partial(reduceBBSaveCallback, params=params_))
 
@@ -242,15 +257,16 @@ class PascalPart(object):
         itemsave = imsave if image else np.save
         ext = '.png' if image else ''
         if segmentation:
-            bb = getSingularBB(self.segmentation)
+            bb, slice_ = getSingularBB(self.segmentation.astype(int))
             itemsave(bn + ext, bb)
+            return slice_
         if parts and len(self.parts) > 0:
             if sum:
                 sumOfParts = next(iter(self.parts.values())) * 0
                 # sumOfParts = self.segmentation * 0
                 for part in self.parts:
                     sumOfParts += self.parts[part]
-                bb, slice_ = getSingularBB(sumOfParts)
+                bb, slice_ = getSingularBB(sumOfParts.astype(int))
                 itemsave(bn + ext, bb)
                 return slice_
 

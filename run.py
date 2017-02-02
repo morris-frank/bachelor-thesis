@@ -1,23 +1,22 @@
 import ba
 
-sourcedir = 'data/datasets/pascalparts/Annotations_Part/'
+# sourcedir = 'data/datasets/pascalparts/Annotations_Part/'
 
-#ppset = ba.PascalPartSet('pascpart', sourcedir, 'stern', 'aeroplane')
-#ppset.saveSegmentations()
+traintxt = 'data/tmp/pascpart_aeroplane_stern.txt'
+valtxt = 'data/tmp/pascpart_aeroplane_stern.txt'
 
-traintxt = 'data/models/tmp/xaa'
-valtxt = 'data/models/tmp/xab'
+tag = 'airStern_2lFC'
 
-#traintxt = ppset.targets['parts']
-#valtxt = ppset.targets['parts']
-
-fcn = ba.FCNPartRunner('airStern_2l', traintxt, valtxt)
+fcn = ba.FCNPartRunner(tag, traintxt, valtxt)
 fcn.weights = 'data/models/fcn8s/fcn8s-heavy-pascal.caffemodel'
 fcn.net_generator = ba.caffeine.fcn.fcn8s
 fcn.baselr = 10e-14
 fcn.epochs = 20
-fcn.gpu = 2
-fcn.labeldir = 'data/models/tmp/segmentations/pascpart_aeroplane_stern/'
+fcn.gpu = 1
+fcn.imgdir = 'data/tmp/segmentations/pascpart_aeroplane_stern_bb/'
+fcn.imgdir = 'data/tmp/segmentations/pascpart_aeroplane_stern_bb_patches/'
+# fcn.imgext = 'png'
+fcn.labeldir = 'data/tmp/segmentations/pascpart_aeroplane_stern_bb/'
 fcn.prepare() # ?? Everythong alright then continue....
 lastiter = fcn.epochs * len(fcn.trainlist)
 
@@ -31,7 +30,7 @@ else:
 	ba.caffeine.surgery.interp(fcn.solver.net, interp_layers)
 
 if ba.utils.query_boolean('Wanna test?'):
-    fcn.weights = 'data/models//airStern/snapshots/train_iter_{}.caffemodel'.format(lastiter)
+    fcn.weights = 'data/models/{}/snapshots/train_iter_{}.caffemodel'.format(tag, lastiter)
     #fcn.solver = Null
     fcn.forwardList(list_=fcn.vallist)
     fcn.forwardList(list_=fcn.trainlist)

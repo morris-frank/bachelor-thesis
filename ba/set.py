@@ -4,7 +4,7 @@ import numpy as np
 import warnings
 from scipy.misc import imread
 import random
-import ba.utils
+from . import utils
 
 
 class SetList(object):
@@ -28,7 +28,7 @@ class SetList(object):
         '''Loads the contents of self.source into the list.
         It does replace the whole content and does not append to it.
         '''
-        ba.utils.touch(self.source)
+        utils.touch(self.source)
         with open(self.source) as f:
             self.list = [l[:-1] for l in f.readlines() if l.strip()]
 

@@ -1,9 +1,8 @@
-from ba.set import SetList
+from .set import SetList
 from PIL import Image
 from scipy.misc import imsave
 from tqdm import tqdm
-import ba.caffeine
-import ba.caffeine.surgery
+from . import caffeine
 import caffe
 import copy
 import numpy as np
@@ -11,7 +10,7 @@ import os
 import sys
 from functools import partial
 import tempfile
-import ba.utils
+from . import utils
 import warnings
 
 
@@ -64,8 +63,9 @@ class FCNPartRunner(NetRunner):
         self.trainlist = SetList(traintxt)
         self.vallist = SetList(valtxt)
         self.samples = []
-        self.net_generator = ba.caffeine.fcn.fcn8s
+        self.net_generator = caffeine.fcn.fcn8s
         self.imgdir = 'data/datasets/voc2010/JPEGImages/'
+        self.imgext = 'jpg'
         self.weights = ''
         self.target = {}
         if self.random:
@@ -100,14 +100,15 @@ class FCNPartRunner(NetRunner):
         self.samples.list = self.samples.list[:count]
 
     def FCNparams(self, split):
-        params = {}
-        params['img_dir'] = self.imgdir
-        params['label_dir'] = self.labeldir
-        params['splitfile'] = self.target[split + 'set']
-        self.samples.addPreSuffix(self.imgdir, '.jpg')
+        params = {'img_dir': self.imgdir,
+                  'img_ext': self.imgext,
+                  'label_dir': self.labeldir,
+                  'splitfile': self.target[split + 'set']
+                  }
+        self.samples.addPreSuffix(self.imgdir, '.' + self.imgext)
         if self.samples.mean == []:
             self.samples.calculate_mean()
-        self.samples.rmPreSuffix(self.imgdir, '.jpg')
+        self.samples.rmPreSuffix(self.imgdir, '.' + self.imgext)
         params['mean'] = tuple(self.samples.mean)
         np.save(self.target['dir'] + 'mean.npy', self.samples.mean)
         return params
@@ -120,7 +121,7 @@ class FCNPartRunner(NetRunner):
         if self.target == {}:
             self.targets()
         # Create build and snapshot direcotry:
-        ba.utils.touch(self.target['snapshots'])
+        utils.touch(self.target['snapshots'])
         if 'train' in split:
             self.samples.target = self.target['trainset']
             self.samples.save()
@@ -161,7 +162,7 @@ class FCNPartRunner(NetRunner):
         self.writeSolver()
         self.createSolver(self.target['solver'], self.weights, self.gpu)
         interp_layers = [k for k in self.solver.net.params.keys() if 'up' in k]
-        ba.caffeine.surgery.interp(self.solver.net, interp_layers)
+        caffeine.surgery.interp(self.solver.net, interp_layers)
         for _ in range(self.epochs):
             self.solver.step(len(self.samples))
         self.solver.snapshot()
@@ -185,10 +186,10 @@ class FCNPartRunner(NetRunner):
                 return
         self.prepare('deploy')
         self.createNet(self.target['deploy'], self.weights, self.gpu)
-        ba.utils.touch(self.target['heatmaps'])
-        ba.utils.touch(self.target['heatmaps'][:-1] + '_overlays/')
+        utils.touch(self.target['heatmaps'])
+        utils.touch(self.target['heatmaps'][:-1] + '_overlays/')
         print('Forwarding all in {}'.format(list_))
-        self.list.addPreSuffix(self.imgdir, '.jpg')
+        self.list.addPreSuffix(self.imgdir, '.' + self.imgext)
         for idx in tqdm(self.list.list):
             bn = os.path.basename(os.path.splitext(idx)[0])
             bn_hm = self.target['heatmaps'] + bn
@@ -196,5 +197,5 @@ class FCNPartRunner(NetRunner):
             self.forward(self.loadimg(idx, mean=mean))
             score = self.net.blobs['score'].data[0][1,...]
             imsave(bn_hm + '.png', score)
-            ba.utils.apply_overlay(self.tmpim, score, bn_ov + '.png')
-        self.list.rmPreSuffix(self.imgdir, '.jpg')
+            utils.apply_overlay(self.tmpim, score, bn_ov + '.png')
+        self.list.rmPreSuffix(self.imgdir, '.' + self.imgext)

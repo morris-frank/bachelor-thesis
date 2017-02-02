@@ -4,6 +4,9 @@ import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 
+class Bunch(object):
+    def __init__(self, adict):
+        self.__dict__.update(adict)
 
 def apply_overlay(image, overlay, path, label=''):
     '''Overlay overlay onto image and add label as text
@@ -16,15 +19,16 @@ def apply_overlay(image, overlay, path, label=''):
         label (str, optional): A label for the heatmap.
     '''
     fig = plt.figure(frameon=False)
+    plt.axis('off')
     ax = plt.Axes(fig, [0.,0.,1.,1.])
     ax.set_axis_off()
     fig.add_axes(ax)
     plt.imshow(image, interpolation='none')
     plt.imshow(overlay, cmap='viridis', alpha=0.5, interpolation='none')
     if label != '':
-        red_patch = mpatches.Patch(color='yellow', label=label)
-        plt.legend(handles=[red_patch])
-    fig.savefig(path, bbox_inches='tight', pad_inches=0)
+        patch = mpatches.Patch(color='yellow', label=label)
+        plt.legend(handles=[patch])
+    fig.savefig(path, pad_inches=0, dpi=80)
     plt.close(fig)
 
 
@@ -65,7 +69,7 @@ def query_boolean(question, default='yes'):
                   '(or "y" or "n").')
 
 
-def query_overwrite(path):
+def query_overwrite(path, default='yes'):
     '''Checks with the user if a file shall be overwritten
 
     Args:
@@ -79,7 +83,7 @@ def query_overwrite(path):
         return True
     question = ('File {} does exist.\n'
                 'Overwrite it?'.format(path))
-    return query_boolean(question, default='yes')
+    return query_boolean(question, default)
 
 
 def touch(path, clear=False):

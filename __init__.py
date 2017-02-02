@@ -1,2 +1,2 @@
 from .ba import *
-import ba.scripts as scripts
+# import ba.scripts as scripts

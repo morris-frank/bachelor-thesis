@@ -38,6 +38,9 @@ class SegDataLayer(caffe.Layer):
         # config
         params = eval(self.param_str)
         self.img_dir = params['img_dir']
+        self.img_ext = 'jpg'
+        if 'img_ext' in params:
+            self.img_ext = params['img_ext']
         self.label_dir = params['label_dir']
         self.split = params['split']
         self.mean = np.array(params['mean'])
@@ -103,7 +106,7 @@ class SegDataLayer(caffe.Layer):
         - subtract mean
         - transpose to channel x height x width order
         """
-        im = Image.open('{}/{}.jpg'.format(self.img_dir, idx))
+        im = Image.open('{}/{}.{}'.format(self.img_dir, idx, self.img_ext))
         in_ = np.array(im, dtype=np.float32)
         in_ = in_[:,:,::-1]
         in_ -= self.mean
