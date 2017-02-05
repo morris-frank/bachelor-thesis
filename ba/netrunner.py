@@ -1,8 +1,9 @@
-from .set import SetList
+from ba.set import SetList
 from PIL import Image
 from scipy.misc import imsave
+from scipy.misc import imread
 from tqdm import tqdm
-from . import caffeine
+from ba import caffeine
 import caffe
 import copy
 import numpy as np
@@ -10,33 +11,64 @@ import os
 import sys
 from functools import partial
 import tempfile
-from . import utils
+from ba import utils
 import warnings
 
 
 class NetRunner(object):
-    """docstring for NetRunner."""
+    '''A Wrapper for a caffe Network'''
 
     def __init__(self):
+        '''Constructs a new NetRunner'''
         self.epochs = 1
         self.baselr = 1
 
     def createNet(self, model, weights, gpu):
+        '''Creates the net inside the runner.
+
+        Args:
+            model (str): The path to the model definition
+            weights (str): The path to the weights
+            gpu (int): The ID of the GPU to use
+        '''
         caffe.set_device(gpu)
         caffe.set_mode_gpu()
         self.net = caffe.Net(model, weights, caffe.TEST)
 
     def createSolver(self, solverpath, weights, gpu):
+        '''Creates a Solver to Train a network
+
+        Args:
+            solverpath (str): The path to the solver definition file
+            weights (str): The path to the weights
+            gpu (int): The ID of the GPU to use
+        '''
         caffe.set_device(gpu)
         caffe.set_mode_gpu()
         self.solver = caffe.SGDSolver(solverpath)
         self.solver.net.copy_from(weights)
 
     def addListFile(self, fpath):
+        '''Adds a list to run the net on
+
+        Args:
+            fpath (str): The path to the list file
+        '''
         self.list = SetList(fpath)
 
     def loadimg(self, path, mean):
-        im = Image.open(path)
+        '''Loads an image and prepares it for caffe.
+
+        Args:
+            path (str): The path to the image
+            mean (list): The mean pixel of the dataset
+
+        Returns:
+            The processed image
+        '''
+        # im = Image.open(path)
+        # Seems faster in my opinion:
+        im = imread(path)
         self.tmpim = im
         in_ = np.array(im, dtype=np.float32)
         in_ = in_[:, :, ::-1]
@@ -45,6 +77,14 @@ class NetRunner(object):
         return in_
 
     def forward(self, in_):
+        '''Forwards a loaded image through the network.
+
+        Args:
+            in_ (np.array): The preprocessed image
+
+        Returns:
+            The results from the score layer
+        '''
         self.net.blobs['data'].reshape(1, *in_.shape)
         self.net.blobs['data'].data[...] = in_
         # run net and take argmax for prediction
@@ -126,7 +166,7 @@ class FCNPartRunner(NetRunner):
             self.samples.target = self.target['trainset']
             self.samples.save()
             self.write('train')
-        if 'test' in split:
+        if 'train' in split or 'test' in split:
             self.vallist.target = self.target['valset']
             self.vallist.save()
             self.write('val')
@@ -190,12 +230,14 @@ class FCNPartRunner(NetRunner):
         utils.touch(self.target['heatmaps'][:-1] + '_overlays/')
         print('Forwarding all in {}'.format(list_))
         self.list.addPreSuffix(self.imgdir, '.' + self.imgext)
-        for idx in tqdm(self.list.list):
+        for idx in tqdm(list_.list):
             bn = os.path.basename(os.path.splitext(idx)[0])
             bn_hm = self.target['heatmaps'] + bn
             bn_ov = self.target['heatmaps'][:-1] + '_overlays/' + bn
             self.forward(self.loadimg(idx, mean=mean))
             score = self.net.blobs['score'].data[0][1,...]
+            print(score.shape)
+            print(self.tmpim.shape)
             imsave(bn_hm + '.png', score)
             utils.apply_overlay(self.tmpim, score, bn_ov + '.png')
         self.list.rmPreSuffix(self.imgdir, '.' + self.imgext)

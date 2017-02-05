@@ -4,7 +4,7 @@ import numpy as np
 import warnings
 from scipy.misc import imread
 import random
-from . import utils
+from ba import utils
 
 
 class SetList(object):

@@ -1,5 +1,5 @@
-from .set import SetList
-from . import utils
+from ba.set import SetList
+from ba import utils
 from glob import glob
 import numpy as np
 import os.path

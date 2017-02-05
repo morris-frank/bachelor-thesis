@@ -5,8 +5,22 @@ mpl.use('Agg')
 import matplotlib.pyplot as plt
 
 class Bunch(object):
+    '''Serves as a dictionary in the form of an object.'''
     def __init__(self, adict):
+        '''Construct a bunch
+
+        Args:
+            adict (dict): The dictionary to build the object from
+        '''
         self.__dict__.update(adict)
+
+    def __str__(self):
+        '''Get the string representation for the bunch (inherit from dict..)
+
+        Returns:
+            The string representation
+        '''
+        return self.__dict__.__str__()
 
 def apply_overlay(image, overlay, path, label=''):
     '''Overlay overlay onto image and add label as text
