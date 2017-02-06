@@ -7,8 +7,6 @@ baselr: 10e-14
 epochs: 20
 images: 'data/datasets/voc2010/JPEGImages/'
 labels: 'data/tmp/segmentations/pascpart_aeroplane_stern/'
-image_extension: 'jpg'
 desc: 'Trained on whole images. Retrained FC-Layers'
 fc: True
 test_images: ''
-test_image_extension: ''

@@ -1,3 +1,4 @@
+from glob import glob
 import os.path
 import sys
 import matplotlib as mpl
@@ -118,3 +119,19 @@ def touch(path, clear=False):
         open(path, 'a').close()
         if clear:
             open(path, 'w').close()
+
+
+def prevalentExtension(path):
+    '''Looks at a directory and returns the most prevalent file extension of
+    the files in this directory.
+
+    Args:
+        path (str): The path to the directory
+
+    Returns:
+        the extension without leading full stop
+    '''
+    path = os.path.normpath(path) + '/'
+    exts = [os.path.splitext(x)[1][1:] for x in glob(path + '*')]
+    exts = [x for x in exts if x]
+    return max(set(exts), key=exts.count)

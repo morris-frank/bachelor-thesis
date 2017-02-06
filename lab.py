@@ -6,10 +6,10 @@ import sys
 def main(args):
     sysargs = experiment.parseArgs(argv=args)
     conf = experiment.loadConf(sysargs.conf)
+    if sysargs.train:
+        experiment.runTrain(sysargs, conf)
     if sysargs.test:
         experiment.runTests(sysargs, conf)
-    else:
-        experiment.runExperiment(sysargs, conf)
 
 
 if __name__ == '__main__':
