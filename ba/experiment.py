@@ -56,7 +56,15 @@ def loadConf(path):
 
 
 def prepareFCN(sysargs, conf):
-    # TODO(doc): Add docstring
+    '''Prepares a FCNPartRunner from the given configuration.
+
+    Args:
+        sysargs (list): The cli runtime options from parseArgs()
+        conf (list): The configuration array from loadConf()
+
+    Returns:
+        the FCNPartRunner
+    '''
     fcn = FCNPartRunner(conf.tag,
                         train=conf.train,
                         val=conf.val,
@@ -72,7 +80,13 @@ def prepareFCN(sysargs, conf):
 
 
 def runTests(sysargs, conf):
-    # TODO(doc): Add docstring
+    '''Tests the given experiment, Normally depends on user input. If --default
+    flag is set will test EVERY snapshot previously saved.
+
+    Args:
+        sysargs (list): The cli runtime options from parseArgs()
+        conf (list): The configuration array from loadConf()
+    '''
     snapdir = 'data/models/{}/snapshots/'.format(conf.tag)
     weights = glob('{}*caffemodel'.format(snapdir))
     if len(weights) < 1:
@@ -94,7 +108,7 @@ def runTests(sysargs, conf):
 
 
 def runTrain(sysargs, conf):
-    '''Run an experiment
+    '''Trains the given experiment
 
     Args:
         sysargs (list): The cli runtime options from parseArgs()
