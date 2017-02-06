@@ -10,6 +10,7 @@ from ba.caffeine.utils import *
 
 
 def fcn8s(params):
+    # TODO(doc): Add docstring
     nclasses = 2
     n = caffe.NetSpec()
     splitfile = params['splitfile']

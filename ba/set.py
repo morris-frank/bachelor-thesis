@@ -8,8 +8,7 @@ from ba import utils
 
 
 class SetList(object):
-    """docstring for SetList."""
-
+    # TODO(doc): Add docstring
     def __init__(self, source=''):
         self.source = source
         self.target = source
@@ -19,9 +18,11 @@ class SetList(object):
             self.load()
 
     def __len__(self):
+        # TODO(doc): Add docstring
         return len(self.list)
 
     def __str__(self):
+        # TODO(doc): Add docstring
         return '{}[{}] → {}'.format(self.source, len(self.list), self.target)
 
     def load(self):
@@ -65,6 +66,7 @@ class SetList(object):
         self.list = [x[len(prefix):-len(suffix)] for x in self.list]
 
     def calculate_mean(self):
+        # TODO(doc): Add docstring
         self.mean = [[],[],[]]
         print('Calculating mean pixel...')
         for row in tqdm(self.list):

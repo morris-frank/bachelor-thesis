@@ -32,7 +32,9 @@ def apply_overlay(image, overlay, path, label=''):
         path (str): The path to save the result to.
         label (str, optional): A label for the heatmap.
     '''
-    fig = plt.figure(frameon=False)
+    xS = 3
+    yS = xS / image.shape[1] * image.shape[0]
+    fig = plt.figure(frameon=False, figsize=(xS,yS), dpi=image.shape[1]/xS)
     plt.axis('off')
     ax = plt.Axes(fig, [0.,0.,1.,1.])
     ax.set_axis_off()
@@ -42,11 +44,11 @@ def apply_overlay(image, overlay, path, label=''):
     if label != '':
         patch = mpatches.Patch(color='yellow', label=label)
         plt.legend(handles=[patch])
-    fig.savefig(path, pad_inches=0, dpi=80)
+    fig.savefig(path, pad_inches=0, dpi=fig.dpi)
     plt.close(fig)
 
 
-def query_boolean(question, default='yes'):
+def query_boolean(question, default='yes', defaulting=False):
     '''Ask a yes/no question via input() and return their answer.
 
     Args:
@@ -54,6 +56,7 @@ def query_boolean(question, default='yes'):
         default (str, optional): Is the presumed answer if the user just
             hits <Enter>. It must be 'yes' (the default), 'no' or None
             (meaning an answer is required of the user).
+        defaulting (bool, optional): If we should just do the default
 
     Returns:
         True for 'yes' or False for 'no'.
@@ -68,7 +71,8 @@ def query_boolean(question, default='yes'):
         prompt = ' (y/[N]) '
     else:
         raise ValueError('invalid default answer: {}'.format(default))
-
+    if defaulting:
+        return valid[default]
     while True:
         sys.stdout.write(question + prompt)
         choice = input().lower()
@@ -83,7 +87,7 @@ def query_boolean(question, default='yes'):
                   '(or "y" or "n").')
 
 
-def query_overwrite(path, default='yes'):
+def query_overwrite(path, default='yes', defaulting=False):
     '''Checks with the user if a file shall be overwritten
 
     Args:
@@ -97,7 +101,7 @@ def query_overwrite(path, default='yes'):
         return True
     question = ('File {} does exist.\n'
                 'Overwrite it?'.format(path))
-    return query_boolean(question, default)
+    return query_boolean(question, default=default, defaulting=defaulting)
 
 
 def touch(path, clear=False):

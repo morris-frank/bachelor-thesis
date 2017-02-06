@@ -93,10 +93,12 @@ class NetRunner(object):
 
 
 class FCNPartRunner(NetRunner):
+    # TODO(doc): Add docstring
     builddir = 'data/models/'
     results = 'data/results/'
 
     def __init__(self, tag, traintxt, valtxt, samples=0, random=True):
+        # TODO(doc): Add docstring
         super().__init__()
         self.name = tag
         self.random = random
@@ -111,12 +113,17 @@ class FCNPartRunner(NetRunner):
         if self.random:
             self.vallist.shuffle()
         self.selectSamples(samples)
+        self.targets()
 
     def targets(self, builddir=None):
+        # TODO(doc): Add docstring
+        bn_weights = os.path.basename(self.weights[:-len('.caffemodel')])
         if builddir is None:
             builddir = self.builddir
         self.target['dir'] = os.path.normpath(builddir + '/' + self.name) + '/'
-        self.target['outdir'] = os.path.normpath(self.results + '/' + self.name) + '/'
+        self.target['outdir'] = os.path.normpath('/'.join([self.results,
+                                                           self.name,
+                                                           bn_weights])) + '/'
         self.target['snapshots'] = self.target['dir'] + 'snapshots/'
         self.target['solver'] = self.target['dir'] + 'solver.prototxt'
         self.target['train'] = self.target['dir'] + 'train.prototxt'
@@ -130,6 +137,7 @@ class FCNPartRunner(NetRunner):
         return
 
     def selectSamples(self, count):
+        # TODO(doc): Add docstring
         if count > len(self.trainlist) or count < 1:
             warnings.warn('More samples selected then possible...\n'
                           'Or less then one sample -> now doing all...')
@@ -140,6 +148,7 @@ class FCNPartRunner(NetRunner):
         self.samples.list = self.samples.list[:count]
 
     def FCNparams(self, split):
+        # TODO(doc): Add docstring
         params = {'img_dir': self.imgdir,
                   'img_ext': self.imgext,
                   'label_dir': self.labeldir,
@@ -154,10 +163,12 @@ class FCNPartRunner(NetRunner):
         return params
 
     def write(self, split):
+        # TODO(doc): Add docstring
         with open(self.target[split], 'w') as f:
             f.write(str(self.net_generator(self.FCNparams(split))))
 
     def prepare(self, split='train_test_deploy'):
+        # TODO(doc): Add docstring
         if self.target == {}:
             self.targets()
         # Create build and snapshot direcotry:
@@ -174,6 +185,7 @@ class FCNPartRunner(NetRunner):
             self.write('deploy')
 
     def writeSolver(self):
+        # TODO(doc): Add docstring
         train_net = self.target['train']
         val_net = self.target['val']
         prefix = self.target['snapshots'] + 'train'
@@ -198,6 +210,7 @@ class FCNPartRunner(NetRunner):
             ))
 
     def train(self):
+        # TODO(doc): Add docstring
         self.prepare('train')
         self.writeSolver()
         self.createSolver(self.target['solver'], self.weights, self.gpu)
@@ -208,36 +221,33 @@ class FCNPartRunner(NetRunner):
         self.solver.snapshot()
 
     def test(self):
+        # TODO(doc): Add docstring
         self.prepare('test')
         pass
 
     def forwardList(self, list_=None, mean=None):
+        # TODO(doc): Add docstring
         if list_ is None:
-            self.list = self.vallist
-            list_  = self.vallist.source
-        else:
-            self.list = list_
+            list_  = self.vallist
         if mean is None:
             if self.samples.mean != []:
                 mean = self.samples.mean
                 print('Using mean from samples')
             else:
-                print('No mean.....')
-                return
+                print('Loading mean from training phase')
+                mean = np.load(self.target['dir'] + 'mean.npy')
         self.prepare('deploy')
         self.createNet(self.target['deploy'], self.weights, self.gpu)
         utils.touch(self.target['heatmaps'])
         utils.touch(self.target['heatmaps'][:-1] + '_overlays/')
         print('Forwarding all in {}'.format(list_))
-        self.list.addPreSuffix(self.imgdir, '.' + self.imgext)
+        list_.addPreSuffix(self.imgdir, '.' + self.imgext)
         for idx in tqdm(list_.list):
             bn = os.path.basename(os.path.splitext(idx)[0])
             bn_hm = self.target['heatmaps'] + bn
             bn_ov = self.target['heatmaps'][:-1] + '_overlays/' + bn
             self.forward(self.loadimg(idx, mean=mean))
             score = self.net.blobs['score'].data[0][1,...]
-            print(score.shape)
-            print(self.tmpim.shape)
             imsave(bn_hm + '.png', score)
             utils.apply_overlay(self.tmpim, score, bn_ov + '.png')
-        self.list.rmPreSuffix(self.imgdir, '.' + self.imgext)
+        list_.rmPreSuffix(self.imgdir, '.' + self.imgext)

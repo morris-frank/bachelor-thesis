@@ -13,6 +13,8 @@ from functools import partial
 
 
 def getSingularBB(img):
+    # TODO(doc): Add docstring
+    # TODO: Transform to method of class
     slices = scipy.ndimage.find_objects(img)
     # TODO: Yeah so, that cant be rught: :P
     slice_ = slices[-1]
@@ -20,6 +22,8 @@ def getSingularBB(img):
 
 
 def reduceSaveCallback(imgid, params):
+    # TODO(doc): Add docstring
+    # TODO: Transform to method of class
     item = PascalPart(params['dir'] + imgid + '.mat')
     item.reduce(params['parts'])
     if len(item.parts) > 0:
@@ -31,6 +35,8 @@ def reduceSaveCallback(imgid, params):
 
 
 def reduceBBSaveCallback(imgid, params):
+    # TODO(doc): Add docstring
+    # TODO: Transform to method of class
     item = PascalPart(params['dir'] + imgid + '.mat')
     item.reduce(params['parts'])
     im = imread(params['imdir'] + imgid + '.jpg')
@@ -45,11 +51,12 @@ def reduceBBSaveCallback(imgid, params):
 
 
 class PascalPartSet(object):
-    """docstring for PascalPartSet."""
+    # TODO(doc): Add docstring
     builddir = 'data/tmp/'
     sourceext = '.mat'
 
     def __init__(self, tag_, dir_='.', parts_=[], classes_=[]):
+        # TODO(doc): Add docstring
         self.dir = dir_
         self.tag = tag_
         self.targets = {}
@@ -64,18 +71,21 @@ class PascalPartSet(object):
         self.genPartList()
 
     def setParts(self, parts_):
+        # TODO(doc): Add docstring
         if parts_ is not None and not isinstance(parts_, list):
             self.parts = [parts_]
         else:
             self.parts = parts_
 
     def setClasses(self, classes_):
+        # TODO(doc): Add docstring
         if classes_ is not None and not isinstance(classes_, list):
             self.classes = [classes_]
         else:
             self.classes = classes_
 
     def genTargets(self):
+        # TODO(doc): Add docstring
         txtroot = self.builddir + self.tag
         segroot = self.builddir + 'segmentations/' + self.tag
         classstr = '_'.join([''] + self.classes)
@@ -91,6 +101,7 @@ class PascalPartSet(object):
             self.targets['classes_seg'] = segroot + classstr + '/'
 
     def genRootList(self):
+        # TODO(doc): Add docstring
         overwrite = utils.query_overwrite(self.targets['root'], default='no')
         self.rlist = SetList(self.targets['root'])
         if not overwrite:
@@ -107,6 +118,7 @@ class PascalPartSet(object):
         return self.rlist
 
     def genClassList(self):
+        # TODO(doc): Add docstring
         if self.classes == []:
             return False
         if not self.rlist:
@@ -129,6 +141,7 @@ class PascalPartSet(object):
         return self.clist
 
     def genPartList(self):
+        # TODO(doc): Add docstring
         if self.parts == []:
             return False
         if not self.rlist:
@@ -157,6 +170,7 @@ class PascalPartSet(object):
         return self.plist
 
     def saveSegmentations(self):
+        # TODO(doc): Add docstring
         doClasses = len(self.classes) > 0
         params_ = {}
         if not utils.query_overwrite(self.targets['parts_seg'],
@@ -183,6 +197,7 @@ class PascalPartSet(object):
             print('Will not save any Segmentations...')
 
     def saveBoundingBoxes(self, imgdir):
+        # TODO(doc): Add docstring
         params_ = {'dir': self.dir,
                    'imdir': imgdir,
                    'parts_bb_target': None,
@@ -214,14 +229,17 @@ class PascalPartSet(object):
 
 
 class PascalPart(object):
-    """docstring for PascalPart."""
+    # TODO(doc): Add docstring
+
     def __init__(self, source=''):
+        # TODO(doc): Add docstring
         self.parts = {}
         self.source = source
         if source != '':
             self.load()
 
     def load(self):
+        # TODO(doc): Add docstring
         mat = sio.loadmat(self.source)
         try:
             mat = mat['anno'][0][0][1][0][0]
@@ -235,6 +253,7 @@ class PascalPart(object):
                 self.parts[part[0][0]] = part[1].astype('float')
 
     def save(self, image=True, parts=True, sum=False, segmentation=False):
+        # TODO(doc): Add docstring
         bn = os.path.splitext(self.source)[0]
         itemsave = imsave if image else np.save
         ext = '.png' if image else ''
@@ -253,6 +272,7 @@ class PascalPart(object):
                     itemsave(bn + ext, self.parts[part])
 
     def saveBB(self, image=True, parts=True, sum=False, segmentation=False):
+        # TODO(doc): Add docstring
         bn = os.path.splitext(self.source)[0]
         itemsave = imsave if image else np.save
         ext = '.png' if image else ''
@@ -271,6 +291,7 @@ class PascalPart(object):
                 return slice_
 
     def reduce(self, parts=[]):
+        # TODO(doc): Add docstring
         newparts = {}
         if len(parts) > 0 and len(self.parts) > 0:
             for part in parts:
