@@ -20,7 +20,12 @@ class NetRunner(object):
     '''A Wrapper for a caffe Network'''
 
     def __init__(self, name, **kwargs):
-        '''Constructs a new NetRunner'''
+        '''Constructs a new NetRunner
+
+        Args:
+            name (str): The name of this network (for save paths etc..)
+            kwargs...
+        '''
         defaults = {
             'epochs': 1,
             'baselr': 1,
@@ -50,6 +55,7 @@ class NetRunner(object):
             self.val = SetList(self.val)
 
     def clear(self):
+        '''Clears the nets'''
         del self.net
         del self.solver
 
@@ -152,6 +158,13 @@ class NetRunner(object):
             np.save(self.dir + 'mean.npy', self.train.mean)
 
     def mean(self):
+        '''Returns the mean for this NetRunner. If we have a train set with a
+        mean that is returned otherwise we try to import the mean saved from
+        the training phase.
+
+        Returns:
+            the mean
+        '''
         if self.train.mean != []:
             print('Using mean from samples')
             return self.train.mean
@@ -161,25 +174,38 @@ class NetRunner(object):
 
 
 class FCNPartRunner(NetRunner):
-    # TODO(doc): Add docstring
+    '''A NetRunner specific for FCNs'''
     buildroot = 'data/models/'
     resultroot = 'data/results/'
 
     def __init__(self, name, **kwargs):
-        # TODO(doc): Add docstring
+        '''Constructs a new FCNPartRunner
+
+        Args:
+            name (str): The name of this network (for saving paths...)
+            kwargs...
+        '''
         super().__init__(name=name, **kwargs)
         self.images = 'data/datasets/voc2010/JPEGImages/'
         self.net_generator = caffeine.fcn.fcn8s
         self.targets()
 
     def targets(self):
+        '''Building the saving paths from the current state.'''
         self.dir = self.buildroot + '/' + self.name + '/'
         self.snapshots = self.dir + 'snapshots/'
         self.results = self.resultroot + '/' + self.name + '/'
         self.heatmaps = self.results + 'heatmaps/'
 
     def FCNparams(self, split):
-        # TODO(doc): Add docstring
+        '''Builds the dict for a net_generator.
+
+        Args:
+            split (str): The split (test|train|deploy)
+
+        Returns:
+            The parameter dictionary
+        '''
         imgext = '.' + utils.prevalentExtension(self.images)
         params = {'img_dir': self.images,
                   'img_ext': imgext,
@@ -191,12 +217,20 @@ class FCNPartRunner(NetRunner):
         return params
 
     def write(self, split):
-        # TODO(doc): Add docstring
+        '''Writes the model file for one split to disk
+
+        Args:
+            split (str): The split (test|train|deploy)
+        '''
         with open(self.dir + split + '.prototxt', 'w') as f:
             f.write(str(self.net_generator(self.FCNparams(split))))
 
     def prepare(self, split='train_test_deploy'):
-        # TODO(doc): Add docstring
+        '''Prepares the enviroment for phases.
+
+        Args:
+            split (str): The split to prepare for.
+        '''
         self.targets()
         # Create build and snapshot direcotry:
         if 'train' in split:
@@ -216,7 +250,7 @@ class FCNPartRunner(NetRunner):
             self.write('deploy')
 
     def writeSolver(self):
-        # TODO(doc): Add docstring
+        '''Writes the solver definition to disk.'''
         train_iter = str(len(self.train))
         train_net = self.dir + 'train.prototxt'
         val_net = self.dir + 'val.prototxt'
@@ -242,7 +276,7 @@ class FCNPartRunner(NetRunner):
                 ))
 
     def train(self):
-        # TODO(doc): Add docstring
+        '''Will train the network and make snapshots accordingly'''
         self.prepare('train')
         self.writeSolver()
         self.createSolver(self.dir + 'solver.prototxt',
@@ -260,12 +294,38 @@ class FCNPartRunner(NetRunner):
         self.prepare('test')
 
     def forwardVal(self):
+        '''Will forward the whole validation set through the network'''
         imgext = '.' + utils.prevalentExtension(self.images)
         self.val.addPreSuffix(self.images, imgext)
         self.forwardList(setlist=self.val)
         self.val.rmPreSuffix(self.images, imgext)
 
+    def forwardIDx(self, idx, mean=None):
+        '''Will forward one single idx-image from the source set and saves the
+        scoring heatmaps and heatmaps to disk.
+
+        Args:
+            idx (str): The index (basename) of the image to forward
+            mean (tuple, optional): The mean
+        '''
+        if mean is None:
+            mean = self.mean()
+        data, im = self.loadimg(idx, mean=mean)
+        self.forward(data)
+        score = self.net.blobs[self.net.outputs[0]].data[0][1, ...]
+        bn = os.path.basename(os.path.splitext(idx)[0])
+        bn_hm = self.heatmaps + bn
+        imsave(bn_hm + '.png', score)
+        bn_ov = self.heatmaps[:-1] + '_overlays/' + bn
+        utils.apply_overlay(im, score, bn_ov + '.png')
+
     def forwardList(self, setlist=None):
+        '''Will forward a whole setlist through the network. Will default to the
+        validation set.
+
+        Args:
+            setlist (SetList, optional): The set to put forward
+        '''
         # TODO(doc): Add docstring
         if setlist is None:
             return self.forwardVal()
@@ -276,11 +336,4 @@ class FCNPartRunner(NetRunner):
         mean = self.mean()
         print('Forwarding all in {}'.format(setlist))
         for idx in tqdm(setlist.list):
-            data, im = self.loadimg(idx, mean=mean)
-            self.forward(data)
-            score = self.net.blobs[self.net.outputs[0]].data[0][1, ...]
-            bn = os.path.basename(os.path.splitext(idx)[0])
-            bn_hm = self.heatmaps + bn
-            imsave(bn_hm + '.png', score)
-            bn_ov = self.heatmaps[:-1] + '_overlays/' + bn
-            utils.apply_overlay(im, score, bn_ov + '.png')
+            self.forwardIDx(idx, mean=mean)
