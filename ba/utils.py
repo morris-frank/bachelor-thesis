@@ -135,3 +135,15 @@ def prevalentExtension(path):
     exts = [os.path.splitext(x)[1][1:] for x in glob(path + '*')]
     exts = [x for x in exts if x]
     return max(set(exts), key=exts.count)
+
+def sliding_window(image, stride, kernel_size):
+    '''Slides a quadratic window over an image.
+
+    Args:
+        image (image): The image to use
+        stride (int): The step size for the sliding window
+        kernel_size (int): Width of the window
+    '''
+    for y in range(0, image.shape[0], stride):
+        for x in range(0, image.shape[1], stride):
+            yield (x, y, image[y:y + kernel_size, x:x + kernel_size])

@@ -239,6 +239,7 @@ class FCNPartRunner(NetRunner):
             self.train.target = self.dir + 'train.txt'
             self.train.save()
             self.write('train')
+            self.writeSolver()
         if 'train' in split or 'test' in split:
             self.val.target = self.dir + 'test.txt'
             self.val.save()
@@ -279,7 +280,6 @@ class FCNPartRunner(NetRunner):
     def train(self):
         '''Will train the network and make snapshots accordingly'''
         self.prepare('train')
-        self.writeSolver()
         self.createSolver(self.dir + 'solver.prototxt',
                           self.solver_weights,
                           self.gpu)
@@ -327,7 +327,6 @@ class FCNPartRunner(NetRunner):
         Args:
             setlist (SetList, optional): The set to put forward
         '''
-        # TODO(doc): Add docstring
         if setlist is None:
             return self.forwardVal()
         self.prepare('deploy')
@@ -338,3 +337,53 @@ class FCNPartRunner(NetRunner):
         print('Forwarding all in {}'.format(setlist))
         for idx in tqdm(setlist):
             self.forwardIDx(idx, mean=mean)
+
+
+class SlidingFCNPartRunner(FCNPartRunner):
+    '''A subclass of FCNPartRunner that forwards images in a sliding window kind
+    of way'''
+
+    def __init__(self, name, **kwargs):
+        '''Constructs a new FCNPartRunner
+
+        Args:
+            name (str): The name of this network (for saving paths...)
+            kwargs...
+        '''
+        super().__init__(name=name, **kwargs)
+        self.stride = 10
+        self.kernel_size = 50
+
+    def forwardWindow(self, idx, x, y, window):
+        '''Forwards a single window from the sliding window through the network.
+
+        Args:
+            idx (str): The index-string (basename) of the image
+            x (int): The x starting position of the window
+            y (int): The y starting position of the window
+            window (image): The window (channels shall be last dimension)
+        '''
+        self.forward(window)
+        score = self.net.blobs[self.net.outputs[0]].data[0][1, ...]
+        bn = os.path.basename(os.path.splitext(idx)[0]) + '_'.join(['', x, y])
+        bn_hm = self.heatmaps + bn
+        imsave(bn_hm + '.png', score)
+        bn_ov = self.heatmaps[:-1] + '_overlays/' + bn
+        utils.apply_overlay(im, score, bn_ov + '.png')
+
+    def forwardIDx(self, idx, mean=None):
+        '''Will slide a window over the idx-image from the source and forward
+        that slice through the network. Saves the scoring heatmaps and heatmaps
+        to disk.
+
+        Args:
+            idx (str): The index (basename) of the image to forward
+            mean (tuple, optional): The mean
+        '''
+        if mean is None:
+            mean = self.mean()
+        data, im = self.loadimg(idx, mean=mean)
+        data = data.transpose((1, 2, 0))
+        for (x, y, window) in utils.sliding_window(data, self.stride,
+                                                   self.kernel_size):
+            score = self.forwardWindow(idx, x, y, window)

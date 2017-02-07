@@ -1,7 +1,7 @@
 import argparse
 import ba
 from ba import caffeine
-from ba.netrunner import FCNPartRunner
+from ba import netrunner
 from ba.set import SetList
 from ba import utils
 from glob import glob
@@ -69,17 +69,21 @@ class Experiment(object):
         self.conf = conf
 
     def self._prepareFCN():
-        '''Prepares a FCNPartRunner from the given configuration.'''
-        self.fcn = FCNPartRunner(self.conf.tag,
-                                 train=self.conf.train,
-                                 val=self.conf.val,
-                                 solver_weights=self.conf.weights,
-                                 net_generator=self.conf.net,
-                                 baselr=self.conf.baselr,
-                                 epochs=self.conf.epochs,
-                                 images=self.conf.images,
-                                 labels=self.conf.labels
-                                 )
+        '''Prepares a NetRunner from the given configuration.'''
+        if self.conf.sliding_window:
+            runner = netrunner.SlidingFCNPartRunner
+        else:
+            runner = netrunner.FCNPartRunner
+        self.fcn = runner(self.conf.tag,
+                          train=self.conf.train,
+                          val=self.conf.val,
+                          solver_weights=self.conf.weights,
+                          net_generator=self.conf.net,
+                          baselr=self.conf.baselr,
+                          epochs=self.conf.epochs,
+                          images=self.conf.images,
+                          labels=self.conf.labels
+                          )
         self.fcn.gpu = self.sysargs.gpu
         self.fcn.generator_switches['learn_fc'] = self.conf.learn_fc
 
