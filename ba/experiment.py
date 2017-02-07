@@ -9,6 +9,9 @@ import os
 import sys
 import yaml
 
+class Experiment(object):
+    '''A class to contain everything needed for an experiment'''
+    pass
 
 def parseArgs(argv=sys.argv):
     '''Parse the arguments for an experiment script
@@ -30,6 +33,15 @@ def parseArgs(argv=sys.argv):
         sysargs.conf = sysargs.conf[0]
     return sysargs
 
+def loadConfYaml(path):
+    with open(path, 'r') as f:
+        try:
+            contents = yaml.load(f)
+        except yaml.YAMLError as e:
+            print(e)
+            sendWarning('Configuration {} couldn\'t be loaded'.format(path))
+            sys.exit()
+    return contents
 
 def loadConf(path):
     '''Open a YAML Configuration file and make a Bunch from it
@@ -40,13 +52,9 @@ def loadConf(path):
     Returns:
         The parsed configuration array
     '''
-    with open(path, 'r') as f:
-        try:
-            conf = utils.Bunch(yaml.load(f))
-        except yaml.YAMLError as e:
-            print(e)
-            sendWarning('Configuration couldn\'t be loaded')
-            sys.exit()
+    defaults = loadConfYaml('data/experiments/defaults.yaml')
+    conf  = loadConfYaml(path)
+    conf = utils.Bunch({**defaults, **conf})
     if not conf.net.startswith('ba.'):
         print('Given Network is not from correct namespace you fucker')
         sys.exit()
@@ -76,6 +84,7 @@ def prepareFCN(sysargs, conf):
                         labels=conf.labels
                         )
     fcn.gpu=sysargs.gpu
+    fcn.generator_switches['learn_fc'] = conf.learn_fc
     return fcn
 
 

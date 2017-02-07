@@ -1,0 +1,10 @@
+tag: '_'
+train: ''
+val: ''
+weights: ''
+baselr: 1
+epochs: 1
+images: ''
+labels: ''
+learn_fc: True
+test_images: ''

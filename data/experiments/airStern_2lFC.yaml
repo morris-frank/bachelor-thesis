@@ -8,5 +8,5 @@ epochs: 20
 images: 'data/datasets/voc2010/JPEGImages/'
 labels: 'data/tmp/segmentations/pascpart_aeroplane_stern/'
 desc: 'Trained on whole images. Retrained FC-Layers'
-fc: True
+learn_fc: True
 test_images: ''

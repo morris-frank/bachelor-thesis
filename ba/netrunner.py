@@ -40,7 +40,8 @@ class NetRunner(object):
             'results': './',
             'random': True,
             'net_weights': '',
-            'solver_weights': ''
+            'solver_weights': '',
+            'generator_switches': {}
             }
         for (attr, default) in defaults.items():
             setattr(self, attr, kwargs.get(attr, default))
@@ -207,13 +208,12 @@ class FCNPartRunner(NetRunner):
             The parameter dictionary
         '''
         imgext = '.' + utils.prevalentExtension(self.images)
-        params = {'img_dir': self.images,
-                  'img_ext': imgext,
-                  'label_dir': self.labels,
-                  'splitfile': self.dir + split + '.txt'
-                  }
         self.calculate_mean()
-        params['mean'] = tuple(self.train.mean)
+        params = dict(images=self.images,
+                        extension=self.imgext,
+                        labels=self.labels,
+                        splitfile=self.dir + split + '.txt',
+                        mean=tuple(self.train.mean))
         return params
 
     def write(self, split):
@@ -223,7 +223,8 @@ class FCNPartRunner(NetRunner):
             split (str): The split (test|train|deploy)
         '''
         with open(self.dir + split + '.prototxt', 'w') as f:
-            f.write(str(self.net_generator(self.FCNparams(split))))
+            f.write(str(self.net_generator(self.FCNparams(split),
+                                           self.generator_switches)))
 
     def prepare(self, split='train_test_deploy'):
         '''Prepares the enviroment for phases.

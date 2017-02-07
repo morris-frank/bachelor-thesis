@@ -9,23 +9,21 @@ from caffe.coord_map import crop
 from ba.caffeine.utils import *
 
 
-def fcn8s(params):
+def fcn8s(params, switches):
     # TODO(doc): Add docstring
     nclasses = 2
     n = caffe.NetSpec()
-    splitfile = params['splitfile']
-    pydata_params = dict(split=splitfile, mean=params['mean'],
-        seed=1337)
-    if 'img_ext' in params:
-        pydata_params['img_ext'] = params['img_ext']
     pylayer = 'SegDataLayer'
-    pydata_params['img_dir'] = params['img_dir']
-    pydata_params['label_dir'] = params['label_dir']
-    if 'train' in splitfile or 'val' in splitfile:
-        n.data, n.label = L.Python(module='ba.caffeine.voc_layers', layer=pylayer,
-        ntop=2, param_str=str(pydata_params))
+    if 'train' in params['splitfile'] or 'val' in params['splitfile']:
+        n.data, n.label = L.Python(module='ba.caffeine.voc_layers',
+                                   layer=pylayer,
+                                   ntop=2,
+                                   param_str=str(params))
     else:
         n.data = L.Input(shape=[dict(dim=[1,3,500,500])])
+
+    if 'learn_fc' not in switches:
+        switches['learn_fc'] = False
 
     # the base net
     n.conv1_1, n.relu1_1 = conv_relu(n.data, 64, pad=100, lrmult=0)
@@ -52,12 +50,17 @@ def fcn8s(params):
     n.pool5 = max_pool(n.relu5_3)
 
     # fully conv
-    n.fc6_, n.relu6 = conv_relu(n.pool5, 4096, ks=7, pad=0, lrmult=0)
-    # n.fc6, n.relu6 = conv_relu(n.pool5, 4096, ks=7, pad=0, lrmult=0)
+    if switches['learn_fc']:
+        n.fc6_, n.relu6 = conv_relu(n.pool5, 4096, ks=7, pad=0, lrmult=0)
+    else:
+        n.fc6, n.relu6 = conv_relu(n.pool5, 4096, ks=7, pad=0, lrmult=0)
     n.drop6 = L.Dropout(n.relu6, dropout_ratio=0.5, in_place=True)
-    n.fc7_, n.relu7 = conv_relu(n.drop6, 4096, ks=1, pad=0, lrmult=0)
-    # n.fc7, n.relu7 = conv_relu(n.drop6, 4096, ks=1, pad=0, lrmult=0)
+    if switches['learn_fc']:
+        n.fc7_, n.relu7 = conv_relu(n.drop6, 4096, ks=1, pad=0, lrmult=0)
+    else:
+        n.fc7, n.relu7 = conv_relu(n.drop6, 4096, ks=1, pad=0, lrmult=0)
     n.drop7 = L.Dropout(n.relu7, dropout_ratio=0.5, in_place=True)
+    
     #From scratch:
     n.score_fr_ = L.Convolution(n.drop7, num_output=nclasses, kernel_size=1, pad=0,
         param=[dict(lr_mult=1, decay_mult=1), dict(lr_mult=2, decay_mult=0)])
@@ -93,7 +96,7 @@ def fcn8s(params):
 
     n.score = crop(n.upscore8_, n.data)
 
-    if 'deploy' not in splitfile:
+    if 'deploy' not in params['splitfile']:
         n.loss = L.SoftmaxWithLoss(n.score, n.label,
                 loss_param=dict(normalize=False, ignore_label=255))
 

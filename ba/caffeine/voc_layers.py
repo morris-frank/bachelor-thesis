@@ -3,7 +3,6 @@
     fcn.berkeleyvision.org
 '''
 import caffe
-
 import numpy as np
 from PIL import Image
 from scipy.misc import imread
@@ -15,35 +14,13 @@ class SegDataLayer(caffe.Layer):
     """
 
     def setup(self, bottom, top):
-        """
-        Setup data layer according to parameters:
-
-        - sbdd_dir: path to SBDD `dataset` dir
-        - split: train / seg11valid
-        - mean: tuple of mean values to subtract
-        - randomize: load in random order (default: True)
-        - seed: seed for randomization (default: None / current time)
-
-        for SBDD semantic segmentation.
-
-        N.B.segv11alid is the set of segval11 that does not intersect with SBDD.
-        Find it here: https://gist.github.com/shelhamer/edb330760338892d511e.
-
-        example
-
-        params = dict(sbdd_dir="/path/to/SBDD/dataset",
-            mean=(104.00698793, 116.66876762, 122.67891434),
-            split="valid")
-        """
         # config
         params = eval(self.param_str)
-        self.img_dir = params['img_dir']
-        self.img_ext = 'jpg'
-        if 'img_ext' in params:
-            self.img_ext = params['img_ext']
-        self.label_dir = params['label_dir']
-        self.split = params['split']
+        self.images = params['images']
+        self.labels = params['labels']
+        self.splitfile = params['splitfile']
         self.mean = np.array(params['mean'])
+        self.extension = params.get('extension', 'jpg')
         self.random = params.get('randomize', True)
         self.seed = params.get('seed', None)
 
@@ -55,14 +32,11 @@ class SegDataLayer(caffe.Layer):
             raise Exception("Do not define a bottom.")
 
         # load indices for images and labels
-        # split_f  = '{}/{}.txt'.format(self.label_dir,
-        #         self.split)
-        split_f = self.split
-        self.indices = open(split_f, 'r').read().splitlines()
+        self.indices = open(self.splitfile, 'r').read().splitlines()
         self.idx = 0
 
         # make eval deterministic
-        if 'train' not in self.split:
+        if 'train' not in self.splitfile:
             self.random = False
 
         # randomization: seed and pick
@@ -106,7 +80,7 @@ class SegDataLayer(caffe.Layer):
         - subtract mean
         - transpose to channel x height x width order
         """
-        im = Image.open('{}/{}.{}'.format(self.img_dir, idx, self.img_ext))
+        im = Image.open('{}/{}.{}'.format(self.images, idx, self.extension))
         in_ = np.array(im, dtype=np.float32)
         in_ = in_[:,:,::-1]
         in_ -= self.mean
@@ -119,7 +93,7 @@ class SegDataLayer(caffe.Layer):
         Load label image as 1 x height x width integer array of label indices.
         The leading singleton dimension is required by the loss.
         """
-        label = imread('{}/{}.png'.format(self.label_dir, idx))
+        label = imread('{}/{}.png'.format(self.labels, idx))
         label = ((255-label)/255).astype(np.uint8)
         label = label[np.newaxis, ...]
         return label
