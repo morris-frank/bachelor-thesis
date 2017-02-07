@@ -55,32 +55,23 @@ def vgg16(params, switches):
     n.pool5 = max_pool(n.relu5_3)
 
     # fully conv
-    # TODO: -BUILD REAL FCs
-    if switches['learn_fc']:
-        n.fc6_ = L.Inner_Product(n.pool5,
-                                 inner_product_param=dict(num_output=4096))
-        n.relu6 = L.ReLU(n.fc6_)
-    else:
-        n.fc6 = L.Inner_Product(n.pool5,
-                                 inner_product_param=dict(num_output=4096))
-        n.relu6 = L.ReLU(n.fc6)
+    fc6, n.relu6 = fc(n.pool5, std=0.05, lrmult=1)
     n.drop6 = L.Dropout(n.relu6, dropout_ratio=0.5, in_place=True)
 
-    if switches['learn_fc']:
-        n.fc7_ = L.Inner_Product(n.drop6,
-                                 inner_product_param=dict(num_output=4096))
-        n.relu7 = L.ReLU(n.fc7_)
-    else:
-        n.fc7 = L.Inner_Product(n.drop6,
-                                 inner_product_param=dict(num_output=4096))
-        n.relu7 = L.ReLU(n.fc7)
+    fc7, n.relu7 = fc(n.drop6, std=0.05, lrmult=1)
     n.drop7 = L.Dropout(n.relu7, dropout_ratio=0.5, in_place=True)
 
-    n.fc8_ = L.Inner_Product(n.drop7,
-                            inner_product_param=dict(num_output=nclasses))
+    if switches['learn_fc']:
+        n.fc6_ = fc6
+        n.fc7_ = fc7
+    else:
+        n.fc6 = fc6
+        n.fc7 = fc7
+
+    n.fc8_, _ = fc(n.drop7, nout=nclasses, std=0.01, lrmult=10)
 
     if 'deploy' not in params['splitfile']:
-        n.loss = L.SoftmaxWithLoss(n.fc8_, n.label)
+        n.loss = L.Accuracy(n.fc8_, n.label)
     else:
         n.score = L.Softmax(n.fc8_, n.score)
 

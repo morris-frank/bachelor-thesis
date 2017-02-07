@@ -1,4 +1,3 @@
-tag: 'airStern_2lFC'
 train: 'data/tmp/pascpart_aeroplane_stern.txt'
 val: 'data/tmp/pascpart_aeroplane_stern.txt'
 weights: 'data/models/vgg16/VGG_ILSVRC_16_layers.caffemodel'
@@ -9,4 +8,6 @@ images: 'data/datasets/voc2010/JPEGImages/'
 labels: 'data/tmp/segmentations/pascpart_aeroplane_stern/'
 desc: 'Trained on whole images. Retrained FC-Layers'
 learn_fc: True
+sliding_window: True
 test_images: ''
+mean: [103.939, 116.779, 123.68]

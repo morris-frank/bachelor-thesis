@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from b.experiment import Experiment
+from ba.experiment import Experiment
 import sys
 
 

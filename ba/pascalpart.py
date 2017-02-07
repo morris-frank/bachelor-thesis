@@ -34,6 +34,14 @@ def reduceSaveCallback(imgid, params):
         item.save(parts=False, segmentation=True)
 
 
+def sliceOverlap(x1, x2, w):
+    x1_2 = [x1[0] + w[0], x1[1] + w[1]]
+    x2_2 = [x2[0] + w[0], x2[1] + w[1]]
+    SI = max(0, min(x1_2[0], x2_2[0]) - max(x1[0], x2[0])) * max(0, min(x1_2[1], x2_2[1]) - max(x1[1], x2[1]))
+    S = 2*w[0]*w[1] - SI
+    return SI/S
+
+
 def reduceBBSaveCallback(imgid, params):
     # TODO(doc): Add docstring
     # TODO: Transform to method of class
@@ -44,6 +52,17 @@ def reduceBBSaveCallback(imgid, params):
         item.source = params['parts_bb_target'] + imgid
         slice_ = item.saveBB(sum=True)
         imsave(params['parts_patch_target'] + imgid + '.png', im[slice_])
+        for negidx in range(0, params['negatives']):
+            x2 = x1 = [slice_[0].start, slice_[1].start]
+            w = [slice_[0].stop - x1[0], slice_[1].stop - x1[1]]
+            subim = [im.shape[0] - w[0], im.shape[1] - w[1]]
+            checkidx = 0
+            while checkidx < 30 and sliceOverlap(x1, x2, w) > 0.3:
+                checkidx += 1
+                x2 = (np.random.random(2) * subim).astype(int)
+            if checkidx >= 30:
+                continue
+            imsave(params['parts_patch_target'] + '{}_f{}.png'.format(imgid, negidx), im[x2[0]:x2[0] + w[0], x2[1]:x2[1] + w[1]])
     if params['class']:
         item.source = params['classes_bb_target'] + imgid
         slice_ = item.saveBB(parts=False, segmentation=True)
@@ -196,16 +215,18 @@ class PascalPartSet(object):
         else:
             print('Will not save any Segmentations...')
 
-    def saveBoundingBoxes(self, imgdir):
+    def saveBoundingBoxes(self, imgdir, negatives=0):
         # TODO(doc): Add docstring
-        params_ = {'dir': self.dir,
-                   'imdir': imgdir,
-                   'parts_bb_target': None,
-                   'classes_bb_target': None,
-                   'parts_patch_target': None,
-                   'classes_patch_target': None,
-                   'class': len(self.classes) > 0
-                   }
+        params_ = {
+            'dir': self.dir,
+            'imdir': imgdir,
+            'negatives': negatives,
+            'parts_bb_target': None,
+            'classes_bb_target': None,
+            'parts_patch_target': None,
+            'classes_patch_target': None,
+            'class': len(self.classes) > 0
+            }
         params_['parts_bb_target'] = self.targets['parts_seg'][:-1] + '_bb/'
         params_['classes_bb_target'] = self.targets['classes_seg'][:-1] + '_bb/'
         params_['parts_patch_target'] = self.targets['parts_seg'][:-1] + '_bb_patches/'

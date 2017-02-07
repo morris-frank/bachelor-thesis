@@ -12,9 +12,8 @@ import yaml
 
 class Experiment(object):
     '''A class to contain everything needed for an experiment'''
-    pass
 
-    __init__(argv):
+    def __init__(self, argv):
         '''Initialize the new experiment from the cli args
 
         Args:
@@ -23,7 +22,7 @@ class Experiment(object):
         self.argv = argv
         self.parseArgs()
 
-    def parseArgs():
+    def parseArgs(self):
         '''Parse the arguments for an experiment script'''
         parser = argparse.ArgumentParser(description='Runs a experiment')
         parser.add_argument('conf', type=str, nargs=1,
@@ -33,12 +32,11 @@ class Experiment(object):
         parser.add_argument('--default', action='store_true')
         parser.add_argument('--gpu', type=int, nargs='?', default=0,
                             help='The GPU to use.')
-        sysargs = parser.parse_args(args=self.argv)
-        if isinstance(sysargs.conf, list):
-            sysargs.conf = sysargs.conf[0]
-        self.sysargs = sysargs
+        self.sysargs = parser.parse_args(args=self.argv)
+        if isinstance(self.sysargs.conf, list):
+            self.sysargs.conf = self.sysargs.conf[0]
 
-    def _loadConfYaml(path):
+    def _loadConfYaml(self, path):
         '''Loads a yaml file.
 
         Args:
@@ -56,38 +54,41 @@ class Experiment(object):
                 sys.exit()
         return contents
 
-    def loadConf():
+    def loadConf(self):
         '''Open a YAML Configuration file and make a Bunch from it'''
         defaults = self._loadConfYaml('data/experiments/defaults.yaml')
-        conf = self._loadConfYaml(sysargs.conf.path)
-        conf = utils.Bunch({**defaults, **conf})
-        if not conf.net.startswith('ba.'):
+        conf = self._loadConfYaml(self.sysargs.conf)
+        if 'tag' not in conf:
+            conf['tag'] = os.path.basename(
+                            os.path.splitext(self.sysargs.conf)[0])
+        self.conf = utils.Bunch({**defaults, **conf})
+        if not self.conf.net.startswith('ba.'):
             print('Given Network is not from correct namespace you fucker')
             sys.exit()
         else:
-            conf.net = eval(conf.net)
-        self.conf = conf
+            self.conf.net = eval(self.conf.net)
 
-    def self._prepareFCN():
+    def prepareFCN(self):
         '''Prepares a NetRunner from the given configuration.'''
         if self.conf.sliding_window:
             runner = netrunner.SlidingFCNPartRunner
         else:
             runner = netrunner.FCNPartRunner
         self.fcn = runner(self.conf.tag,
-                          train=self.conf.train,
-                          val=self.conf.val,
+                          trainset=self.conf.train,
+                          valset=self.conf.val,
                           solver_weights=self.conf.weights,
                           net_generator=self.conf.net,
                           baselr=self.conf.baselr,
                           epochs=self.conf.epochs,
                           images=self.conf.images,
-                          labels=self.conf.labels
+                          labels=self.conf.labels,
+                          mean=self.conf.mean
                           )
         self.fcn.gpu = self.sysargs.gpu
         self.fcn.generator_switches['learn_fc'] = self.conf.learn_fc
 
-    def runTests():
+    def runTests(self):
         '''Tests the given experiment, Normally depends on user input. If --default
         flag is set will test EVERY snapshot previously saved.
         '''
@@ -103,15 +104,15 @@ class Experiment(object):
                                        defaulting=self.sysargs.default):
                 continue
             print('TESTING ' + bn)
-            self._prepareFCN()
+            self.prepareFCN()
             self.fcn.net_weights = w
             if self.conf.test_images != '':
                 self.fcn.images = self.conf.test_images
             self.fcn.forwardVal()
             self.fcn.clear()
 
-    def runTrain():
+    def runTrain(self):
         '''Trains the given experiment'''
-        self._prepareFCN()
-        lastiter = self.fcn.epochs * len(self.fcn.train)
+        self.prepareFCN()
+        lastiter = self.fcn.epochs * len(self.fcn.trainset)
         self.fcn.train()

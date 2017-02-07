@@ -78,7 +78,7 @@ class SetList(object):
         before running this.
 
         Returns:
-            The mean pixel.
+            The mean pixel. As BGR!
         '''
         self.mean = [[],[],[]]
         print('Calculating mean pixel...')
@@ -88,7 +88,7 @@ class SetList(object):
             self.mean[1].append(np.mean(im[...,1]))
             self.mean[2].append(np.mean(im[...,2]))
         self.mean = np.mean(self.mean, axis=1)
-        return self.mean
+        return self.mean[:,:,::-1]
 
     def each(self, callback):
         '''Applies a callable to every element of the list

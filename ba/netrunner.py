@@ -27,33 +27,35 @@ class NetRunner(object):
             kwargs...
         '''
         defaults = {
-            'epochs': 1,
             'baselr': 1,
-            'solver': None,
-            'net': None,
-            'test': '',
-            'train': '',
-            'val': '',
+            'dir': './',
+            'epochs': 1,
+            'generator_switches': {},
             'images': './',
             'labels': './',
-            'dir': './',
-            'results': './',
-            'random': True,
+            'mean': [],
+            'net_generator': None,
             'net_weights': '',
+            'net': None,
+            'random': True,
+            'results': './',
             'solver_weights': '',
-            'generator_switches': {}
+            'solver': None,
+            'testset': '',
+            'trainset': '',
+            'valset': ''
             }
         for (attr, default) in defaults.items():
             setattr(self, attr, kwargs.get(attr, default))
 
         self.name = name
 
-        if not isinstance(self.train, SetList):
-            self.train = SetList(self.train)
-        if not isinstance(self.test, SetList):
-            self.test = SetList(self.test)
-        if not isinstance(self.val, SetList):
-            self.val = SetList(self.val)
+        if not isinstance(self.trainset, SetList):
+            self.trainset = SetList(self.trainset)
+        if not isinstance(self.testset, SetList):
+            self.testset = SetList(self.testset)
+        if not isinstance(self.valset, SetList):
+            self.valset = SetList(self.valset)
 
     def clear(self):
         '''Clears the nets'''
@@ -94,9 +96,9 @@ class NetRunner(object):
             fpath (str): The path to the list file
         '''
         if 'test' in split:
-            self.test = SetList(fpath)
+            self.testset = SetList(fpath)
         if 'train' in split:
-            self.train = SetList(fpath)
+            self.trainset = SetList(fpath)
 
     def loadimg(self, path, mean):
         '''Loads an image and prepares it for caffe.
@@ -133,32 +135,37 @@ class NetRunner(object):
         return self.net.blobs[self.net.outputs[0]].data[0].argmax(axis=0)
 
     def split(self, count=0):
-        '''Splits the train list self.train into samples that we will train on
+        '''Splits the train list self.trainset into samples that we will train on
         and sample to do validation. Passing 0 will just copy the list.
 
         Args:
             count (int, optional): The count of samples
         '''
         if self.random:
-            self.train.shuffle()
-        self.val = copy.copy(self.train)
-        if count < len(self.train) and count > 0:
-            self.val.list = self.train.list[count:]
-            self.train.list = self.train.list[:count]
+            self.trainset.shuffle()
+        self.valset = copy.copy(self.trainset)
+        if count < len(self.trainset) and count > 0:
+            self.valset.list = self.trainset.list[count:]
+            self.trainset.list = self.trainset.list[:count]
 
     def calculate_mean(self):
         '''Calculates the mean for the training set. As that is necessary for
-        the bias of the training phase.'''
+        the bias of the training phase.
+
+        Returns:
+            The newly calculated mean for the trainset
+        '''
         try:
-            self.train.mean = np.load(self.dir + 'mean.npy')
+            self.trainset.mean = np.load(self.dir + 'mean.npy')
         except FileNotFoundError:
             imgext = '.' + utils.prevalentExtension(self.images)
-            self.train.addPreSuffix(self.images, imgext)
-            self.train.calculate_mean()
-            self.train.rmPreSuffix(self.images, imgext)
-            np.save(self.dir + 'mean.npy', self.train.mean)
+            self.trainset.addPreSuffix(self.images, imgext)
+            self.trainset.calculate_mean()
+            self.trainset.rmPreSuffix(self.images, imgext)
+            np.save(self.dir + 'mean.npy', self.trainset.mean)
+        return self.trainset.mean
 
-    def mean(self):
+    def getMean(self):
         '''Returns the mean for this NetRunner. If we have a train set with a
         mean that is returned otherwise we try to import the mean saved from
         the training phase.
@@ -166,12 +173,13 @@ class NetRunner(object):
         Returns:
             the mean
         '''
-        if self.train.mean != []:
+        if self.mean != []:
+            return self.mean
+        elif self.trainset.mean != []:
             print('Using mean from samples')
-            return self.train.mean
+            return self.trainset.mean
         else:
-            print('Loading mean from training phase')
-            return np.load(self.dir + 'mean.npy')
+            return self.calculate_mean()
 
 
 class FCNPartRunner(NetRunner):
@@ -188,7 +196,6 @@ class FCNPartRunner(NetRunner):
         '''
         super().__init__(name=name, **kwargs)
         self.images = 'data/datasets/voc2010/JPEGImages/'
-        self.net_generator = caffeine.fcn.fcn8s
         self.targets()
 
     def targets(self):
@@ -208,12 +215,11 @@ class FCNPartRunner(NetRunner):
             The parameter dictionary
         '''
         imgext = '.' + utils.prevalentExtension(self.images)
-        self.calculate_mean()
         params = dict(images=self.images,
-                        extension=self.imgext,
+                        extension=imgext,
                         labels=self.labels,
                         splitfile=self.dir + split + '.txt',
-                        mean=tuple(self.train.mean))
+                        mean=tuple(self.getMean()))
         return params
 
     def write(self, split):
@@ -236,13 +242,13 @@ class FCNPartRunner(NetRunner):
         # Create build and snapshot direcotry:
         if 'train' in split:
             utils.touch(self.snapshots)
-            self.train.target = self.dir + 'train.txt'
-            self.train.save()
+            self.trainset.target = self.dir + 'train.txt'
+            self.trainset.save()
             self.write('train')
             self.writeSolver()
         if 'train' in split or 'test' in split:
-            self.val.target = self.dir + 'test.txt'
-            self.val.save()
+            self.valset.target = self.dir + 'test.txt'
+            self.valset.save()
             self.write('val')
         if 'deploy' in split:
             bnw = os.path.basename(self.net_weights[:-len('.caffemodel')])
@@ -253,11 +259,11 @@ class FCNPartRunner(NetRunner):
 
     def writeSolver(self):
         '''Writes the solver definition to disk.'''
-        train_iter = str(len(self.train))
+        train_iter = str(len(self.trainset))
         train_net = self.dir + 'train.prototxt'
         val_net = self.dir + 'val.prototxt'
         prefix = self.snapshots + 'train'
-        avloss = str(np.min([20, len(self.train)]))
+        avloss = str(np.min([20, len(self.trainset)]))
         with open(self.dir + 'solver.prototxt', 'w') as f:
             f.write((
                 "train_net: '" + train_net + "'\n"
@@ -280,6 +286,7 @@ class FCNPartRunner(NetRunner):
     def train(self):
         '''Will train the network and make snapshots accordingly'''
         self.prepare('train')
+        os._exit(0)
         self.createSolver(self.dir + 'solver.prototxt',
                           self.solver_weights,
                           self.gpu)
@@ -287,7 +294,7 @@ class FCNPartRunner(NetRunner):
         interp_layers = [k for k in self.solver.net.params.keys() if 'up' in k]
         caffeine.surgery.interp(self.solver.net, interp_layers)
         for _ in range(self.epochs):
-            self.solver.step(len(self.train))
+            self.solver.step(len(self.trainset))
         self.solver.snapshot()
 
     def test(self):
@@ -297,9 +304,9 @@ class FCNPartRunner(NetRunner):
     def forwardVal(self):
         '''Will forward the whole validation set through the network'''
         imgext = '.' + utils.prevalentExtension(self.images)
-        self.val.addPreSuffix(self.images, imgext)
-        self.forwardList(setlist=self.val)
-        self.val.rmPreSuffix(self.images, imgext)
+        self.valset.addPreSuffix(self.images, imgext)
+        self.forwardList(setlist=self.valset)
+        self.valset.rmPreSuffix(self.images, imgext)
 
     def forwardIDx(self, idx, mean=None):
         '''Will forward one single idx-image from the source set and saves the
@@ -310,7 +317,7 @@ class FCNPartRunner(NetRunner):
             mean (tuple, optional): The mean
         '''
         if mean is None:
-            mean = self.mean()
+            mean = self.getMean()
         data, im = self.loadimg(idx, mean=mean)
         self.forward(data)
         score = self.net.blobs[self.net.outputs[0]].data[0][1, ...]
@@ -333,7 +340,7 @@ class FCNPartRunner(NetRunner):
         self.createNet(self.dir + 'deploy.prototxt',
                        self.net_weights,
                        self.gpu)
-        mean = self.mean()
+        mean = self.getMean()
         print('Forwarding all in {}'.format(setlist))
         for idx in tqdm(setlist):
             self.forwardIDx(idx, mean=mean)
@@ -353,6 +360,11 @@ class SlidingFCNPartRunner(FCNPartRunner):
         super().__init__(name=name, **kwargs)
         self.stride = 10
         self.kernel_size = 50
+
+    def FCNparams(self, split):
+        params = super().FCNparams(split)
+        params['batch_size'] = 10
+        return params
 
     def forwardWindow(self, window):
         '''Forwards a single window from the sliding window through the network.
@@ -378,7 +390,7 @@ class SlidingFCNPartRunner(FCNPartRunner):
             mean (tuple, optional): The mean
         '''
         if mean is None:
-            mean = self.mean()
+            mean = self.getMean()
         data, im = self.loadimg(idx, mean=mean)
         data = data.transpose((1, 2, 0))
         hm = np.zeros(data.shape[:-1])

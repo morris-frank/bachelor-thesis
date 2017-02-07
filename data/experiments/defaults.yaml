@@ -10,3 +10,4 @@ labels: ''
 learn_fc: True
 test_images: ''
 sliding_window: False
+mean: []

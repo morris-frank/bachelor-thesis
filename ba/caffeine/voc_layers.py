@@ -16,7 +16,7 @@ class PatchWiseLayer(caffe.Layer):
         # config
         params = eval(self.param_str)
         self.images = params['images']
-        self.labels = params['labels']
+        self.batch_size = params['batch_size']
         self.splitfile = params['splitfile']
         self.mean = np.array(params['mean'])
         self.extension = params.get('extension', 'jpg')
