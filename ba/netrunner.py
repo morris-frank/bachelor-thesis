@@ -336,5 +336,5 @@ class FCNPartRunner(NetRunner):
                        self.gpu)
         mean = self.mean()
         print('Forwarding all in {}'.format(setlist))
-        for idx in tqdm(setlist.list):
+        for idx in tqdm(setlist):
             self.forwardIDx(idx, mean=mean)

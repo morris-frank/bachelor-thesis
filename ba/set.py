@@ -31,6 +31,10 @@ class SetList(object):
         '''Returns a str-description of this Set'''
         return '{}[{}] → {}'.format(self.source, len(self.list), self.target)
 
+    def __iter__(self):
+        '''Returns the iterator for the contained list'''
+        return iter(self.list)
+
     def load(self):
         '''Loads the contents of self.source into the list. It does replace the
         whole content and does not append to it.'''
@@ -42,7 +46,7 @@ class SetList(object):
         '''Saves the list to the path set in self.target. This is normally set
         to self.source'''
         with open(self.target, 'w') as f:
-            for row in self.list:
+            for row in self:
                 f.write("{}\n".format(row))
         print('List {} written...'.format(self.target))
 
@@ -57,7 +61,7 @@ class SetList(object):
             prefix (str,optional): The prefix to prepend
             suffix (str,optional): The prefix to append
         '''
-        self.list = [prefix + x + suffix for x in self.list]
+        self.list = [prefix + x + suffix for x in self]
 
     def rmPreSuffix(self, prefix='', suffix=''):
         '''Removes a prefix and a suffix from every element of the list.
@@ -66,7 +70,7 @@ class SetList(object):
             prefix (str,optional): The prefix to remove
             suffix (str,optional): The prefix to remove
         '''
-        self.list = [x[len(prefix):-len(suffix)] for x in self.list]
+        self.list = [x[len(prefix):-len(suffix)] for x in self]
 
     def calculate_mean(self):
         '''Calculates the mean pixel for this set. The list has to contain full
@@ -78,7 +82,7 @@ class SetList(object):
         '''
         self.mean = [[],[],[]]
         print('Calculating mean pixel...')
-        for row in tqdm(self.list):
+        for row in tqdm(self):
             im = imread(row)
             self.mean[0].append(np.mean(im[...,0]))
             self.mean[1].append(np.mean(im[...,1]))
@@ -99,6 +103,6 @@ class SetList(object):
             warnings.warn('Not callable object')
             return False
         print('Each of {}'.format(self.source))
-        for row in tqdm(self.list):
+        for row in tqdm(self):
             callback(row)
         return True

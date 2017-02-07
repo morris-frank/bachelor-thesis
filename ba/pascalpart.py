@@ -131,7 +131,7 @@ class PascalPartSet(object):
             return self.clist
         self.rlist.addPreSuffix(self.dir, self.sourceext)
         print('Generating ClassList {}...'.format(self.targets['classes']))
-        for row in tqdm(self.rlist.list):
+        for row in tqdm(self.rlist):
             item = PascalPart(row)
             if item.classname in self.classes:
                 self.clist.list.append(row)
@@ -160,7 +160,7 @@ class PascalPartSet(object):
             return self.plist
         rootlist.addPreSuffix(self.dir, self.sourceext)
         print('Generating PartList {}...'.format(self.targets['parts']))
-        for row in tqdm(rootlist.list):
+        for row in tqdm(rootlist):
             item = PascalPart(row)
             if any(part in item.parts for part in self.parts):
                 self.plist.list.append(row)
