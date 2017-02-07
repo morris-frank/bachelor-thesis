@@ -1,0 +1,12 @@
+tag: 'airStern_BB'
+train: 'data/tmp/pascpart_aeroplane_stern.txt'
+val: 'data/tmp/pascpart_aeroplane_stern.txt'
+weights: 'data/models/fcn8s/fcn8s-heavy-pascal.caffemodel'
+net: ba.caffeine.fcn.fcn8s
+baselr: 10e-14
+epochs: 20
+images: 'data/tmp/segmentations/pascpart_aeroplane_stern_bb_patches/'
+labels: 'data/tmp/segmentations/pascpart_aeroplane_stern_bb/'
+test_images: 'data/datasets/voc2010/JPEGImages/'
+desc: 'Trained on patches. Run on Images. Retrianed FC-Layers'
+fc: True
