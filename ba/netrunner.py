@@ -354,22 +354,19 @@ class SlidingFCNPartRunner(FCNPartRunner):
         self.stride = 10
         self.kernel_size = 50
 
-    def forwardWindow(self, idx, x, y, window):
+    def forwardWindow(self, window):
         '''Forwards a single window from the sliding window through the network.
 
         Args:
-            idx (str): The index-string (basename) of the image
-            x (int): The x starting position of the window
-            y (int): The y starting position of the window
             window (image): The window (channels shall be last dimension)
+
+        Returns:
+            the score for that window sized for the window
         '''
+        window = window.transpose((2, 0, 1))
         self.forward(window)
         score = self.net.blobs[self.net.outputs[0]].data[0][1, ...]
-        bn = os.path.basename(os.path.splitext(idx)[0]) + '_'.join(['', x, y])
-        bn_hm = self.heatmaps + bn
-        imsave(bn_hm + '.png', score)
-        bn_ov = self.heatmaps[:-1] + '_overlays/' + bn
-        utils.apply_overlay(im, score, bn_ov + '.png')
+        return score * np.ones(window.shape[:-1])
 
     def forwardIDx(self, idx, mean=None):
         '''Will slide a window over the idx-image from the source and forward
@@ -384,6 +381,13 @@ class SlidingFCNPartRunner(FCNPartRunner):
             mean = self.mean()
         data, im = self.loadimg(idx, mean=mean)
         data = data.transpose((1, 2, 0))
+        hm = np.zeros(data.shape[:-1])
         for (x, y, window) in utils.sliding_window(data, self.stride,
                                                    self.kernel_size):
-            score = self.forwardWindow(idx, x, y, window)
+            score = self.forwardWindow(window)
+            hm[y:y + self.kernel_size, x:x + self.kernel_size] += score
+        bn = os.path.basename(os.path.splitext(idx)[0])
+        bn_hm = self.heatmaps + bn
+        imsave(bn_hm + '.png', score)
+        bn_ov = self.heatmaps[:-1] + '_overlays/' + bn
+        utils.apply_overlay(im, score, bn_ov + '.png')

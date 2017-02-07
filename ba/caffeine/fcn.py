@@ -18,7 +18,7 @@ def vgg16(params, switches):
     '''
     nclasses = 2
     n = caffe.NetSpec()
-    pylayer = 'SegDataLayer'
+    pylayer = 'PatchWiseLayer'
     if 'train' in params['splitfile'] or 'val' in params['splitfile']:
         n.data, n.label = L.Python(module='ba.caffeine.voc_layers',
                                    layer=pylayer,

@@ -1,7 +1,8 @@
 tag: '_'
 train: ''
 val: ''
-weights: ''
+solver_weights: ''
+net_weights: ''
 baselr: 1
 epochs: 1
 images: ''
