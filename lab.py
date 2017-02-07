@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-import ba.experiment as experiment
+from b.experiment import Experiment
 import sys
 
 
 def main(args):
-    sysargs = experiment.parseArgs(argv=args)
-    conf = experiment.loadConf(sysargs.conf)
-    if sysargs.train:
-        experiment.runTrain(sysargs, conf)
-    if sysargs.test:
-        experiment.runTests(sysargs, conf)
+    e = Experiment(argv=args)
+    e.loadConf()
+    if e.sysargs.train:
+        e.runTrain()
+    if e.sysargs.test:
+        e.runTests()
 
 
 if __name__ == '__main__':
