@@ -74,9 +74,9 @@ class PascalPartSet(object):
     builddir = 'data/tmp/'
     sourceext = '.mat'
 
-    def __init__(self, tag_, dir_='.', parts_=[], classes_=[]):
+    def __init__(self, tag_, root='.', parts_=[], classes_=[]):
         # TODO(doc): Add docstring
-        self.dir = dir_
+        self.root = root
         self.tag = tag_
         self.targets = {}
         self.rlist = None
@@ -125,13 +125,10 @@ class PascalPartSet(object):
         self.rlist = SetList(self.targets['root'])
         if not overwrite:
             return self.rlist
-        # Get most prominent extension:
-        exts = [os.path.splitext(x)[1][1:] for x in glob(self.dir + '*')]
-        exts = [x for x in exts if x]
-        self.ext = max(set(exts), key=exts.count)
-        files = glob(self.dir + '*' + self.ext)
+        self.ext = utils.prevalentExtension(self.root)
+        files = glob(self.root + '*' + self.ext)
         # Remove path and extension:
-        files = [row[len(self.dir):-len(self.sourceext)] for row in files]
+        files = [row[len(self.root):-len(self.sourceext)] for row in files]
         self.rlist.list = files
         self.rlist.save()
         return self.rlist
@@ -148,14 +145,14 @@ class PascalPartSet(object):
         self.clist = SetList(self.targets['classes'])
         if not overwrite:
             return self.clist
-        self.rlist.addPreSuffix(self.dir, self.sourceext)
+        self.rlist.addPreSuffix(self.root, self.sourceext)
         print('Generating ClassList {}...'.format(self.targets['classes']))
         for row in tqdm(self.rlist):
             item = PascalPart(row)
             if item.classname in self.classes:
                 self.clist.list.append(row)
-        self.rlist.rmPreSuffix(self.dir, self.sourceext)
-        self.clist.rmPreSuffix(self.dir, self.sourceext)
+        self.rlist.rmPreSuffix(self.root, self.sourceext)
+        self.clist.rmPreSuffix(self.root, self.sourceext)
         self.clist.save()
         return self.clist
 
@@ -177,14 +174,14 @@ class PascalPartSet(object):
         self.plist = SetList(self.targets['parts'])
         if not overwrite:
             return self.plist
-        rootlist.addPreSuffix(self.dir, self.sourceext)
+        rootlist.addPreSuffix(self.root, self.sourceext)
         print('Generating PartList {}...'.format(self.targets['parts']))
         for row in tqdm(rootlist):
             item = PascalPart(row)
             if any(part in item.parts for part in self.parts):
                 self.plist.list.append(row)
-        rootlist.rmPreSuffix(self.dir, self.sourceext)
-        self.plist.rmPreSuffix(self.dir, self.sourceext)
+        rootlist.rmPreSuffix(self.root, self.sourceext)
+        self.plist.rmPreSuffix(self.root, self.sourceext)
         self.plist.save()
         return self.plist
 
@@ -205,7 +202,7 @@ class PascalPartSet(object):
             rootlist = self.clist
         else:
             rootlist = self.plist
-        params_['dir'] = self.dir
+        params_['dir'] = self.root
         params_['parts_target'] = self.targets['parts_seg']
         params_['class_target'] = self.targets['classes_seg']
         params_['class'] = doClasses
@@ -218,7 +215,7 @@ class PascalPartSet(object):
     def saveBoundingBoxes(self, imgdir, negatives=0):
         # TODO(doc): Add docstring
         params_ = {
-            'dir': self.dir,
+            'dir': self.root,
             'imdir': imgdir,
             'negatives': negatives,
             'parts_bb_target': None,
