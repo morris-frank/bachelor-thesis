@@ -1,6 +1,7 @@
 from ba.set import SetList
 from PIL import Image
 from scipy.misc import imsave
+from scipy.misc import imresize
 from scipy.misc import imread
 from tqdm import tqdm
 from ba import caffeine
@@ -130,6 +131,7 @@ class NetRunner(object):
         '''
         self.net.blobs['data'].reshape(1, *data.shape)
         self.net.blobs['data'].data[...] = data
+
         # run net and take argmax for prediction
         self.net.forward()
         return self.net.blobs[self.net.outputs[0]].data[0].argmax(axis=0)
@@ -358,7 +360,7 @@ class SlidingFCNPartRunner(FCNPartRunner):
             kwargs...
         '''
         super().__init__(name=name, **kwargs)
-        self.stride = 10
+        self.stride = 25
         self.kernel_size = 50
 
     def FCNparams(self, split):
@@ -375,10 +377,12 @@ class SlidingFCNPartRunner(FCNPartRunner):
         Returns:
             the score for that window sized for the window
         '''
+        inshape = window.shape[:-1]
+        window = imresize(window, (224, 224, 3))
         window = window.transpose((2, 0, 1))
         self.forward(window)
         score = self.net.blobs[self.net.outputs[0]].data[0][1, ...]
-        return score * np.ones(window.shape[:-1])
+        return score * np.ones(inshape)
 
     def forwardIDx(self, idx, mean=None):
         '''Will slide a window over the idx-image from the source and forward
@@ -400,6 +404,6 @@ class SlidingFCNPartRunner(FCNPartRunner):
             hm[y:y + self.kernel_size, x:x + self.kernel_size] += score
         bn = os.path.basename(os.path.splitext(idx)[0])
         bn_hm = self.heatmaps + bn
-        imsave(bn_hm + '.png', score)
+        imsave(bn_hm + '.png', hm)
         bn_ov = self.heatmaps[:-1] + '_overlays/' + bn
-        utils.apply_overlay(im, score, bn_ov + '.png')
+        utils.apply_overlay(im, hm, bn_ov + '.png')

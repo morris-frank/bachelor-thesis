@@ -25,7 +25,7 @@ def vgg16(params, switches):
                                    ntop=2,
                                    param_str=str(params))
     else:
-        n.data = L.Input(shape=[dict(dim=[1,3,500,500])])
+        n.data = L.Input(shape=[dict(dim=[1,3,224,224])])
 
     if 'learn_fc' not in switches:
         switches['learn_fc'] = False
@@ -69,11 +69,13 @@ def vgg16(params, switches):
         n.fc7 = fc7
 
     n.fc8_, _ = fc(n.drop7, nout=nclasses, std=0.01, lrmult=10)
+    n.prob = L.Softmax(n.fc8_)
 
     if 'deploy' not in params['splitfile']:
-        n.loss = L.Accuracy(n.fc8_, n.label)
-    else:
-        n.score = L.Softmax(n.fc8_, n.score)
+        if 'test' in params['splitfile']:
+            n.accuracy = L.Accuracy(n.fc8_, n.label)
+        else:
+            n.loss = L.SoftmaxWithLoss(n.fc8_, n.label)
 
     return n.to_proto()
 

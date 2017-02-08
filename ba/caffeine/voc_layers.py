@@ -6,6 +6,7 @@ import caffe
 import numpy as np
 from PIL import Image
 from scipy.misc import imread
+from scipy.misc import imresize
 import random
 
 class PatchWiseLayer(caffe.Layer):
@@ -47,16 +48,16 @@ class PatchWiseLayer(caffe.Layer):
     def reshape(self, bottom, top):
         # load image + label image pair
         self.data = self.load_image(self.indices[self.idx])
-        self.label = self.load_label(self.indices[self.idx])
+        #self.label = self.load_label(self.indices[self.idx])
         # reshape tops to fit (leading 1 is for batch dimension)
-        top[0].reshape(1, *self.data.shape)
-        top[1].reshape(1, *self.label.shape)
+        #top[0].reshape(1, *self.data.shape)
+        #top[1].reshape(1, *self.label.shape)
 
 
     def forward(self, bottom, top):
         # assign output
         top[0].data[...] = self.data
-        top[1].data[...] = self.label
+        # top[1].data[...] = self.label
 
         # pick next input
         if self.random:

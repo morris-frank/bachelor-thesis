@@ -5,8 +5,7 @@ net: ba.caffeine.fcn.vgg16
 baselr: 10e-14
 epochs: 20
 images: 'data/datasets/voc2010/JPEGImages/'
-labels: 'data/tmp/segmentations/pascpart_aeroplane_stern/'
-desc: 'Trained on whole images. Retrained FC-Layers'
+desc: 'VGG16 trained on Stern patches, sliding window detection'
 learn_fc: True
 sliding_window: True
 test_images: ''
