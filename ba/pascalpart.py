@@ -130,7 +130,7 @@ class PascalPartSet(object):
         # Remove path and extension:
         files = [row[len(self.root):-len(self.sourceext)] for row in files]
         self.rlist.list = files
-        self.rlist.save()
+        self.rlist.write()
         return self.rlist
 
     def genClassList(self):
@@ -153,7 +153,7 @@ class PascalPartSet(object):
                 self.clist.list.append(row)
         self.rlist.rmPreSuffix(self.root, self.sourceext)
         self.clist.rmPreSuffix(self.root, self.sourceext)
-        self.clist.save()
+        self.clist.write()
         return self.clist
 
     def genPartList(self):
@@ -182,7 +182,7 @@ class PascalPartSet(object):
                 self.plist.list.append(row)
         rootlist.rmPreSuffix(self.root, self.sourceext)
         self.plist.rmPreSuffix(self.root, self.sourceext)
-        self.plist.save()
+        self.plist.write()
         return self.plist
 
     def saveSegmentations(self):

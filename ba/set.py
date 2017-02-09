@@ -42,7 +42,7 @@ class SetList(object):
         with open(self.source) as f:
             self.list = [l[:-1] for l in f.readlines() if l.strip()]
 
-    def save(self):
+    def write(self):
         '''Saves the list to the path set in self.target. This is normally set
         to self.source'''
         with open(self.target, 'w') as f:

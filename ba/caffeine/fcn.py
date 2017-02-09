@@ -3,6 +3,42 @@ from caffe import layers as L
 from caffe import params as P
 from caffe.coord_map import crop
 from ba.caffeine.utils import *
+from os.path import dirname
+
+'''
+layer {
+  name: "data"
+  type: "Data"
+  top: "data"
+  top: "label"
+  data_param {
+    source: "/net/hciserver03/storage/mfrank/src/ba/data/models/airStern_patchDetection/lmdb_train/"
+    backend: LMDB
+    batch_size: 10
+  }
+  transform_param {
+    crop_size: 224
+    #mean_file: "/net/hciserver03/storage/mfrank/src/ba/data/models/airStern_patchDetection/mean.binaryproto"
+    mean_value: 103.939
+    mean_value: 116.779
+    mean_value: 123.68
+    mirror: True
+  }
+  include {
+    phase: TRAIN
+  }
+}
+layer {
+  data_param {
+    source: "/net/hciserver03/storage/mfrank/src/ba/data/models/airStern_patchDetection/lmdb_test/"
+    backend: LMDB
+    batch_size: 10
+  }
+  include {
+    phase: TEST
+  }
+}
+'''
 
 def vgg16(params, switches):
     '''Builds the FCN8s Network.
@@ -18,14 +54,18 @@ def vgg16(params, switches):
     '''
     nclasses = 2
     n = caffe.NetSpec()
-    pylayer = 'PatchWiseLayer'
-    if 'train' in params['splitfile'] or 'val' in params['splitfile']:
-        n.data, n.label = L.Python(module='ba.caffeine.voc_layers',
-                                   layer=pylayer,
-                                   ntop=2,
-                                   param_str=str(params))
-    else:
-        n.data = L.Input(shape=[dict(dim=[1,3,224,224])])
+
+    lmdbdir = '{}/lmdb_{}'.format(dirname(params['splitfile']), params['split'])
+    print(list(params['mean']))
+    n.data, n.label = L.Data()
+    # param=[dict(backend='LMDB', batch_size='10', source=lmdbdir)]
+    # transform_param=[dict(crop_size='224', mirror='True'), mean_value=list(params['mean'])]
+
+    # pylayer = 'PatchWiseLayer'
+    # n.data, n.label = L.Python(module='ba.caffeine.voc_layers',
+    #                            layer=pylayer,
+    #                            ntop=2,
+    #                            param_str=str(params))
 
     if 'learn_fc' not in switches:
         switches['learn_fc'] = False
@@ -71,8 +111,8 @@ def vgg16(params, switches):
     n.fc8_, _ = fc(n.drop7, nout=nclasses, std=0.01, lrmult=10)
     n.prob = L.Softmax(n.fc8_)
 
-    if 'deploy' not in params['splitfile']:
-        if 'test' in params['splitfile']:
+    if 'deploy' != params['split']:
+        if 'test' == params['split']:
             n.accuracy = L.Accuracy(n.fc8_, n.label)
         else:
             n.loss = L.SoftmaxWithLoss(n.fc8_, n.label)

@@ -3,11 +3,11 @@ test_iter: 10
 test_interval: 100
 display: 10
 lr_policy: 'step'
-base_lr: 10e-8
-stepsize: 500
+base_lr: 10e-6
+stepsize: 1000
 momentum: 0.9
 gamma: 0.001
-max_iter: 100000
+max_iter: 4000
 weight_decay: 0.0005
-snapshot: 500
+snapshot: 1000
 snapshot_prefix: '/export/home/mfrank/src/ba/data/models/airStern_patchDetection/snapshots/train'

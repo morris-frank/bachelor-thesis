@@ -1,20 +1,59 @@
-from ba.set import SetList
-from PIL import Image
-from scipy.misc import imsave
-from scipy.misc import imresize
-from scipy.misc import imread
-from tqdm import tqdm
 from ba import caffeine
+from ba.set import SetList
+from ba import utils
 import caffe
 from collections import namedtuple
 import copy
+from functools import partial
 import numpy as np
 import os
+from os.path import normpath
+from PIL import Image
+from scipy.misc import imread
+from scipy.misc import imresize
+from scipy.misc import imsave
 import sys
-from functools import partial
 import tempfile
-from ba import utils
+from tqdm import tqdm
 import warnings
+
+
+class SolverSpec(utils.Bunch):
+
+    def __init__(self, dir, adict={}):
+        '''Constructs a new SolverSpec object.
+
+        Args:
+            dir (str): The filepath of the model directory
+            adict (dict, optional):  Optional values already set.
+        '''
+        self._dir = dir
+        self.train_net = normpath(self._dir + '/train.prototxt')
+        self.test_net = normpath(self._dir + '/val.prototxt')
+        self.snapshot = 1000
+        self.snapshot_prefix = normpath(self._dir + '/snapshots/train')
+        self.weight_decay = 0.0001
+        self.momentum = 0.9
+        self.display = 20
+        self.average_loss = self.display
+        self.base_lr = 0.001
+        self.lr_policy = 'fixed'
+        self.gamma = 0.1
+        self.test_initialization = 'false'
+        self.iter_size = 1
+        self.max_iter = 4000
+        self.test_iter = 100
+        self.test_interval = 500
+        super().__init__(adict)
+
+    def write(self):
+        '''Writes this SolverSpec to the disc at the path set at self.target.
+
+        '''
+        with open(normpath(self._dir + '/solver.prototxt'), 'w') as f:
+            for key, value in sorted(self.__dict__):
+                if not key.startswith('_'):
+                    f.write('%s: %s\n'.format(key, value))
 
 
 class NetRunner(object):
@@ -27,6 +66,8 @@ class NetRunner(object):
             name (str): The name of this network (for save paths etc..)
             kwargs...
         '''
+        self.name = name
+        self._spattr = {}
         defaults = {
             'baselr': 1,
             'dir': './',
@@ -46,10 +87,12 @@ class NetRunner(object):
             'trainset': '',
             'valset': ''
             }
-        for (attr, default) in defaults.items():
-            setattr(self, attr, kwargs.get(attr, default))
-
-        self.name = name
+        self.__dict__.update(defaults)
+        for (attr, value) in kwargs.items():
+            if attr in defaults:
+                setattr(self, attr, value)
+            else:
+                self._spattr['attr'] = value
 
         if not isinstance(self.trainset, SetList):
             self.trainset = SetList(self.trainset)
@@ -218,10 +261,11 @@ class FCNPartRunner(NetRunner):
         '''
         imgext = '.' + utils.prevalentExtension(self.images)
         params = dict(images=self.images,
-                        extension=imgext,
-                        labels=self.labels,
-                        splitfile=self.dir + split + '.txt',
-                        mean=tuple(self.getMean()))
+                      extension=imgext,
+                      labels=self.labels,
+                      splitfile=self.dir + split + '.txt',
+                      split=split,
+                      mean=tuple(self.getMean()))
         return params
 
     def write(self, split):
@@ -245,12 +289,12 @@ class FCNPartRunner(NetRunner):
         if 'train' in split:
             utils.touch(self.snapshots)
             self.trainset.target = self.dir + 'train.txt'
-            self.trainset.save()
+            self.trainset.write()
             self.write('train')
             self.writeSolver()
         if 'train' in split or 'test' in split:
             self.valset.target = self.dir + 'test.txt'
-            self.valset.save()
+            self.valset.write()
             self.write('val')
         if 'deploy' in split:
             bnw = os.path.basename(self.net_weights[:-len('.caffemodel')])
@@ -261,29 +305,10 @@ class FCNPartRunner(NetRunner):
 
     def writeSolver(self):
         '''Writes the solver definition to disk.'''
-        train_iter = str(len(self.trainset))
-        train_net = self.dir + 'train.prototxt'
-        val_net = self.dir + 'val.prototxt'
-        prefix = self.snapshots + 'train'
-        avloss = str(np.min([20, len(self.trainset)]))
-        with open(self.dir + 'solver.prototxt', 'w') as f:
-            f.write((
-                "train_net: '" + train_net + "'\n"
-                "test_net: '" + val_net + "'\n"
-                "test_iter: " + train_iter + "\n"
-                "test_interval: " + str(999999) + "\n"
-                "display: " + avloss + "\n"
-                "average_loss: " + avloss + "\n"
-                "lr_policy: 'fixed'\n"
-                "base_lr: " + str(self.baselr) + "\n"
-                "momentum: 0.99\n"
-                "iter_size: 1\n"
-                "max_iter: 100000\n"
-                "weight_decay: 0.0005\n"
-                "snapshot: " + train_iter + "\n"
-                "snapshot_prefix: '" + prefix + "'\n"
-                "test_initialization: false\n"
-                ))
+        s = SolverSpec(self.dir, self._spattr)
+        s.base_lr = self.base_lr
+        s.lr_policy = self.lr_policy
+        s.write()
 
     def train(self):
         '''Will train the network and make snapshots accordingly'''

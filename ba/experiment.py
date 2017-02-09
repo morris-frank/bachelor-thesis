@@ -95,7 +95,7 @@ class Experiment(object):
         snapdir = 'data/models/{}/snapshots/'.format(self.conf.tag)
         weights = glob('{}*caffemodel'.format(snapdir))
         if len(weights) < 1:
-            print('No weights found for {}'.formart(self.conf.tag))
+            print('No weights found for {}'.format(self.conf.tag))
             return False
         for w in weights:
             bn = os.path.basename(w)
