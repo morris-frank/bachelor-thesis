@@ -1,15 +1,16 @@
 from ba.set import SetList
 from ba import utils
+import copy
+from functools import partial
 from glob import glob
 import numpy as np
 import os.path
 import scipy.io as sio
-import scipy.ndimage
-from scipy.misc import imsave
 from scipy.misc import imread
+from scipy.misc import imsave
+import scipy.ndimage
 import tempfile
 from tqdm import tqdm
-from functools import partial
 
 
 def getSingularBB(img):
@@ -21,229 +22,185 @@ def getSingularBB(img):
     return img[slice_], slice_
 
 
-def reduceSaveCallback(imgid, params):
-    # TODO(doc): Add docstring
-    # TODO: Transform to method of class
-    item = PascalPart(params['dir'] + imgid + '.mat')
-    item.reduce(params['parts'])
-    if len(item.parts) > 0:
-        item.source = params['parts_target'] + imgid
-        item.save(sum=True)
-    if params['class']:
-        item.source = params['class_target'] + imgid
-        item.save(parts=False, segmentation=True)
-
-
 def sliceOverlap(x1, x2, w):
     x1_2 = [x1[0] + w[0], x1[1] + w[1]]
     x2_2 = [x2[0] + w[0], x2[1] + w[1]]
     SI = max(0, min(x1_2[0], x2_2[0]) - max(x1[0], x2[0])) * max(0, min(x1_2[1], x2_2[1]) - max(x1[1], x2[1]))
-    S = 2*w[0]*w[1] - SI
-    return SI/S
-
-
-def reduceBBSaveCallback(imgid, params):
-    # TODO(doc): Add docstring
-    # TODO: Transform to method of class
-    item = PascalPart(params['dir'] + imgid + '.mat')
-    item.reduce(params['parts'])
-    im = imread(params['imdir'] + imgid + '.jpg')
-    if len(item.parts) > 0:
-        item.source = params['parts_bb_target'] + imgid
-        slice_ = item.saveBB(sum=True)
-        imsave(params['parts_patch_target'] + imgid + '.png', im[slice_])
-        for negidx in range(0, params['negatives']):
-            x2 = x1 = [slice_[0].start, slice_[1].start]
-            w = [slice_[0].stop - x1[0], slice_[1].stop - x1[1]]
-            subim = [im.shape[0] - w[0], im.shape[1] - w[1]]
-            checkidx = 0
-            while checkidx < 30 and sliceOverlap(x1, x2, w) > 0.3:
-                checkidx += 1
-                x2 = (np.random.random(2) * subim).astype(int)
-            if checkidx >= 30:
-                continue
-            imsave(params['parts_patch_target'] + '{}_f{}.png'.format(imgid, negidx), im[x2[0]:x2[0] + w[0], x2[1]:x2[1] + w[1]])
-    if params['class']:
-        item.source = params['classes_bb_target'] + imgid
-        slice_ = item.saveBB(parts=False, segmentation=True)
-        imsave(params['classes_patch_target'] + imgid + '.png', im[slice_])
-
+    S = 2 * w[0] * w[1] - SI
+    return SI / S
 
 class PascalPartSet(object):
     # TODO(doc): Add docstring
-    builddir = 'data/tmp/'
-    sourceext = '.mat'
+    _builddir = 'data/tmp/'
 
-    def __init__(self, tag_, root='.', parts_=[], classes_=[]):
+    def __init__(self, name, root='.', parts=[], classes=[]):
         # TODO(doc): Add docstring
-        self.root = root
-        self.tag = tag_
-        self.targets = {}
-        self.rlist = None
-        self.clist = None
-        self.plist = None
-        self.setParts(parts_)
-        self.setClasses(classes_)
-        self.genTargets()
-        self.genRootList()
-        self.genClassList()
-        self.genPartList()
+        self.name = name
+        self.source = root
+        self.parts = parts
+        self.classes = classes
+        self.genLists()
 
-    def setParts(self, parts_):
-        # TODO(doc): Add docstring
-        if parts_ is not None and not isinstance(parts_, list):
-            self.parts = [parts_]
+    @property
+    def parts(self):
+        return self.__parts
+
+    @parts.setter
+    def parts(self, parts):
+        if isinstance(parts, list):
+            self.__parts = parts
         else:
-            self.parts = parts_
+            self.__parts = [parts]
+        self.tag = '_'.join(self.classes + self.parts)
 
-    def setClasses(self, classes_):
-        # TODO(doc): Add docstring
-        if classes_ is not None and not isinstance(classes_, list):
-            self.classes = [classes_]
+    @property
+    def classes(self):
+        return self.__classes
+
+    @classes.setter
+    def classes(self, classes):
+        if isinstance(classes, list):
+            self.__classes = classes
         else:
-            self.classes = classes_
+            self.__classes = [classes]
+        self.tag = '_'.join(self.classes + self.parts)
 
-    def genTargets(self):
-        # TODO(doc): Add docstring
-        txtroot = self.builddir + self.tag
-        segroot = self.builddir + 'segmentations/' + self.tag
-        classstr = '_'.join([''] + self.classes)
-        classnpartstr = '_'.join([''] + self.classes + self.parts)
-        self.targets['root'] = txtroot + '.txt'
-        self.targets['parts'] = self.targets['root']
-        self.targets['classes'] = self.targets['root']
-        if self.parts is not None:
-            self.targets['parts'] = txtroot + classnpartstr + '.txt'
-            self.targets['parts_seg'] = segroot + classnpartstr + '/'
-        if self.classes is not None:
-            self.targets['classes'] = txtroot + classstr + '.txt'
-            self.targets['classes_seg'] = segroot + classstr + '/'
+    @property
+    def source(self):
+        return self.__source
 
-    def genRootList(self):
-        # TODO(doc): Add docstring
-        overwrite = utils.query_overwrite(self.targets['root'], default='no')
-        self.rlist = SetList(self.targets['root'])
-        if not overwrite:
-            return self.rlist
-        self.ext = utils.prevalentExtension(self.root)
-        files = glob(self.root + '*' + self.ext)
-        # Remove path and extension:
-        files = [row[len(self.root):-len(self.sourceext)] for row in files]
-        self.rlist.list = files
-        self.rlist.write()
-        return self.rlist
-
-    def genClassList(self):
-        # TODO(doc): Add docstring
-        if self.classes == []:
-            return False
-        if not self.rlist:
-            self.genRootList()
-        overwrite = utils.query_overwrite(self.targets['classes'],
-                                             default='no')
-        utils.touch(self.targets['classes'], clear=overwrite)
-        self.clist = SetList(self.targets['classes'])
-        if not overwrite:
-            return self.clist
-        self.rlist.addPreSuffix(self.root, self.sourceext)
-        print('Generating ClassList {}...'.format(self.targets['classes']))
-        for row in tqdm(self.rlist):
-            item = PascalPart(row)
-            if item.classname in self.classes:
-                self.clist.list.append(row)
-        self.rlist.rmPreSuffix(self.root, self.sourceext)
-        self.clist.rmPreSuffix(self.root, self.sourceext)
-        self.clist.write()
-        return self.clist
-
-    def genPartList(self):
-        # TODO(doc): Add docstring
-        if self.parts == []:
-            return False
-        if not self.rlist:
-            self.genRootList()
-        if not self.clist:
-            self.genClassList()
-        if self.classes == []:
-            rootlist = self.rlist
+    @source.setter
+    def source(self, source):
+        if not os.path.isdir(source):
+            raise OSError('source attribute must be path to a dir')
         else:
-            rootlist = self.clist
-        overwrite = utils.query_overwrite(self.targets['parts'],
-                                             default='no')
-        utils.touch(self.targets['parts'], clear=overwrite)
-        self.plist = SetList(self.targets['parts'])
-        if not overwrite:
-            return self.plist
-        rootlist.addPreSuffix(self.root, self.sourceext)
-        print('Generating PartList {}...'.format(self.targets['parts']))
-        for row in tqdm(rootlist):
-            item = PascalPart(row)
-            if any(part in item.parts for part in self.parts):
-                self.plist.list.append(row)
-        rootlist.rmPreSuffix(self.root, self.sourceext)
-        self.plist.rmPreSuffix(self.root, self.sourceext)
-        self.plist.write()
-        return self.plist
+            self.__source = source
+            self.extension = '.' + utils.prevalentExtension(source)
+
+    @property
+    def name(self):
+        return self.__name
+
+    @name.setter
+    def name(self, name):
+        self.name = str(name)
+        self.build = self._builddir + '/' + self.name + '/'
+        utils.touch(self.build)
+
+    def write(self):
+        for l in [self.sourcelist, self.classlist, self.partslist]:
+            l.rmPreSuffix(self.source, self.extension)
+            l.write()
+            l.addPreSuffix(self.source, self.extension)
+
+    def genLists(self):
+        '''Generates the *.txt lists for this set.'''
+        f = {
+            source = self.build + self.name + '.txt',
+            classes = self.build + '_'.join(self.classes) + '.txt',
+            parts = self.build + self.tag + '.txt'
+            }
+        overwrite = {
+            source = utils.query_overwrite(f['source'], default='no'),
+            classes = utils.query_overwrite(f['classes'], default='no'),
+            parts = utils.query_overwrite(f['parts'], default='no')
+            }
+        if not sum(f.values()):
+            return True
+
+        self.sourcelist = SetList(f['source'])
+        if overwrite['source']:
+            self.sourcelist.loadDir(self.source)
+        self.sourcelist.addPreSuffix(self.source, self.extension)
+
+        self.classlist = SetList(f['classes'])
+        self.partslist = SetList(f['parts'])
+
+        if overwrite['classes'] or overwrite['parts']:
+            print('Generating List for {} and {}'.format(f['classes'],
+                                                         f['parts']))
+            for row in tqdm(self.sourcelist):
+                item = PascalPart(row)
+                if item.classname in self.classes or len(self.classes) < 1:
+                    self.classlist.list.append(row)
+                    if any(part in item.parts for part in self.parts):
+                        self.partslist.list.append(row)
+        self.write()
 
     def saveSegmentations(self):
-        # TODO(doc): Add docstring
-        doClasses = len(self.classes) > 0
-        params_ = {}
-        if not utils.query_overwrite(self.targets['parts_seg'],
-                                        default='no'):
-            params_['parts'] = []
-        else:
-            utils.touch(self.targets['parts_seg'])
-            params_['parts'] = self.parts
-        if doClasses:
-            doClasses = utils.query_overwrite(self.targets['classes_seg'],
-                                                 default='no')
-            utils.touch(self.targets['classes_seg'])
-            rootlist = self.clist
-        else:
-            rootlist = self.plist
-        params_['dir'] = self.root
-        params_['parts_target'] = self.targets['parts_seg']
-        params_['class_target'] = self.targets['classes_seg']
-        params_['class'] = doClasses
-        if params_['parts'] != [] or doClasses:
-            print('Generating and extracting the segmentations...')
-            rootlist.each(partial(reduceSaveCallback, params=params_))
-        else:
-            print('Will not save any Segmentations...')
+        '''Saves the segmentations for selected classes or parts.'''
+        d = {
+            classes = '{}segmentations/{}/'.format(self.build, '_'.join(self.classes))
+            parts = '{}segmentations/{}/'.format(self.build, self.tag)
+            }
+        overwrite = {
+            classes = utils.query_overwrite(d['classes'], default='no')
+            parts = utils.query_overwrite(d['parts'], default='no')
+            }
+        if not sum(f.values()):
+            return True
+
+        print('Generating and extracting the segmentations...')
+        for item in tqdm(self.sourcelist):
+            idx = os.path.splitext(os.path.basename(item))[0]
+            item = PascalPart(item)
+            if overwrite['parts']:
+                item.reduce(self.parts)
+                item.source = d['parts'] + idx
+                item.save(sum=True)
+            if overwrite['classes']:
+                item.source = d['classes'] + idx
+                item.save(parts=False, segmentation=True)
 
     def saveBoundingBoxes(self, imgdir, negatives=0):
-        # TODO(doc): Add docstring
-        params_ = {
-            'dir': self.root,
-            'imdir': imgdir,
-            'negatives': negatives,
-            'parts_bb_target': None,
-            'classes_bb_target': None,
-            'parts_patch_target': None,
-            'classes_patch_target': None,
-            'class': len(self.classes) > 0
+        '''Saves the bounding box patches for classes and parts.
+
+        Args:
+            imgdir (str): The directory where the original images live
+            negatives (int, optional): How many negative samples to generate
+        '''
+        cbdir = '{}patches/{}/'.format(self.build, '_'.join(self.classes))
+        pbdir = '{}patches/{}/'.format(self.build, self.tag)
+        d = {
+            img_pos = utils.touch(pbdir + 'img/pos/'),
+            img_neg = utils.touch(pbdir + 'img/neg/'),
+            seg_pos = utils.touch(pbdir + 'seg/pos/'),
+            img_cla = utils.touch(cbdir + 'img/'),
+            seg_cla = utils.touch(cbdir + 'seg/')
             }
-        params_['parts_bb_target'] = self.targets['parts_seg'][:-1] + '_bb/'
-        params_['classes_bb_target'] = self.targets['classes_seg'][:-1] + '_bb/'
-        params_['parts_patch_target'] = self.targets['parts_seg'][:-1] + '_bb_patches/'
-        params_['classes_patch_target'] = self.targets['classes_seg'][:-1] + '_bb_patches/'
-        if not utils.query_overwrite(params_['parts_bb_target'], default='no'):
-            params_['parts'] = []
-        else:
-            utils.touch(params_['parts_bb_target'])
-            utils.touch(params_['parts_patch_target'])
-            params_['parts'] = self.parts
-        if params_['class']:
-            params_['class'] = utils.query_overwrite(params_['classes_bb_target'],
-                                                        default='no')
-            utils.touch(params_['classes_bb_target'])
-            utils.touch(params_['classes_patch_target'])
-            rootlist = self.clist
-        else:
-            rootlist = self.plist
+        if not utils.query_overwrite(pbdir, default='yes'):
+            return True
+
         print('Generating and extracting the segmentation bounding boxes...')
-        rootlist.each(partial(reduceBBSaveCallback, params=params_))
+        for item in self.sourcelist:
+            idx = os.path.splitext(os.path.basename(item))[0]
+            item = PascalPart(item)
+            im = imread(imgdir + idx + '.' + utils.prevalentExtension(imgdir))
+            item.reduce(self.parts)
+
+            # Save Class patches
+            item.source = d['seg_cla'] + idx
+            bb = item.saveBB(parts=False, segmentation=True)
+            imsave(d['img_cla'] + idx + '.png', im[bb])
+
+            # Save positive patch
+            item.source = d['seg_pos'] + idx
+            bb = item.saveBB(sum=True)
+            imsave(d['img_pos'] + idx + '.png', im[bb])
+
+            # Save neagtive patches
+            for i in range(0, negatives):
+                x2 = x1 = [bb[0].start, bb[1].start]
+                w = [bb[0].stop - x1[0], bb[1].stop - x1[1]]
+                subim = [im.shape[0] - w[0], im.shape[1] - w[1]]
+                checkidx = 0
+                while checkidx < 30 and sliceOverlap(x1, x2, w) > 0.3:
+                    checkidx += 1
+                    x2 = (np.random.random(2) * subim).astype(int)
+                if checkidx >= 30:
+                    continue
+                negpatch = im[x2[0]:x2[0] + w[0], x2[1]:x2[1] + w[1]]
+                imsave(d['img_neg'] + '{}_{}.png'.format(idx, i), negpatch)
 
 
 class PascalPart(object):

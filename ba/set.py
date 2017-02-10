@@ -10,14 +10,17 @@ from ba import utils
 class SetList(object):
     '''A class to hold lists of inputs for a network'''
 
-    def __init__(self, source=''):
+    def __init__(self, source='', target=None):
         '''Constructs a new SetList.
 
         Args:
             source (str): The path to the list file
         '''
         self.source = source
-        self.target = source
+        if target is None:
+            self.target = source
+        else:
+            self.target = target
         self.list = []
         self.mean = []
         if source != '':
@@ -36,11 +39,25 @@ class SetList(object):
         return iter(self.list)
 
     def load(self):
-        '''Loads the contents of self.source into the list. It does replace the
+        '''Loads the contents of self.source into the list. If source is a dir
+        it will list all files in it without extensions. It does replace the
         whole content and does not append to it.'''
         utils.touch(self.source)
-        with open(self.source) as f:
-            self.list = [l[:-1] for l in f.readlines() if l.strip()]
+        if os.path.isdir(self.source):
+            self.loadDir(self.source)
+            self.source = ''
+            self.target = ''
+        else:
+            with open(self.source) as f:
+                self.list = [l[:-1] for l in f.readlines() if l.strip()]
+
+    def loadDir(self, dir):
+        '''Loads the contents of a dirctory into the list
+
+        Args:
+            dir (str): The path to the dir
+        '''
+        self.list = [os.path.splitext(f)[0] for f in next(os.walk(dir))[2]]
 
     def write(self):
         '''Saves the list to the path set in self.target. This is normally set

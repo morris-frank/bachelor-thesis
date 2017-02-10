@@ -99,10 +99,16 @@ def query_overwrite(path, default='yes', defaulting=False):
     '''
 
     if not os.path.exists(path):
+        touch(path)
         return True
-    question = ('File {} does exist.\n'
-                'Overwrite it?'.format(path))
-    return query_boolean(question, default=default, defaulting=defaulting)
+    else:
+        question = ('File {} does exist.\n'
+                    'Overwrite it?'.format(path))
+        if query_boolean(question, default=default, defaulting=defaulting):
+            touch(path, clear=True)
+            return True
+        else:
+            return False
 
 
 def touch(path, clear=False):
@@ -119,6 +125,7 @@ def touch(path, clear=False):
         open(path, 'a').close()
         if clear:
             open(path, 'w').close()
+    return path
 
 
 def prevalentExtension(path):
