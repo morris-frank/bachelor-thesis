@@ -143,6 +143,7 @@ def prevalentExtension(path):
     exts = [x for x in exts if x]
     return max(set(exts), key=exts.count)
 
+
 def sliding_window(image, stride, kernel_size):
     '''Slides a quadratic window over an image.
 
@@ -154,3 +155,20 @@ def sliding_window(image, stride, kernel_size):
     for y in range(0, image.shape[0], stride):
         for x in range(0, image.shape[1], stride):
             yield (x, y, image[y:y + kernel_size, x:x + kernel_size])
+
+
+def sliceOverlap(x1, x2, w):
+    '''Calculates the overlap between two same sized rectangles.
+
+    Args:
+        x1 (list or tuple): First 2d-Point for the first rectangle
+        x2 (list or tuple): Second 2d-Point for the second rectangle
+
+    Returns:
+        The overlap in a percentage range
+    '''
+    x1_2 = [x1[0] + w[0], x1[1] + w[1]]
+    x2_2 = [x2[0] + w[0], x2[1] + w[1]]
+    SI = max(0, min(x1_2[0], x2_2[0]) - max(x1[0], x2[0])) * max(0, min(x1_2[1], x2_2[1]) - max(x1[1], x2[1]))
+    S = 2 * w[0] * w[1] - SI
+    return SI / S

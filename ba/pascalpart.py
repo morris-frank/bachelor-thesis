@@ -13,22 +13,6 @@ import tempfile
 from tqdm import tqdm
 
 
-def getSingularBB(img):
-    # TODO(doc): Add docstring
-    # TODO: Transform to method of class
-    slices = scipy.ndimage.find_objects(img)
-    # TODO: Yeah so, that cant be rught: :P
-    slice_ = slices[-1]
-    return img[slice_], slice_
-
-
-def sliceOverlap(x1, x2, w):
-    x1_2 = [x1[0] + w[0], x1[1] + w[1]]
-    x2_2 = [x2[0] + w[0], x2[1] + w[1]]
-    SI = max(0, min(x1_2[0], x2_2[0]) - max(x1[0], x2[0])) * max(0, min(x1_2[1], x2_2[1]) - max(x1[1], x2[1]))
-    S = 2 * w[0] * w[1] - SI
-    return SI / S
-
 class PascalPartSet(object):
     # TODO(doc): Add docstring
     _builddir = 'data/tmp/'
@@ -146,11 +130,11 @@ class PascalPartSet(object):
             item = PascalPart(item)
             if overwrite['parts']:
                 item.reduce(self.parts)
-                item.source = d['parts'] + idx
-                item.save(sum=True)
+                item.target = d['parts'] + idx
+                item.save(mode='parts')
             if overwrite['classes']:
-                item.source = d['classes'] + idx
-                item.save(parts=False, segmentation=True)
+                item.target = d['classes'] + idx
+                item.save(mode='class')
 
     def saveBoundingBoxes(self, imgdir, negatives=0):
         '''Saves the bounding box patches for classes and parts.
@@ -179,13 +163,13 @@ class PascalPartSet(object):
             item.reduce(self.parts)
 
             # Save Class patches
-            item.source = d['seg_cla'] + idx
-            bb = item.saveBB(parts=False, segmentation=True)
+            item.target = d['seg_cla'] + idx
+            bb = item.saveBB(mode='class')
             imsave(d['img_cla'] + idx + '.png', im[bb])
 
             # Save positive patch
-            item.source = d['seg_pos'] + idx
-            bb = item.saveBB(sum=True)
+            item.target = d['seg_pos'] + idx
+            bb = item.saveBB(mode='parts')
             imsave(d['img_pos'] + idx + '.png', im[bb])
 
             # Save neagtive patches
@@ -194,7 +178,7 @@ class PascalPartSet(object):
                 w = [bb[0].stop - x1[0], bb[1].stop - x1[1]]
                 subim = [im.shape[0] - w[0], im.shape[1] - w[1]]
                 checkidx = 0
-                while checkidx < 30 and sliceOverlap(x1, x2, w) > 0.3:
+                while checkidx < 30 and utils.sliceOverlap(x1, x2, w) > 0.3:
                     checkidx += 1
                     x2 = (np.random.random(2) * subim).astype(int)
                 if checkidx >= 30:
@@ -210,66 +194,93 @@ class PascalPart(object):
         # TODO(doc): Add docstring
         self.parts = {}
         self.source = source
-        if source != '':
-            self.load()
+        self.target = source
+        self.itemsave = lambda path, im: imsave(path + '.png', im)
+
+    @property
+    def source(self):
+        return self.__source
+
+    @source.setter
+    def source(self, source):
+        self.__source = source
+        self.load()
 
     def load(self):
-        # TODO(doc): Add docstring
-        mat = sio.loadmat(self.source)
+        '''Loads the inouts from the mat file'''
+        mat = sio.loadmat(self.target)
         try:
             mat = mat['anno'][0][0][1][0][0]
         except IndexError:
-            print('PascalPart::load: given file is wrong, %s', self.source)
+            print('PascalPart::load: given file is wrong, %s', self.target)
             return False
         self.classname = mat[0][0]
         self.segmentation = mat[2].astype('float')
         if mat[3].size and mat[3][0].size:
             for part in mat[3][0]:
                 self.parts[part[0][0]] = part[1].astype('float')
+        self.genSumOfParts()
 
-    def save(self, image=True, parts=True, sum=False, segmentation=False):
-        # TODO(doc): Add docstring
-        bn = os.path.splitext(self.source)[0]
-        itemsave = imsave if image else np.save
-        ext = '.png' if image else ''
-        if segmentation:
-            itemsave(bn + ext, self.segmentation)
-        if parts and len(self.parts) > 0:
-            if sum:
-                sumOfParts = next(iter(self.parts.values())) * 0
-                # sumOfParts = self.segmentation * 0
-                for part in self.parts:
-                    sumOfParts += self.parts[part]
-                itemsave(bn + ext, sumOfParts)
-            else:
-                for part in self.parts:
-                    # TODO(saveEach): What??? saving all on hte same imagE??
-                    itemsave(bn + ext, self.parts[part])
+    def save(self, mode='parts'):
+        '''Saves the segmentations binarly samesized to input
 
-    def saveBB(self, image=True, parts=True, sum=False, segmentation=False):
-        # TODO(doc): Add docstring
-        bn = os.path.splitext(self.source)[0]
-        itemsave = imsave if image else np.save
-        ext = '.png' if image else ''
-        if segmentation:
-            bb, slice_ = getSingularBB(self.segmentation.astype(int))
-            itemsave(bn + ext, bb)
-            return slice_
-        if parts and len(self.parts) > 0:
-            if sum:
-                sumOfParts = next(iter(self.parts.values())) * 0
-                # sumOfParts = self.segmentation * 0
-                for part in self.parts:
-                    sumOfParts += self.parts[part]
-                bb, slice_ = getSingularBB(sumOfParts.astype(int))
-                itemsave(bn + ext, bb)
-                return slice_
+        Args:
+            mode (str, optional): Either doing the whole object or only the
+                                  parts
+        '''
+        if mode == 'class':
+            self.itemsave(self.target, self.segmentation)
+        elif len(self.parts) > 0:
+            self.itemsave(self.target, self.sumOfParts)
+
+    def saveBB(self, mode='parts'):
+        '''Saves the segmentations in their respective patches (bounding boxes)
+
+        Args:
+            mode (str, optional): Either doing the whole object or only the
+                                  parts
+        '''
+        if mode == 'class':
+            bb, bbSlice = self.getSingularBB(self.segmentation.astype(int))
+            self.itemsave(self.target, bb)
+            return bbSlice
+        elif len(self.parts) > 0:
+            bb, bbSlice = self.getSingularBB(self.sumOfParts.astype(int))
+            self.itemsave(self.target, bb)
+            return bbSlice
 
     def reduce(self, parts=[]):
-        # TODO(doc): Add docstring
+        '''Reduces the segmentations to the specified list of parts
+
+        Args:
+            parts (list, optional): List of part names that shall be saved.
+        '''
         newparts = {}
         if len(parts) > 0 and len(self.parts) > 0:
             for part in parts:
                 if part in self.parts:
                     newparts[part] = self.parts[part]
         self.parts = newparts
+        self.genSumOfParts()
+
+    def genSumOfParts(self):
+        '''Generate the sum of the parts or the union of segmentations.'''
+        if len(self.parts) > 0:
+            self.sumOfParts = next(iter(self.parts.values())) * 0
+            for part in self.parts:
+                self.sumOfParts += self.parts[part]
+
+    def getSingularBB(self, img):
+        '''Produces the cut part and bounding box slice for a single connected
+        component in an image
+
+        Args:
+            img (image): The image to search in
+
+        Returns:
+            The part of the input image and the slice it fits.
+        '''
+        slices = scipy.ndimage.find_objects(img)
+        # No idead why we need this:
+        bbSlice = slices[-1]
+        return img[bbSlice], bbSlice
