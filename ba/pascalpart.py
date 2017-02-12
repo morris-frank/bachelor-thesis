@@ -3,6 +3,7 @@ from ba import utils
 import copy
 from functools import partial
 from glob import glob
+import keras.preprocessing.image
 import numpy as np
 import os.path
 import scipy.io as sio
@@ -15,6 +16,7 @@ from tqdm import tqdm
 
 class PascalPartSet(object):
     _builddir = 'data/tmp/'
+    _testtrain = 0.2
 
     def __init__(self, name, root='.', parts=[], classes=[]):
         '''Constructs a new PascalPartSet
@@ -29,6 +31,14 @@ class PascalPartSet(object):
         self.source = root
         self.classes = classes
         self.parts = parts
+        self.augmenter = keras.preprocessing.image.ImageDataGenerator(
+            rotation_range=15,
+            shear_range=0.2,
+            zoom_range=0.2,
+            width_shift_range=0.05,
+            height_shift_range=0.05,
+            horizontal_flip=True
+            )
         self.genLists()
 
     @property
@@ -133,8 +143,12 @@ class PascalPartSet(object):
                         self.partslist.list.append(row)
         self.write()
 
-    def saveSegmentations(self):
-        '''Saves the segmentations for selected classes or parts.'''
+    def saveSegmentations(self, augment=0):
+        '''Saves the segmentations for selected classes or parts.
+
+        Args:
+            augment (int, optional): How many augmentations per image
+        '''
         d = {
             'classes': '{}segmentations/{}/'.format(self.build, '_'.join(self.classes)),
             'parts': '{}segmentations/{}/'.format(self.build, self.tag)
@@ -158,12 +172,13 @@ class PascalPartSet(object):
                 item.target = d['classes'] + idx
                 item.save(mode='class')
 
-    def saveBoundingBoxes(self, imgdir, negatives=0):
+    def saveBoundingBoxes(self, imgdir, negatives=0, augment=0):
         '''Saves the bounding box patches for classes and parts.
 
         Args:
             imgdir (str): The directory where the original images live
             negatives (int, optional): How many negative samples to generate
+            augment (int, optional): How many augmentations per image
         '''
         cbdir = '{}patches/{}/'.format(self.build, '_'.join(self.classes))
         pbdir = '{}patches/{}/'.format(self.build, self.tag)
@@ -212,6 +227,8 @@ class PascalPartSet(object):
                 negpatch = im[x2[0]:x2[0] + w[0], x2[1]:x2[1] + w[1]]
                 imsave(d['patch_neg'] + '{}_{}.png'.format(idx, i), negpatch)
 
+        self.augmentSingle(pbdir + 'img/', len(self.classlist)*augment)
+        # self.augmentDual(d['patch_pos'], d['patch_seg'], len(self.classlist)*augment)
         self.genLMDB(pbdir + 'img/')
 
     def genLMDB(self, path):
@@ -223,16 +240,77 @@ class PascalPartSet(object):
         '''
         print('Generating LMDB for {}'.format(path))
         absp = os.path.abspath(path)
-        target = absp + '_lmdb'
+        target = {'train': absp + '_lmdb_train', 'test': absp + '_lmdb_test'}
         wh = 224
-        posList = SetList(absp + '/pos/')
-        posList.addPreSuffix(absp + '/pos/', '.png 1')
+        trainlist = SetList(absp + '/pos/')
+        trainlist.addPreSuffix(absp + '/pos/', '.png 1')
         negList = SetList(absp + '/neg/')
         negList.addPreSuffix(absp + '/neg/', '.png 0')
-        posList.list += negList.list
-        posList.target = target + '.txt'
-        posList.write()
-        os.system('convert_imageset --resize_height={} --resize_height={} --shuffle "/" "{}" "{}" '.format(wh, wh, posList.target, target))
+        trainlist.list += negList.list
+        testies = int(len(trainlist)*0.2)
+        testlist = copy.deepcopy(trainlist)
+        testlist.list = testlist.list[:testies]
+        trainlist.list = trainlist.list[testies:]
+        trainlist.target = target['train'] + '.txt'
+        testlist.target = target['test'] + '.txt'
+        trainlist.write()
+        testlist.write()
+        os.system('convert_imageset --resize_height={} --resize_height={} --shuffle "/" "{}" "{}" '.format(wh, wh, trainlist.target, target['train']))
+        os.system('convert_imageset --resize_height={} --resize_height={} --shuffle "/" "{}" "{}" '.format(wh, wh, testlist.target, target['test']))
+
+    def augmentSingle(self, imdir, n):
+        '''Generates augmentet images
+
+        Args:
+            imdir (str): The path to the images
+            n (int): Number of images to produce
+        '''
+        img_generator = self.augmenter.flow_from_directory(
+            directory=imdir,
+            target_size=(224, 224),
+            class_mode='binary',
+            save_to_dir=imdir,
+            save_format='png',
+            batch_size=50
+            )
+        for _ in range(0, int(n/50)):
+            img_generator.next()
+
+    def augmentDual(self, imdir, segdir, n):
+        '''Generates augmentet images and segmentations
+
+        Args:
+            imdir (str): The path to the images
+            segdir (str): The path to the segmentations
+            n (int): Number of images to produce
+        '''
+        if n < 50:
+            return True
+        par_imdir = '/'.join(os.path.normpath(imdir).split('/')[:-1])
+        bn_imdir = os.path.normpath(imdir).split('/')[-1]
+        par_segdir = '/'.join(os.path.normpath(segdir).split('/')[:-1])
+        bn_segdir = os.path.normpath(segdir).split('/')[-1]
+        img_generator = self.augmenter.flow_from_directory(
+            directory=par_imdir,
+            classes=bn_segdir,
+            target_size=(224, 224),
+            class_mode='binary',
+            save_to_dir=imdir,
+            save_format='png',
+            batch_size=50
+            )
+        seg_generator = self.augmenter.flow_from_directory(
+            directory=par_segdir,
+            classes=bn_segdir,
+            target_size=(224, 224),
+            class_mode='binary',
+            save_to_dir=segdir,
+            save_format='png',
+            batch_size=50
+            )
+        generator = zip(img_generator, seg_generator)
+        for _ in range(0, int(n/50)):
+            iter(generator)
 
 
 class PascalPart(object):

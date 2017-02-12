@@ -118,6 +118,6 @@ class Experiment(object):
     def genData(self, name, source):
         '''Generates the training data for that experiment'''
         ppset = ba.PascalPartSet(name, source, 'stern', 'aeroplane')
-        ppset.saveSegmentations()
+        ppset.saveSegmentations(augment=2)
         if self.conf.sliding_window:
-            ppset.saveBoundingBoxes('data/datasets/voc2010/JPEGImages/', negatives=2)
+            ppset.saveBoundingBoxes('data/datasets/voc2010/JPEGImages/', negatives=2, augment=2)
