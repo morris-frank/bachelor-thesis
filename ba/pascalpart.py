@@ -14,15 +14,21 @@ from tqdm import tqdm
 
 
 class PascalPartSet(object):
-    # TODO(doc): Add docstring
     _builddir = 'data/tmp/'
 
     def __init__(self, name, root='.', parts=[], classes=[]):
-        # TODO(doc): Add docstring
+        '''Constructs a new PascalPartSet
+
+        Args:
+            name (str): The name of this set. User for saving paths
+            root (str, optional): The path for the dir with the mat files
+            parts (list, optional): The parts we are interested in
+            classes (classes, optional): The classes we are interested in
+        '''
         self.name = name
         self.source = root
-        self.parts = parts
         self.classes = classes
+        self.parts = parts
         self.genLists()
 
     @property
@@ -47,7 +53,8 @@ class PascalPartSet(object):
             self.__classes = classes
         else:
             self.__classes = [classes]
-        self.tag = '_'.join(self.classes + self.parts)
+        # yeah, so I think Im misusing this whole construct: ^^
+        # self.tag = '_'.join(self.classes + self.parts)
 
     @property
     def source(self):
@@ -67,42 +74,57 @@ class PascalPartSet(object):
 
     @name.setter
     def name(self, name):
-        self.name = str(name)
-        self.build = self._builddir + '/' + self.name + '/'
+        self.__name = str(name)
+        self.build = self._builddir + '/' + self.__name + '/'
         utils.touch(self.build)
 
     def write(self):
+        '''Writes the generated lists to disk'''
         for l in [self.sourcelist, self.classlist, self.partslist]:
             l.rmPreSuffix(self.source, self.extension)
             l.write()
             l.addPreSuffix(self.source, self.extension)
 
+    def loadLists(self):
+        '''Loads the *.txt lists for this set.'''
+        f = {
+            'source': self.build + self.name + '.txt',
+            'classes': self.build + '_'.join(self.classes) + '.txt',
+            'parts': self.build + self.tag + '.txt'
+            }
+        self.sourcelist = SetList(f['source'])
+        self.classlist = SetList(f['classes'])
+        self.partslist = SetList(f['parts'])
+        self.sourcelist.addPreSuffix(self.source, self.extension)
+        self.classlist.addPreSuffix(self.source, self.extension)
+        self.partslist.addPreSuffix(self.source, self.extension)
+
     def genLists(self):
         '''Generates the *.txt lists for this set.'''
         f = {
-            source = self.build + self.name + '.txt',
-            classes = self.build + '_'.join(self.classes) + '.txt',
-            parts = self.build + self.tag + '.txt'
+            'source': self.build + self.name + '.txt',
+            'classes': self.build + '_'.join(self.classes) + '.txt',
+            'parts': self.build + self.tag + '.txt'
             }
         overwrite = {
-            source = utils.query_overwrite(f['source'], default='no'),
-            classes = utils.query_overwrite(f['classes'], default='no'),
-            parts = utils.query_overwrite(f['parts'], default='no')
+            'source': utils.query_overwrite(f['source'], default='no'),
+            'classes': utils.query_overwrite(f['classes'], default='no'),
+            'parts': utils.query_overwrite(f['parts'], default='no')
             }
-        if not sum(f.values()):
+
+        self.loadLists()
+        if not sum(overwrite.values()):
             return True
 
-        self.sourcelist = SetList(f['source'])
         if overwrite['source']:
+            print('Generating List {}'.format(f['source']))
             self.sourcelist.loadDir(self.source)
-        self.sourcelist.addPreSuffix(self.source, self.extension)
-
-        self.classlist = SetList(f['classes'])
-        self.partslist = SetList(f['parts'])
+            self.sourcelist.addPreSuffix(self.source, self.extension)
 
         if overwrite['classes'] or overwrite['parts']:
-            print('Generating List for {} and {}'.format(f['classes'],
-                                                         f['parts']))
+            self.classlist = []
+            self.partslist = []
+            print('Generating List {} and {}'.format(f['classes'], f['parts']))
             for row in tqdm(self.sourcelist):
                 item = PascalPart(row)
                 if item.classname in self.classes or len(self.classes) < 1:
@@ -114,18 +136,18 @@ class PascalPartSet(object):
     def saveSegmentations(self):
         '''Saves the segmentations for selected classes or parts.'''
         d = {
-            classes = '{}segmentations/{}/'.format(self.build, '_'.join(self.classes))
-            parts = '{}segmentations/{}/'.format(self.build, self.tag)
+            'classes': '{}segmentations/{}/'.format(self.build, '_'.join(self.classes)),
+            'parts': '{}segmentations/{}/'.format(self.build, self.tag)
             }
         overwrite = {
-            classes = utils.query_overwrite(d['classes'], default='no')
-            parts = utils.query_overwrite(d['parts'], default='no')
+            'classes': utils.query_overwrite(d['classes'], default='no'),
+            'parts': utils.query_overwrite(d['parts'], default='no')
             }
-        if not sum(f.values()):
+        if not sum(overwrite.values()):
             return True
 
         print('Generating and extracting the segmentations...')
-        for item in tqdm(self.sourcelist):
+        for item in tqdm(self.classlist):
             idx = os.path.splitext(os.path.basename(item))[0]
             item = PascalPart(item)
             if overwrite['parts']:
@@ -146,31 +168,35 @@ class PascalPartSet(object):
         cbdir = '{}patches/{}/'.format(self.build, '_'.join(self.classes))
         pbdir = '{}patches/{}/'.format(self.build, self.tag)
         d = {
-            img_pos = utils.touch(pbdir + 'img/pos/'),
-            img_neg = utils.touch(pbdir + 'img/neg/'),
-            seg_pos = utils.touch(pbdir + 'seg/pos/'),
-            img_cla = utils.touch(cbdir + 'img/'),
-            seg_cla = utils.touch(cbdir + 'seg/')
+            'patch_pos': utils.touch(pbdir + 'img/pos/'),
+            'patch_neg': utils.touch(pbdir + 'img/neg/'),
+            'patch_seg': utils.touch(pbdir + 'seg/'),
+            'class_img': utils.touch(cbdir + 'img/'),
+            'class_seg': utils.touch(cbdir + 'seg/')
             }
         if not utils.query_overwrite(pbdir, default='yes'):
             return True
 
+        ext = utils.prevalentExtension(imgdir)
+
         print('Generating and extracting the segmentation bounding boxes...')
-        for item in self.sourcelist:
+        for item in tqdm(self.classlist):
             idx = os.path.splitext(os.path.basename(item))[0]
             item = PascalPart(item)
-            im = imread(imgdir + idx + '.' + utils.prevalentExtension(imgdir))
+            im = imread(imgdir + idx + '.' + ext)
             item.reduce(self.parts)
 
             # Save Class patches
-            item.target = d['seg_cla'] + idx
+            item.target = d['class_seg'] + idx
             bb = item.saveBB(mode='class')
-            imsave(d['img_cla'] + idx + '.png', im[bb])
+            imsave(d['class_img'] + idx + '.png', im[bb])
 
             # Save positive patch
-            item.target = d['seg_pos'] + idx
+            item.target = d['patch_seg'] + idx
             bb = item.saveBB(mode='parts')
-            imsave(d['img_pos'] + idx + '.png', im[bb])
+            if bb is None:
+                continue
+            imsave(d['patch_pos'] + idx + '.png', im[bb])
 
             # Save neagtive patches
             for i in range(0, negatives):
@@ -184,14 +210,39 @@ class PascalPartSet(object):
                 if checkidx >= 30:
                     continue
                 negpatch = im[x2[0]:x2[0] + w[0], x2[1]:x2[1] + w[1]]
-                imsave(d['img_neg'] + '{}_{}.png'.format(idx, i), negpatch)
+                imsave(d['patch_neg'] + '{}_{}.png'.format(idx, i), negpatch)
+
+        self.genLMDB(pbdir + 'img/')
+
+    def genLMDB(self, path):
+        '''Generates the LMDB for the trainingset.
+
+        Args:
+            path (str): The path to the image directory. (Contains dirs pos and
+                       neg)
+        '''
+        print('Generating LMDB for {}'.format(path))
+        absp = os.path.abspath(path)
+        target = absp + '_lmdb'
+        wh = 224
+        posList = SetList(absp + '/pos/')
+        posList.addPreSuffix(absp + '/pos/', '.png 1')
+        negList = SetList(absp + '/neg/')
+        negList.addPreSuffix(absp + '/neg/', '.png 0')
+        posList.list += negList.list
+        posList.target = target + '.txt'
+        posList.write()
+        os.system('convert_imageset --resize_height={} --resize_height={} --shuffle "/" "{}" "{}" '.format(wh, wh, posList.target, target))
 
 
 class PascalPart(object):
-    # TODO(doc): Add docstring
 
     def __init__(self, source=''):
-        # TODO(doc): Add docstring
+        '''Constructs a new PascalPart.
+
+        Args:
+            source (str, optional): The path to mat file
+        '''
         self.parts = {}
         self.source = source
         self.target = source
@@ -208,11 +259,11 @@ class PascalPart(object):
 
     def load(self):
         '''Loads the inouts from the mat file'''
-        mat = sio.loadmat(self.target)
+        mat = sio.loadmat(self.source)
         try:
             mat = mat['anno'][0][0][1][0][0]
         except IndexError:
-            print('PascalPart::load: given file is wrong, %s', self.target)
+            print('PascalPart::load: given file is wrong, %s', self.source)
             return False
         self.classname = mat[0][0]
         self.segmentation = mat[2].astype('float')
@@ -239,15 +290,18 @@ class PascalPart(object):
         Args:
             mode (str, optional): Either doing the whole object or only the
                                   parts
+
+        Returns:
+            The bounding box slice for that patch
         '''
         if mode == 'class':
-            bb, bbSlice = self.getSingularBB(self.segmentation.astype(int))
-            self.itemsave(self.target, bb)
-            return bbSlice
+            patch, bb = self.getSingularBB(self.segmentation.astype(int))
+            self.itemsave(self.target, patch)
+            return bb
         elif len(self.parts) > 0:
-            bb, bbSlice = self.getSingularBB(self.sumOfParts.astype(int))
-            self.itemsave(self.target, bb)
-            return bbSlice
+            patch, bb = self.getSingularBB(self.sumOfParts.astype(int))
+            self.itemsave(self.target, patch)
+            return bb
 
     def reduce(self, parts=[]):
         '''Reduces the segmentations to the specified list of parts
@@ -282,5 +336,5 @@ class PascalPart(object):
         '''
         slices = scipy.ndimage.find_objects(img)
         # No idead why we need this:
-        bbSlice = slices[-1]
-        return img[bbSlice], bbSlice
+        bb = slices[-1]
+        return img[bb], bb

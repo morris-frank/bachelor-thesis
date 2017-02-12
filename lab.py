@@ -2,10 +2,14 @@
 from ba.experiment import Experiment
 import sys
 
+DATASET = 'pascpart'
+DSSSOURCE = 'data/datasets/pascalparts/Annotations_Part/'
 
 def main(args):
     e = Experiment(argv=args)
     e.loadConf()
+    if e.sysargs.data:
+        e.genData(DATASET, DSSSOURCE)
     if e.sysargs.train:
         e.runTrain()
     if e.sysargs.test:

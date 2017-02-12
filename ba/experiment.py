@@ -1,8 +1,5 @@
 import argparse
 import ba
-from ba import caffeine
-from ba import netrunner
-from ba.set import SetList
 from ba import utils
 from glob import glob
 import os
@@ -29,6 +26,7 @@ class Experiment(object):
                             help='The YAML conf file')
         parser.add_argument('--test', action='store_true')
         parser.add_argument('--train', action='store_true')
+        parser.add_argument('--data', action='store_true')
         parser.add_argument('--default', action='store_true')
         parser.add_argument('--gpu', type=int, nargs='?', default=0,
                             help='The GPU to use.')
@@ -71,9 +69,9 @@ class Experiment(object):
     def prepareFCN(self):
         '''Prepares a NetRunner from the given configuration.'''
         if self.conf.sliding_window:
-            runner = netrunner.SlidingFCNPartRunner
+            runner = ba.SlidingFCNPartRunner
         else:
-            runner = netrunner.FCNPartRunner
+            runner = ba.FCNPartRunner
         self.fcn = runner(self.conf.tag,
                           trainset=self.conf.train,
                           valset=self.conf.val,
@@ -116,3 +114,10 @@ class Experiment(object):
         self.prepareFCN()
         lastiter = self.fcn.epochs * len(self.fcn.trainset)
         self.fcn.train()
+
+    def genData(self, name, source):
+        '''Generates the training data for that experiment'''
+        ppset = ba.PascalPartSet(name, source, 'stern', 'aeroplane')
+        ppset.saveSegmentations()
+        if self.conf.sliding_window:
+            ppset.saveBoundingBoxes('data/datasets/voc2010/JPEGImages/', negatives=2)
