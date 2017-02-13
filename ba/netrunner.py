@@ -372,7 +372,7 @@ class FCNPartRunner(NetRunner):
         self.prepare('deploy')
         self.createNet(self.dir + 'deploy.prototxt',
                        self.net_weights,
-                       self.gpu)
+                       self.gpu[0])
         mean = self.getMean()
         print('Forwarding all in {}'.format(setlist))
         for idx in tqdm(setlist):

@@ -184,6 +184,6 @@ class SegDataLayer(caffe.Layer):
         The leading singleton dimension is required by the loss.
         """
         label = imread('{}/{}.png'.format(self.labels, idx))
-        label = ((255-label)/255).astype(np.uint8)
+        label = (label/255).astype(np.uint8)
         label = label[np.newaxis, ...]
         return label

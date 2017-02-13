@@ -21,7 +21,8 @@ def vgg16(params, switches):
     nclasses = 2
     n = caffe.NetSpec()
 
-    n.data, n.label = L.Data(
+    if params['split'] == 'train' or params['split'] == 'val':
+        n.data, n.label = L.Data(
         batch_size=8,
         source=params['lmdb'],
         backend=P.Data.LMDB,
@@ -30,14 +31,10 @@ def vgg16(params, switches):
             crop_size=224,
             mirror=True,
             mean_value=list(params['mean'])
+            )
         )
-      )
-
-    # pylayer = 'PatchWiseLayer'
-    # n.data, n.label = L.Python(module='ba.caffeine.voc_layers',
-    #                            layer=pylayer,
-    #                            ntop=2,
-    #                            param_str=str(params))
+    else:
+        n.data = L.Input(shape=[dict(dim=[1,3,224,224])])
 
     if 'learn_fc' not in switches:
         switches['learn_fc'] = False

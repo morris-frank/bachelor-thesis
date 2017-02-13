@@ -1,5 +1,6 @@
 train: 'data/tmp/pascpart/patches/aeroplane_stern/img_augmented_lmdb_train.txt'
-val: 'data/tmp/pascpart/patches/aeroplane_stern/img_augmented_lmdb_test.txt'
+# val: 'data/tmp/pascpart/patches/aeroplane_stern/img_augmented_lmdb_test.txt'
+val: 'data/tmp/pascpart/aeroplane_stern.txt'
 weights: 'data/models/vgg16/VGG_ILSVRC_16_layers.caffemodel'
 net: ba.caffeine.fcn.vgg16
 baselr: 10e-6
