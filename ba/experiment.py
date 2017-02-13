@@ -28,7 +28,7 @@ class Experiment(object):
         parser.add_argument('--train', action='store_true')
         parser.add_argument('--data', action='store_true')
         parser.add_argument('--default', action='store_true')
-        parser.add_argument('--gpu', type=int, nargs='?', default=0,
+        parser.add_argument('--gpu', type=int, nargs='+', default=0,
                             help='The GPU to use.')
         self.sysargs = parser.parse_args(args=self.argv)
         if isinstance(self.sysargs.conf, list):
@@ -55,45 +55,53 @@ class Experiment(object):
     def loadConf(self):
         '''Open a YAML Configuration file and make a Bunch from it'''
         defaults = self._loadConfYaml('data/experiments/defaults.yaml')
-        conf = self._loadConfYaml(self.sysargs.conf)
-        if 'tag' not in conf:
-            conf['tag'] = os.path.basename(
-                            os.path.splitext(self.sysargs.conf)[0])
-        self.conf = utils.Bunch({**defaults, **conf})
-        if not self.conf.net.startswith('ba.'):
+        self.conf = self._loadConfYaml(self.sysargs.conf)
+        if 'tag' not in self.conf:
+            self.conf['tag'] = os.path.basename(
+                os.path.splitext(self.sysargs.conf)[0])
+        for key, value in defaults.items():
+            if key not in self.conf:
+                self.conf[key] = value
+        if not self.conf['net'].startswith('ba.'):
             print('Given Network is not from correct namespace you fucker')
             sys.exit()
         else:
-            self.conf.net = eval(self.conf.net)
+            self.conf['net'] = eval(self.conf['net'])
 
     def prepareFCN(self):
         '''Prepares a NetRunner from the given configuration.'''
-        if self.conf.sliding_window:
+        if self.conf['sliding_window']:
             runner = ba.SlidingFCNPartRunner
         else:
             runner = ba.FCNPartRunner
-        self.fcn = runner(self.conf.tag,
-                          trainset=self.conf.train,
-                          valset=self.conf.val,
-                          solver_weights=self.conf.weights,
-                          net_generator=self.conf.net,
-                          baselr=self.conf.baselr,
-                          epochs=self.conf.epochs,
-                          images=self.conf.images,
-                          labels=self.conf.labels,
-                          mean=self.conf.mean
+        self.fcn = runner(self.conf['tag'],
+                          trainset=self.conf['train'],
+                          valset=self.conf['val'],
+                          solver_weights=self.conf['weights'],
+                          net_generator=self.conf['net'],
+                          baselr=self.conf['baselr'],
+                          epochs=self.conf['epochs'],
+                          images=self.conf['images'],
+                          labels=self.conf['labels'],
+                          mean=self.conf['mean']
                           )
+        if 'lr_policy' in self.conf:
+            self.fcn._spattr['lr_policy'] = self.conf['lr_policy']
+        if 'stepsize' in self.conf:
+            self.fcn._spattr['stepsize'] = self.conf['stepsize']
+        if 'weight_decay' in self.conf:
+            self.fcn._spattr['weight_decay'] = self.conf['weight_decay']
         self.fcn.gpu = self.sysargs.gpu
-        self.fcn.generator_switches['learn_fc'] = self.conf.learn_fc
+        self.fcn.generator_switches['learn_fc'] = self.conf['learn_fc']
 
     def runTests(self):
         '''Tests the given experiment, Normally depends on user input. If --default
         flag is set will test EVERY snapshot previously saved.
         '''
-        snapdir = 'data/models/{}/snapshots/'.format(self.conf.tag)
+        snapdir = 'data/models/{}/snapshots/'.format(self.conf['tag'])
         weights = glob('{}*caffemodel'.format(snapdir))
         if len(weights) < 1:
-            print('No weights found for {}'.format(self.conf.tag))
+            print('No weights found for {}'.format(self.conf['tag']))
             return False
         for w in weights:
             bn = os.path.basename(w)
@@ -104,8 +112,8 @@ class Experiment(object):
             print('TESTING ' + bn)
             self.prepareFCN()
             self.fcn.net_weights = w
-            if self.conf.test_images != '':
-                self.fcn.images = self.conf.test_images
+            if self.conf['test_images'] != '':
+                self.fcn.images = self.conf['test_images']
             self.fcn.forwardVal()
             self.fcn.clear()
 
@@ -119,5 +127,5 @@ class Experiment(object):
         '''Generates the training data for that experiment'''
         ppset = ba.PascalPartSet(name, source, 'stern', 'aeroplane')
         ppset.saveSegmentations(augment=2)
-        if self.conf.sliding_window:
+        if self.conf['sliding_window']:
             ppset.saveBoundingBoxes('data/datasets/voc2010/JPEGImages/', negatives=2, augment=2)

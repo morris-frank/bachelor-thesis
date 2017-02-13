@@ -4,6 +4,7 @@ from ba import utils
 import caffe
 from collections import namedtuple
 import copy
+import datetime
 from functools import partial
 import numpy as np
 import os
@@ -39,7 +40,7 @@ class SolverSpec(utils.Bunch):
         self.base_lr = 0.001
         self.lr_policy = 'fixed'
         self.gamma = 0.1
-        self.test_initialization = 'false'
+        self.test_initialization = False
         self.iter_size = 1
         self.max_iter = 4000
         self.test_iter = 100
@@ -51,9 +52,12 @@ class SolverSpec(utils.Bunch):
 
         '''
         with open(normpath(self._dir + '/solver.prototxt'), 'w') as f:
-            for key, value in sorted(self.__dict__):
+            for key, value in sorted(self.__dict__.items(), key=lambda x: x[0]):
                 if not key.startswith('_'):
-                    f.write('%s: %s\n'.format(key, value))
+                    if isinstance(value, str):
+                        f.write('{}: "{}"\n'.format(key, value))
+                    else:
+                        f.write('{}: {}\n'.format(key, value))
 
 
 class NetRunner(object):
@@ -92,7 +96,7 @@ class NetRunner(object):
             if attr in defaults:
                 setattr(self, attr, value)
             else:
-                self._spattr['attr'] = value
+                self._spattr[attr] = value
 
         if not isinstance(self.trainset, SetList):
             self.trainset = SetList(self.trainset)
@@ -306,14 +310,14 @@ class FCNPartRunner(NetRunner):
     def writeSolver(self):
         '''Writes the solver definition to disk.'''
         s = SolverSpec(self.dir, self._spattr)
-        s.base_lr = self.base_lr
-        s.lr_policy = self.lr_policy
+        s.base_lr = float(self.baselr)
+        # s.lr_policy = 'fixed'
+        # # s.lr_policy = self.lr_policy
         s.write()
 
     def train(self):
         '''Will train the network and make snapshots accordingly'''
         self.prepare('train')
-        os._exit(0)
         self.createSolver(self.dir + 'solver.prototxt',
                           self.solver_weights,
                           self.gpu)
@@ -389,9 +393,32 @@ class SlidingFCNPartRunner(FCNPartRunner):
         self.kernel_size = 50
 
     def FCNparams(self, split):
+        '''Builds the dict for a net_generator.
+
+        Args:
+            split (str): The split (test|train|deploy)
+
+        Returns:
+            The parameter dictionary
+        '''
         params = super().FCNparams(split)
         params['batch_size'] = 10
+        if split == 'train':
+            params['lmdb'] = self.trainset.source[:-4]
+        elif split == 'val':
+            params['lmdb'] = self.valset.source[:-4]
         return params
+
+    def train(self):
+        '''Trains the network'''
+        self.prepare('train')
+        logf = '{}_{}_train.log'.format(
+            datetime.datetime.now().strftime('%y_%m_%d_'), self.name)
+        os.system('caffe train -solver {} -weights {} -gpu {} 2>&1 | tee {}'.format(
+            self.dir + 'solver.prototxt',
+            self.solver_weights,
+            ','.join(str(x) for x in self.gpu),
+            self.dir + logf))
 
     def forwardWindow(self, window):
         '''Forwards a single window from the sliding window through the network.

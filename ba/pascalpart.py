@@ -18,7 +18,7 @@ class PascalPartSet(object):
     _builddir = 'data/tmp/'
     _testtrain = 0.2
 
-    def __init__(self, name, root='.', parts=[], classes=[]):
+    def __init__(self, name, root='.', parts=[], classes=[], dolists=True):
         '''Constructs a new PascalPartSet
 
         Args:
@@ -39,7 +39,8 @@ class PascalPartSet(object):
             height_shift_range=0.05,
             horizontal_flip=True
             )
-        self.genLists()
+        if dolists:
+            self.genLists()
 
     @property
     def parts(self):
@@ -189,47 +190,47 @@ class PascalPartSet(object):
             'class_img': utils.touch(cbdir + 'img/'),
             'class_seg': utils.touch(cbdir + 'seg/')
             }
-        if not utils.query_overwrite(pbdir, default='yes'):
-            return True
+        if utils.query_overwrite(pbdir, default='yes'):
+            ext = utils.prevalentExtension(imgdir)
 
-        ext = utils.prevalentExtension(imgdir)
+            print('Generating and extracting the segmentation bounding boxes...')
+            for item in tqdm(self.classlist):
+                idx = os.path.splitext(os.path.basename(item))[0]
+                item = PascalPart(item)
+                im = imread(imgdir + idx + '.' + ext)
+                item.reduce(self.parts)
 
-        print('Generating and extracting the segmentation bounding boxes...')
-        for item in tqdm(self.classlist):
-            idx = os.path.splitext(os.path.basename(item))[0]
-            item = PascalPart(item)
-            im = imread(imgdir + idx + '.' + ext)
-            item.reduce(self.parts)
+                # Save Class patches
+                item.target = d['class_seg'] + idx
+                bb = item.saveBB(mode='class')
+                imsave(d['class_img'] + idx + '.png', im[bb])
 
-            # Save Class patches
-            item.target = d['class_seg'] + idx
-            bb = item.saveBB(mode='class')
-            imsave(d['class_img'] + idx + '.png', im[bb])
-
-            # Save positive patch
-            item.target = d['patch_seg'] + idx
-            bb = item.saveBB(mode='parts')
-            if bb is None:
-                continue
-            imsave(d['patch_pos'] + idx + '.png', im[bb])
-
-            # Save neagtive patches
-            for i in range(0, negatives):
-                x2 = x1 = [bb[0].start, bb[1].start]
-                w = [bb[0].stop - x1[0], bb[1].stop - x1[1]]
-                subim = [im.shape[0] - w[0], im.shape[1] - w[1]]
-                checkidx = 0
-                while checkidx < 30 and utils.sliceOverlap(x1, x2, w) > 0.3:
-                    checkidx += 1
-                    x2 = (np.random.random(2) * subim).astype(int)
-                if checkidx >= 30:
+                # Save positive patch
+                item.target = d['patch_seg'] + idx
+                bb = item.saveBB(mode='parts')
+                if bb is None:
                     continue
-                negpatch = im[x2[0]:x2[0] + w[0], x2[1]:x2[1] + w[1]]
-                imsave(d['patch_neg'] + '{}_{}.png'.format(idx, i), negpatch)
+                imsave(d['patch_pos'] + idx + '.png', im[bb])
 
-        self.augmentSingle(pbdir + 'img/', len(self.classlist)*augment)
-        # self.augmentDual(d['patch_pos'], d['patch_seg'], len(self.classlist)*augment)
-        self.genLMDB(pbdir + 'img/')
+                # Save neagtive patches
+                for i in range(0, negatives):
+                    x2 = x1 = [bb[0].start, bb[1].start]
+                    w = [bb[0].stop - x1[0], bb[1].stop - x1[1]]
+                    subim = [im.shape[0] - w[0], im.shape[1] - w[1]]
+                    checkidx = 0
+                    while checkidx < 30 and utils.sliceOverlap(x1, x2, w) > 0.3:
+                        checkidx += 1
+                        x2 = (np.random.random(2) * subim).astype(int)
+                    if checkidx >= 30:
+                        continue
+                    negpatch = im[x2[0]:x2[0] + w[0], x2[1]:x2[1] + w[1]]
+                    imsave(d['patch_neg'] + '{}_{}.png'.format(idx, i), negpatch)
+
+        if utils.query_overwrite(pbdir + 'img_augmented/', default='yes'):
+            self.augmentSingle(pbdir + 'img/pos/', len(self.classlist) * augment)
+            self.augmentSingle(pbdir + 'img/neg/', len(self.classlist) * augment)
+            # self.augmentDual(d['patch_pos'], d['patch_seg'], len(self.classlist)*augment)
+            self.genLMDB(pbdir + 'img_augmented/')
 
     def genLMDB(self, path):
         '''Generates the LMDB for the trainingset.
@@ -241,16 +242,18 @@ class PascalPartSet(object):
         print('Generating LMDB for {}'.format(path))
         absp = os.path.abspath(path)
         target = {'train': absp + '_lmdb_train', 'test': absp + '_lmdb_test'}
+        for d in target.values():
+            utils.rm(d)
+            utils.rm(d + '.txt')
         wh = 224
         trainlist = SetList(absp + '/pos/')
         trainlist.addPreSuffix(absp + '/pos/', '.png 1')
         negList = SetList(absp + '/neg/')
         negList.addPreSuffix(absp + '/neg/', '.png 0')
-        trainlist.list += negList.list
-        testies = int(len(trainlist)*0.2)
+        n = {'pos': int(len(trainlist) * 0.2), 'neg': int(len(negList) * 0.2)}
         testlist = copy.deepcopy(trainlist)
-        testlist.list = testlist.list[:testies]
-        trainlist.list = trainlist.list[testies:]
+        testlist.list = testlist.list[:n['pos']] + negList.list[:n['neg']]
+        trainlist.list = trainlist.list[n['pos']:] + negList.list[n['neg']:]
         trainlist.target = target['train'] + '.txt'
         testlist.target = target['test'] + '.txt'
         trainlist.write()
@@ -265,15 +268,21 @@ class PascalPartSet(object):
             imdir (str): The path to the images
             n (int): Number of images to produce
         '''
+        par_imdir = '/'.join(os.path.normpath(imdir).split('/')[:-1])
+        bn_imdir = os.path.normpath(imdir).split('/')[-1]
+        save_imdir = os.path.normpath(par_imdir) + '_augmented'
+        utils.rm(save_imdir + '/' + bn_imdir)
+        os.makedirs(save_imdir + '/' + bn_imdir)
         img_generator = self.augmenter.flow_from_directory(
-            directory=imdir,
+            directory=par_imdir,
             target_size=(224, 224),
             class_mode='binary',
-            save_to_dir=imdir,
+            classes=[bn_imdir],
+            save_to_dir=save_imdir + '/' + bn_imdir,
             save_format='png',
             batch_size=50
             )
-        for _ in range(0, int(n/50)):
+        for _ in range(0, int(n / 50)):
             img_generator.next()
 
     def augmentDual(self, imdir, segdir, n):
@@ -309,7 +318,7 @@ class PascalPartSet(object):
             batch_size=50
             )
         generator = zip(img_generator, seg_generator)
-        for _ in range(0, int(n/50)):
+        for _ in range(0, int(n / 50)):
             iter(generator)
 
 

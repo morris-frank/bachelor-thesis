@@ -55,11 +55,17 @@ def vgg16(params, switches):
     nclasses = 2
     n = caffe.NetSpec()
 
-    lmdbdir = '{}/lmdb_{}'.format(dirname(params['splitfile']), params['split'])
-    print(list(params['mean']))
-    n.data, n.label = L.Data()
-    # param=[dict(backend='LMDB', batch_size='10', source=lmdbdir)]
-    # transform_param=[dict(crop_size='224', mirror='True'), mean_value=list(params['mean'])]
+    n.data, n.label = L.Data(
+        batch_size=10,
+        source=params['lmdb'],
+        backend=P.Data.LMDB,
+        ntop=2,
+        transform_param=dict(
+            crop_size=224,
+            mirror=True,
+            mean_value=list(params['mean'])
+        )
+      )
 
     # pylayer = 'PatchWiseLayer'
     # n.data, n.label = L.Python(module='ba.caffeine.voc_layers',
@@ -137,9 +143,10 @@ def fcn8s(params, switches):
     pylayer = 'SegDataLayer'
     if 'train' in params['splitfile'] or 'val' in params['splitfile']:
         n.data, n.label = L.Python(module='ba.caffeine.voc_layers',
-                                   layer=pylayer,
-                                   ntop=2,
-                                   param_str=str(params))
+            layer=pylayer,
+            ntop=2,
+            param_str=str(params)
+            )
     else:
         n.data = L.Input(shape=[dict(dim=[1,3,500,500])])
 
@@ -184,28 +191,30 @@ def fcn8s(params, switches):
 
     #From scratch:
     n.score_fr_ = L.Convolution(n.drop7, num_output=nclasses, kernel_size=1,
-                                pad=0, param=[dict(lr_mult=1, decay_mult=1),
-                                              dict(lr_mult=2, decay_mult=0)])
+        pad=0, param=[dict(lr_mult=1, decay_mult=1),
+                      dict(lr_mult=2, decay_mult=0)])
     #From scratch:
-    n.upscore2_ = L.Deconvolution(n.score_fr_,
-                                  convolution_param=dict(num_output=nclasses,
-                                                         kernel_size=4,
-                                                         stride=2,
-                                                         bias_term=False),
-                                  param=[dict(lr_mult=0)])
+    n.upscore2_ = L.Deconvolution(
+        n.score_fr_,
+        convolution_param=dict(num_output=nclasses,
+                             kernel_size=4,
+                             stride=2,
+                             bias_term=False),
+        param=[dict(lr_mult=0)])
 
     #From scratch:
-    n.score_pool4_ = L.Convolution(n.pool4, num_output=nclasses, kernel_size=1,
-                                   pad=0, param=[dict(lr_mult=1, decay_mult=1),
-                                                 dict(lr_mult=2, decay_mult=0)])
+    n.score_pool4_ = L.Convolution(
+        n.pool4, num_output=nclasses, kernel_size=1, pad=0,
+        param=[dict(lr_mult=1, decay_mult=1),
+               dict(lr_mult=2, decay_mult=0)]
+        )
     n.score_pool4c = crop(n.score_pool4_, n.upscore2_)
     n.fuse_pool4 = L.Eltwise(n.upscore2_, n.score_pool4c,
                              operation=P.Eltwise.SUM)
     #From scratch:
-    n.upscore_pool4_ = L.Deconvolution(n.fuse_pool4, convolution_param=dict(
-                                       num_output=nclasses, kernel_size=4,
-                                       stride=2, bias_term=False),
-                                       param=[dict(lr_mult=0)])
+    n.upscore_pool4_ = L.Deconvolution(
+        n.fuse_pool4, convolution_param=dict(num_output=nclasses, kernel_size=4,
+        stride=2, bias_term=False), param=[dict(lr_mult=0)])
 
     #From scratch
     n.score_pool3_ = L.Convolution(n.pool3, num_output=nclasses, kernel_size=1,

@@ -4,6 +4,7 @@ import sys
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
+import warnings
 
 class Bunch(object):
     '''Serves as a dictionary in the form of an object.'''
@@ -172,3 +173,16 @@ def sliceOverlap(x1, x2, w):
     SI = max(0, min(x1_2[0], x2_2[0]) - max(x1[0], x2[0])) * max(0, min(x1_2[1], x2_2[1]) - max(x1[1], x2[1]))
     S = 2 * w[0] * w[1] - SI
     return SI / S
+
+
+def rm(path):
+    '''Removes a path with rm and all its content, recusively.
+    With great power comes great responsibility!
+
+    Args:
+        path (str): The path to the dir, which will be deleted
+    '''
+    if not os.path.exists(path):
+        print('Tried deleting {}, but that does not even exist'.format(path))
+    else:
+        os.system('rm -r {}'.format(path))
