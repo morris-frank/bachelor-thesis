@@ -263,11 +263,13 @@ class FCNPartRunner(NetRunner):
         Returns:
             The parameter dictionary
         '''
-        imgext = '.' + utils.prevalentExtension(self.images)
+        splitfile = self.dir
+        splitfile += 'train.txt' if split == 'train' else 'test.txt'
+        imgext = utils.prevalentExtension(self.images)
         params = dict(images=self.images,
                       extension=imgext,
                       labels=self.labels,
-                      splitfile=self.dir + split + '.txt',
+                      splitfile=splitfile,
                       split=split,
                       mean=tuple(self.getMean()))
         return params
@@ -320,7 +322,7 @@ class FCNPartRunner(NetRunner):
         self.prepare('train')
         self.createSolver(self.dir + 'solver.prototxt',
                           self.solver_weights,
-                          self.gpu)
+                          self.gpu[0])
         # TODO: ONLY DO INTERP WHEN STARTING FROM ZERO
         interp_layers = [k for k in self.solver.net.params.keys() if 'up' in k]
         caffeine.surgery.interp(self.solver.net, interp_layers)

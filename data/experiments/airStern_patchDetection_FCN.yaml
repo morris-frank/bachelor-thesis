@@ -1,0 +1,12 @@
+train: 'data/tmp/pascpart/aeroplane_stern.txt'
+val: 'data/tmp/pascpart/aeroplane_stern.txt'
+weights: 'data/models/airStern_patchDetection/snapshots/fcn_train_iter_4000.caffemodel'
+net: ba.caffeine.fcn.fcn8s
+baselr: 10e-14
+epochs: 10
+labels: 'data/tmp/pascpart/segmentations/aeroplane_stern/'
+test_images: 'data/datasets/voc2010/JPEGImages/'
+images: 'data/datasets/voc2010/JPEGImages/'
+desc: 'FCN8s trained from airStern_patchDetection'
+lr_policy: 'fixed'
+tofcn: True

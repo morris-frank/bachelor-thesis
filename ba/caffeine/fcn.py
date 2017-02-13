@@ -5,40 +5,6 @@ from caffe.coord_map import crop
 from ba.caffeine.utils import *
 from os.path import dirname
 
-'''
-layer {
-  name: "data"
-  type: "Data"
-  top: "data"
-  top: "label"
-  data_param {
-    source: "/net/hciserver03/storage/mfrank/src/ba/data/models/airStern_patchDetection/lmdb_train/"
-    backend: LMDB
-    batch_size: 10
-  }
-  transform_param {
-    crop_size: 224
-    #mean_file: "/net/hciserver03/storage/mfrank/src/ba/data/models/airStern_patchDetection/mean.binaryproto"
-    mean_value: 103.939
-    mean_value: 116.779
-    mean_value: 123.68
-    mirror: True
-  }
-  include {
-    phase: TRAIN
-  }
-}
-layer {
-  data_param {
-    source: "/net/hciserver03/storage/mfrank/src/ba/data/models/airStern_patchDetection/lmdb_test/"
-    backend: LMDB
-    batch_size: 10
-  }
-  include {
-    phase: TEST
-  }
-}
-'''
 
 def vgg16(params, switches):
     '''Builds the FCN8s Network.
@@ -56,7 +22,7 @@ def vgg16(params, switches):
     n = caffe.NetSpec()
 
     n.data, n.label = L.Data(
-        batch_size=10,
+        batch_size=8,
         source=params['lmdb'],
         backend=P.Data.LMDB,
         ntop=2,
@@ -141,7 +107,7 @@ def fcn8s(params, switches):
     nclasses = 2
     n = caffe.NetSpec()
     pylayer = 'SegDataLayer'
-    if 'train' in params['splitfile'] or 'val' in params['splitfile']:
+    if params['split'] == 'train' or params['split'] == 'val':
         n.data, n.label = L.Python(module='ba.caffeine.voc_layers',
             layer=pylayer,
             ntop=2,
@@ -152,6 +118,8 @@ def fcn8s(params, switches):
 
     if 'learn_fc' not in switches:
         switches['learn_fc'] = False
+    if 'tofcn' not in switches:
+        switches['tofcn'] = False
 
     # the base net
     n.conv1_1, n.relu1_1 = conv_relu(n.data, 64, pad=100, lrmult=0)
@@ -178,12 +146,17 @@ def fcn8s(params, switches):
     n.pool5 = max_pool(n.relu5_3)
 
     # fully conv
-    if switches['learn_fc']:
+    if switches['tofcn']:
+        n.fc6_conv, n.relu6 = conv_relu(n.pool5, 4096, ks=7, pad=0, lrmult=0)
+    elif switches['learn_fc']:
         n.fc6_, n.relu6 = conv_relu(n.pool5, 4096, ks=7, pad=0, lrmult=0)
     else:
         n.fc6, n.relu6 = conv_relu(n.pool5, 4096, ks=7, pad=0, lrmult=0)
     n.drop6 = L.Dropout(n.relu6, dropout_ratio=0.5, in_place=True)
-    if switches['learn_fc']:
+
+    if switches['tofcn']:
+        n.fc7_conv, n.relu7 = conv_relu(n.drop6, 4096, ks=1, pad=0, lrmult=0)
+    elif switches['learn_fc']:
         n.fc7_, n.relu7 = conv_relu(n.drop6, 4096, ks=1, pad=0, lrmult=0)
     else:
         n.fc7, n.relu7 = conv_relu(n.drop6, 4096, ks=1, pad=0, lrmult=0)
@@ -233,7 +206,7 @@ def fcn8s(params, switches):
 
     n.score = crop(n.upscore8_, n.data)
 
-    if 'deploy' not in params['splitfile']:
+    if params['split'] != 'deploy':
         n.loss = L.SoftmaxWithLoss(n.score, n.label,
                                    loss_param=dict(normalize=False,
                                                    ignore_label=255))

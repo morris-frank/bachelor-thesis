@@ -91,6 +91,8 @@ class Experiment(object):
             self.fcn._spattr['stepsize'] = self.conf['stepsize']
         if 'weight_decay' in self.conf:
             self.fcn._spattr['weight_decay'] = self.conf['weight_decay']
+        if 'tofcn' in self.conf:
+            self.fcn.generator_switches['tofcn'] = self.conf['tofcn']
         self.fcn.gpu = self.sysargs.gpu
         self.fcn.generator_switches['learn_fc'] = self.conf['learn_fc']
 
