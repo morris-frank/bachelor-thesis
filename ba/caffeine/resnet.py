@@ -153,6 +153,4 @@ class ReseNet50(object):
             else:
                 self.n.loss = L.SoftmaxWithLoss(self.n['fc'], self.n.label)
 
-        with open('test.txt', 'w') as f:
-            f.write(str(self.n.to_proto()))
-        # return self.n.to_proto()
+        return self.n.to_proto()
