@@ -29,7 +29,7 @@ class ReseNet50(object):
         res2c = self.res('pool1', 3, '2', 64, ds=False)
         res3d = self.res(res2c, 4, '3', 128)
         res4f = self.res(res3d, 6, '4', 256)
-        res5c = self.res(res4f, 3, '5', 512, train=Trues)
+        res5c = self.res(res4f, 3, '5', 512, train=True)
         self.n['pool5'] = L.Pooling(
             self.n['res5c'],
             name='pool5',
@@ -62,7 +62,7 @@ class ReseNet50(object):
             )
 
     def cbsr(self, bname, bottom, nout, ks, pad, stride=1, train=False):
-        s = self.cbs(bname, bottom, nout, ks, pad, stride, train)
+        s = self.cbs(bname, bottom, nout, ks, pad, stride, train=train)
         n_rel = 'res{}_relu'.format(bname)
         self.relu(s, n_rel)
         return n_rel
@@ -85,9 +85,9 @@ class ReseNet50(object):
 
     def branch2(self, bottom, resname, startout, ds=False, train=False):
         s = 2 if ds else 1
-        ra = self.cbsr(resname + '_branch2a', bottom, startout, ks=1, pad=0, stride=s, train)
-        rb = self.cbsr(resname + '_branch2b', ra, startout, ks=3, pad=1, train)
-        sc = self.cbs(resname + '_branch2c', rb, startout * 4, ks=1, pad=0, train)
+        ra = self.cbsr(resname + '_branch2a', bottom, startout, ks=1, pad=0, stride=s, train=train)
+        rb = self.cbsr(resname + '_branch2b', ra, startout, ks=3, pad=1, train=train)
+        sc = self.cbs(resname + '_branch2c', rb, startout * 4, ks=1, pad=0, train=train)
         return sc
 
     def resprimblock(self, bottom, name, nout, ds=False):
@@ -100,7 +100,7 @@ class ReseNet50(object):
         return 'res{}_relu'.format(name)
 
     def ressecblock(self, bottom, name, nout, train=False):
-        right = self.branch2(bottom, name + 'a', nout, ds=False, train)
+        right = self.branch2(bottom, name + 'a', nout, ds=False, train=train)
         n_elt = 'res{}'.format(name)
         self.n[n_elt] = L.Eltwise(self.n[bottom], self.n[right], name=n_elt)
         self.relu(n_elt, name='res{}_relu'.format(name))
