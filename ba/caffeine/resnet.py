@@ -91,7 +91,7 @@ class ReseNet50(object):
         if params['split'] == 'train' or params['split'] == 'val':
             self.n['data'], self.n['label'] = L.Data(
                 name='data',
-                batch_size=8,
+                batch_size=24,
                 source=params['lmdb'],
                 backend=P.Data.LMDB,
                 ntop=2,
