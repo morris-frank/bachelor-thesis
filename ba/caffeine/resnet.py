@@ -149,9 +149,9 @@ class ReseNet50(object):
 
         if 'deploy' != params['split']:
             if 'test' == params['split']:
-                self.n.accuracy = L.Accuracy(self.n['fc'], n.label)
+                self.n.accuracy = L.Accuracy(self.n['fc'], self.n.label)
             else:
-                self.n.loss = L.SoftmaxWithLoss(self.n['fc'], n.label)
+                self.n.loss = L.SoftmaxWithLoss(self.n['fc'], self.n.label)
 
         with open('test.txt', 'w') as f:
             f.write(str(self.n.to_proto()))
