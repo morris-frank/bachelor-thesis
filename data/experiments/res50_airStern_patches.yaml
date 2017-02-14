@@ -1,6 +1,6 @@
 train: 'data/tmp/pascpart/patches/aeroplane_stern/img_augmented_lmdb_train.txt'
-val: 'data/tmp/pascpart/patches/aeroplane_stern/img_augmented_lmdb_test.txt'
-# val: 'data/tmp/pascpart/aeroplane_stern.txt'
+#val: 'data/tmp/pascpart/patches/aeroplane_stern/img_augmented_lmdb_test.txt'
+val: 'data/tmp/pascpart/aeroplane_stern.txt'
 weights: 'data/models/resnet/ResNet-50-model.caffemodel'
 net: ba.caffeine.ReseNet50().write
 baselr: 10e-6
