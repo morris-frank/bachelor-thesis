@@ -7,36 +7,6 @@ class ReseNet50(object):
 
     def __init__(self):
         self.n = caffe.NetSpec()
-        self.n['data'] = L.Input(name='data',shape=[dict(dim=[1, 3, 224, 224])])
-        self.n['conv1'] = L.Convolution(
-            self.n['data'],
-            name='conv1',
-            num_output=64,
-            kernel_size=7,
-            stride=2,
-            pad=3
-            )
-        self.bn('conv1', name='bn_conv1')
-        self.scale('bn_conv1', name='scale_conv1')
-        self.relu('scale_conv1', name='conv1_relu')
-        self.n['pool1'] = L.Pooling(
-            self.n['conv1_relu'],
-            name='pool1',
-            kernel_size=3,
-            stride=2,
-            pool=P.Pooling.MAX
-            )
-        res2c = self.res('pool1', 3, '2', 64, ds=False)
-        res3d = self.res(res2c, 4, '3', 128)
-        res4f = self.res(res3d, 6, '4', 256)
-        res5c = self.res(res4f, 3, '5', 512, train=True)
-        self.n['pool5'] = L.Pooling(
-            self.n['res5c'],
-            name='pool5',
-            kernel_size=7,
-            stride=1,
-            pool=P.Pooling.AVE
-            )
 
     def bn(self, bottom, name):
         self.n[name] = L.BatchNorm(
@@ -119,7 +89,7 @@ class ReseNet50(object):
         nclasses = 2
 
         if params['split'] == 'train' or params['split'] == 'val':
-            self.n.data, self.n.label = L.Data(
+            self.n.['data'], self.n.['label'] = L.Data(
                 name='data',
                 batch_size=8,
                 source=params['lmdb'],
@@ -131,6 +101,39 @@ class ReseNet50(object):
                     mean_file="data/models/resnet/ResNet_mean.binaryproto"
                     )
                 )
+        else:
+            self.n['data'] = L.Input(name='data',shape=[dict(dim=[1, 3, 224, 224])])
+
+
+        self.n['conv1'] = L.Convolution(
+            self.n['data'],
+            name='conv1',
+            num_output=64,
+            kernel_size=7,
+            stride=2,
+            pad=3
+            )
+        self.bn('conv1', name='bn_conv1')
+        self.scale('bn_conv1', name='scale_conv1')
+        self.relu('scale_conv1', name='conv1_relu')
+        self.n['pool1'] = L.Pooling(
+            self.n['conv1_relu'],
+            name='pool1',
+            kernel_size=3,
+            stride=2,
+            pool=P.Pooling.MAX
+            )
+        res2c = self.res('pool1', 3, '2', 64, ds=False)
+        res3d = self.res(res2c, 4, '3', 128)
+        res4f = self.res(res3d, 6, '4', 256)
+        res5c = self.res(res4f, 3, '5', 512, train=True)
+        self.n['pool5'] = L.Pooling(
+            self.n['res5c'],
+            name='pool5',
+            kernel_size=7,
+            stride=1,
+            pool=P.Pooling.AVE
+            )
 
         self.n['fc'] = L.InnerProduct(
             self.n.pool5,
