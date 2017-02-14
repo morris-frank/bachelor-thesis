@@ -34,7 +34,7 @@ def vgg16(params, switches):
             )
         )
     else:
-        n.data = L.Input(shape=[dict(dim=[1,3,224,224])])
+        n.data = L.Input(shape=[dict(dim=[1, 3 ,224, 224])])
 
     if 'learn_fc' not in switches:
         switches['learn_fc'] = False
