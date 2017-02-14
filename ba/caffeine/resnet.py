@@ -76,8 +76,7 @@ class ReseNet50(object):
             stride=stride,
             pad=pad,
             bias_term=False,
-            param=[dict(lr_mult=1 * train, decay_mult=1),
-                   dict(lr_mult=1 * train, decay_mult=1)]
+            param=dict(lr_mult=1 * train, decay_mult=1)
             )
         self.bn('res' + bname, name='bn' + bname)
         self.scale('bn' + bname, name='scale' + bname)
@@ -139,10 +138,7 @@ class ReseNet50(object):
                 weight_filler=dict(type='gaussian', std=0.01),
                 bias_filler=dict(type='constant', value=0),
                 ),
-            param=[
-                dict(lr_mult=10, decay_mult=10),
-                dict(lr_mult=10, decay_mult=0)
-                ]
+            param=dict(lr_mult=10, decay_mult=10)
             )
 
         self.n['prob'] = L.Softmax(self.n['fc'])
