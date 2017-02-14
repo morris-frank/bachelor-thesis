@@ -266,12 +266,17 @@ class FCNPartRunner(NetRunner):
         splitfile = self.dir
         splitfile += 'train.txt' if split == 'train' else 'test.txt'
         imgext = utils.prevalentExtension(self.images)
-        params = dict(images=self.images,
-                      extension=imgext,
-                      labels=self.labels,
-                      splitfile=splitfile,
-                      split=split,
-                      mean=tuple(self.getMean()))
+        mean = self.getMean()
+        if not isinstance(mean, bool):
+            mean = tuple(mean)
+        params = dict(
+            images=self.images,
+            extension=imgext,
+            labels=self.labels,
+            splitfile=splitfile,
+            split=split,
+            mean=mean
+            )
         return params
 
     def write(self, split):
