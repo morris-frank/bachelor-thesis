@@ -135,7 +135,7 @@ class ReseNet50(object):
         self.n['fc'] = L.InnerProduct(
             self.n.pool5,
             inner_product_param=dict(
-                num_output=nclasses
+                num_output=nclasses,
                 weight_filler=dict(type='gaussian', std=0.01),
                 bias_filler=dict(type='constant', value=0),
                 ),
