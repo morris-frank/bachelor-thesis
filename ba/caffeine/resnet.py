@@ -7,7 +7,7 @@ class ReseNet50(object):
 
     def __init__(self):
         self.n = caffe.NetSpec()
-        self.n['data'] = L.Input(shape=[dict(dim=[1, 3, 224, 224])])
+        self.n['data'] = L.Input(name='data',shape=[dict(dim=[1, 3, 224, 224])])
         self.n['conv1'] = L.Convolution(
             self.n['data'],
             name='conv1',
@@ -120,6 +120,7 @@ class ReseNet50(object):
 
         if params['split'] == 'train' or params['split'] == 'val':
             self.n.data, self.n.label = L.Data(
+                name='data',
                 batch_size=8,
                 source=params['lmdb'],
                 backend=P.Data.LMDB,
