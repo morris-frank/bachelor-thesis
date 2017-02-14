@@ -1,3 +1,4 @@
+from ba.caffeine.resnet import ReseNet50
 from ba.caffeine.fcn import fcn8s
 from ba.caffeine.fcn import vgg16
 import ba.caffeine.surgery
