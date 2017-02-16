@@ -2,7 +2,7 @@ tag: 'airStern_2lFC'
 train: 'data/tmp/pascpart_aeroplane_stern.txt'
 val: 'data/tmp/pascpart_aeroplane_stern.txt'
 solver_weights: 'data/models/fcn8s/fcn8s-heavy-pascal.caffemodel'
-net: ba.caffeine.fcn.fcn8s
+net: ba.caffeine.fcn.FCN8s().write
 baselr: 10e-14
 epochs: 20
 images: 'data/datasets/voc2010/JPEGImages/'

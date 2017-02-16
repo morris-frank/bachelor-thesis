@@ -323,17 +323,15 @@ class FCNPartRunner(NetRunner):
         s.write()
 
     def train(self):
-        '''Will train the network and make snapshots accordingly'''
+        '''Trains the network'''
         self.prepare('train')
-        self.createSolver(self.dir + 'solver.prototxt',
-                          self.solver_weights,
-                          self.gpu[0])
-        # TODO: ONLY DO INTERP WHEN STARTING FROM ZERO
-        interp_layers = [k for k in self.solver.net.params.keys() if 'up' in k]
-        caffeine.surgery.interp(self.solver.net, interp_layers)
-        for _ in range(self.epochs):
-            self.solver.step(len(self.trainset))
-        self.solver.snapshot()
+        logf = '{}_{}_train.log'.format(
+            datetime.datetime.now().strftime('%y_%m_%d_'), self.name)
+        os.system('caffe train -solver {} -weights {} -gpu {} 2>&1 | tee {}'.format(
+            self.dir + 'solver.prototxt',
+            self.solver_weights,
+            ','.join(str(x) for x in self.gpu),
+            self.dir + logf))
 
     def test(self):
         # TODO(doc): Add docstring
@@ -415,17 +413,6 @@ class SlidingFCNPartRunner(FCNPartRunner):
         elif split == 'val':
             params['lmdb'] = self.valset.source[:-4]
         return params
-
-    def train(self):
-        '''Trains the network'''
-        self.prepare('train')
-        logf = '{}_{}_train.log'.format(
-            datetime.datetime.now().strftime('%y_%m_%d_'), self.name)
-        os.system('caffe train -solver {} -weights {} -gpu {} 2>&1 | tee {}'.format(
-            self.dir + 'solver.prototxt',
-            self.solver_weights,
-            ','.join(str(x) for x in self.gpu),
-            self.dir + logf))
 
     def forwardWindow(self, window):
         '''Forwards a single window from the sliding window through the network.
