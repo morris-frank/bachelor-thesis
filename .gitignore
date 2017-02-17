@@ -11,7 +11,7 @@ lib/
 .venv*/
 .ipynb_checkpoints
 .idea/
-
+pythonstartup
 
 # Extra thesis stuff
 *.caffemodel
