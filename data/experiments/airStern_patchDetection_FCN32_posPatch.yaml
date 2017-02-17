@@ -1,0 +1,14 @@
+baselr: 10e-8
+desc: 'FCN32s refined with positive filled patches with transplants from airStern_patchDetection'
+epochs: 10
+images: 'data/datasets/voc2010/JPEGImages/'
+labels: 'data/tmp/pascpart/patches/aeroplane_stern/seg.yaml'
+lr_policy: 'step'
+mean: [103.939, 116.779, 123.68]
+net: ba.caffeine.fcn.FCN32_PosPatch().write
+stepsize: 1000
+test_images: 'data/datasets/voc2010/JPEGImages/'
+tofcn: True
+train: 'data/tmp/pascpart/aeroplane_stern.txt'
+val: 'data/tmp/pascpart/aeroplane_stern.txt'
+weights: 'data/models/airStern_patchDetection/snapshots/transplants/fcn32s_train_iter_4000.caffemodel'

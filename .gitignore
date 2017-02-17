@@ -9,6 +9,7 @@ __pycache__/
 build/
 lib/
 .venv*/
+.ipynb_checkpoints
 .idea/
 
 
@@ -16,6 +17,7 @@ lib/
 *.caffemodel
 *.npy
 data/datasets/
+data/models/
 data/results/
 data/log/
 *snapshot*

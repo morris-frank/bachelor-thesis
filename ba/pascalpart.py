@@ -3,7 +3,6 @@ from ba import utils
 import copy
 from functools import partial
 from glob import glob
-import keras.preprocessing.image
 import numpy as np
 import os.path
 import scipy.io as sio
@@ -12,6 +11,7 @@ from scipy.misc import imsave
 import scipy.ndimage
 import tempfile
 from tqdm import tqdm
+import yaml
 
 
 class PascalPartSet(object):
@@ -186,14 +186,19 @@ class PascalPartSet(object):
         d = {
             'patch_pos': utils.touch(pbdir + 'img/pos/'),
             'patch_neg': utils.touch(pbdir + 'img/neg/'),
-            'patch_seg': utils.touch(pbdir + 'seg/'),
             'class_img': utils.touch(cbdir + 'img/'),
+            'patch_seg': utils.touch(pbdir + 'seg/'),
             'class_seg': utils.touch(cbdir + 'seg/')
             }
         if utils.query_overwrite(pbdir, default='yes'):
             ext = utils.prevalentExtension(imgdir)
 
-            print('Generating and extracting the segmentation bounding boxes...')
+            classSegDB = {}
+            classDBPath = d['class_seg'][:-1] + '.yaml'
+            patchSegDB = {}
+            patchDBPath = d['patch_seg'][:-1] + '.yaml'
+
+            print('Generating and extracting the segmentation bounding boxes.')
             for item in tqdm(self.classlist):
                 idx = os.path.splitext(os.path.basename(item))[0]
                 item = PascalPart(item)
@@ -203,6 +208,7 @@ class PascalPartSet(object):
                 # Save Class patches
                 item.target = d['class_seg'] + idx
                 bb = item.saveBB(mode='class')
+                classSegDB[idx] = bb
                 imsave(d['class_img'] + idx + '.png', im[bb])
 
                 # Save positive patch
@@ -210,6 +216,7 @@ class PascalPartSet(object):
                 bb = item.saveBB(mode='parts')
                 if bb is None:
                     continue
+                patchSegDB[idx] = bb
                 imsave(d['patch_pos'] + idx + '.png', im[bb])
 
                 # Save neagtive patches
@@ -225,6 +232,11 @@ class PascalPartSet(object):
                         continue
                     negpatch = im[x2[0]:x2[0] + w[0], x2[1]:x2[1] + w[1]]
                     imsave(d['patch_neg'] + '{}_{}.png'.format(idx, i), negpatch)
+
+            with open(classDBPath, 'w') as f:
+                yaml.dump(classSegDB, f)
+            with open(patchDBPath, 'w') as f:
+                yaml.dump(patchSegDB, f)
 
         if utils.query_overwrite(pbdir + 'img_augmented/', default='yes'):
             self.augmentSingle(pbdir + 'img/pos/', len(self.classlist) * augment)
@@ -268,6 +280,7 @@ class PascalPartSet(object):
             imdir (str): The path to the images
             n (int): Number of images to produce
         '''
+        import keras.preprocessing.image
         par_imdir = '/'.join(os.path.normpath(imdir).split('/')[:-1])
         bn_imdir = os.path.normpath(imdir).split('/')[-1]
         save_imdir = os.path.normpath(par_imdir) + '_augmented'
@@ -293,6 +306,7 @@ class PascalPartSet(object):
             segdir (str): The path to the segmentations
             n (int): Number of images to produce
         '''
+        import keras.preprocessing.image
         if n < 50:
             return True
         par_imdir = '/'.join(os.path.normpath(imdir).split('/')[:-1])
