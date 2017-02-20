@@ -1,4 +1,5 @@
 from ba.caffeine.resnet import ReseNet50
+from ba.caffeine.resnet import ReseNet50FCN
 from ba.caffeine.fcn import FCN8s
 from ba.caffeine.fcn import FCN32s
 from ba.caffeine.fcn import VGG16

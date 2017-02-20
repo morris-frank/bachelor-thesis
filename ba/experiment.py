@@ -104,6 +104,8 @@ class Experiment(object):
         weights = glob('{}*caffemodel'.format(snapdir))
         if len(weights) < 1:
             print('No weights found for {}'.format(self.conf['tag']))
+            self.prepareFCN()
+            self.fcn.write('deploy')
             return False
         for w in weights:
             bn = os.path.basename(w)

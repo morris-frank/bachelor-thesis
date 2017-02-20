@@ -11,4 +11,4 @@ test_images: 'data/datasets/voc2010/JPEGImages/'
 tofcn: True
 train: 'data/tmp/pascpart/aeroplane_stern.txt'
 val: 'data/tmp/pascpart/aeroplane_stern.txt'
-weights: 'data/models/airStern_patchDetection/snapshots/transplants/fcn32s_train_iter_4000.caffemodel'
+weights: 'data/models/FCN32_PosPatchRefining/snapshots/fcn32s_train_iter_4000.caffemodel'

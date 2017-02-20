@@ -357,10 +357,12 @@ class FCNPartRunner(NetRunner):
         data, im = self.loadimg(idx, mean=mean)
         self.forward(data)
         score = self.net.blobs[self.net.outputs[0]].data[0][1, ...]
+        import ipdb; ipdb.set_trace()
         bn = os.path.basename(os.path.splitext(idx)[0])
         bn_hm = self.heatmaps + bn
         imsave(bn_hm + '.png', score)
         bn_ov = self.heatmaps[:-1] + '_overlays/' + bn
+        score = imresize(score, im.shape[:-1])
         utils.apply_overlay(im, score, bn_ov + '.png')
 
     def forwardList(self, setlist=None):

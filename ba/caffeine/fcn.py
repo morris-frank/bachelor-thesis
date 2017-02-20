@@ -78,7 +78,7 @@ class VGG16(object):
 
         self.n.fc8_, _ = fc(self.n.drop7, nout=self.nclasses, std=0.01,
                             lrmult=10)
-        self.n.prob = L.Softmax(self.n.fc8_)
+        # self.n.prob = L.Softmax(self.n.fc8_)
 
         if 'deploy' != self.params['split']:
             if 'test' == self.params['split']:
@@ -87,9 +87,7 @@ class VGG16(object):
                 self.n.loss = L.SoftmaxWithLoss(self.n.fc8_, self.n.label)
 
     def write(self, params={}, switches={}):
-        '''Builds the FCN8s Network.
-            Based on code from Evan Shelhamer
-            fcn.berkeleyvision.org
+        '''Builds the VGG16 Network.
 
         Args:
             params (dict): parameter for the network and the pylayer
@@ -130,30 +128,29 @@ class FCN32s(VGG16):
         else:
             na = ''
         # fully conv
-        self.n.fc6, self.n.relu6 = conv_relu(self.n.pool5, 4096, ks=7, pad=0,
-                                             lrmult=0, name='fc6' + na)
-        self.n.drop6 = L.Dropout(self.n.relu6, dropout_ratio=0.5,
-                                 in_place=True)
+        self.n['fc6' + na], self.n.relu6 = conv_relu(
+            self.n.pool5, 4096, ks=7, pad=0, lrmult=0)
+        self.n.drop6 = L.Dropout(
+            self.n.relu6, dropout_ratio=0.5, in_place=True)
 
-        self.n.fc7, self.n.relu7 = conv_relu(self.n.drop6, 4096, ks=1, pad=0,
-                                             lrmult=0, name='fc7' + na)
+        self.n['fc7' + na], self.n.relu7 = conv_relu(
+            self.n.drop6, 4096, ks=1, pad=0, lrmult=0)
         self.n.drop7 = L.Dropout(self.n.relu7, dropout_ratio=0.5,
                                  in_place=True)
 
-        self.n.score_fr_ = L.Convolution(self.n.drop7,
-                                         num_output=self.nclasses,
-                                         kernel_size=1, pad=0,
-                                         param=[dict(lr_mult=1, decay_mult=1),
-                                                dict(lr_mult=2, decay_mult=0)])
+        self.n.score_fr_ = L.Convolution(
+            self.n.drop7, num_output=self.nclasses, kernel_size=1, pad=0,
+            param=[dict(lr_mult=1, decay_mult=1),
+                   dict(lr_mult=2, decay_mult=0)])
 
         if self.switches['tofcn']:
-            na = 'upscore'
+            na = ''
         else:
-            na = 'upscore_'
-        self.n.upscore_ = upsample(self.n.score_fr_, factor=32, name=na,
-                                   nout=self.nclasses)
+            na = '_'
+        self.n['upscore' + na] = upsample(self.n.score_fr_, factor=32,
+                                          nout=self.nclasses)
 
-        self.n.score = crop(self.n.upscore_, self.n.data)
+        self.n.score = crop(self.n['upscore' + na], self.n.data)
 
         if self.params['split'] != 'deploy':
             self.n.loss = L.SoftmaxWithLoss(self.n.score, self.n.label,
@@ -191,13 +188,13 @@ class FCN8s(FCN32s):
         else:
             na = ''
         # fully conv
-        self.n.fc6, self.n.relu6 = conv_relu(self.n.pool5, 4096, ks=7, pad=0,
-                                             lrmult=0, name='fc6' + na)
+        self.n['fc6' + na], self.n.relu6 = conv_relu(self.n.pool5, 4096, ks=7,
+                                                     pad=0, lrmult=0)
         self.n.drop6 = L.Dropout(self.n.relu6, dropout_ratio=0.5,
                                  in_place=True)
 
-        self.n.fc7, self.n.relu7 = conv_relu(self.n.drop6, 4096, ks=1, pad=0,
-                                             lrmult=0, name='fc7' + na)
+        self.n['fc7' + na], self.n.relu7 = conv_relu(self.n.drop6, 4096, ks=1,
+                                                     pad=0, lrmult=0)
         self.n.drop7 = L.Dropout(self.n.relu7, dropout_ratio=0.5,
                                  in_place=True)
 

@@ -1,0 +1,17 @@
+train: 'data/tmp/pascpart/patches/aeroplane_stern/img_augmented_lmdb_train.txt'
+# val: 'data/tmp/pascpart/patches/aeroplane_stern/img_augmented_lmdb_test.txt'
+val: 'data/tmp/pascpart/aeroplane_stern.txt'
+weights: 'data/models/ReseNet50-FCN/snapshots/classifier_train_iter_4000.caffemodel'
+net: ba.caffeine.ReseNet50FCN().write
+labels: 'data/tmp/pascpart/patches/aeroplane_stern/seg.yaml'
+baselr: 10e-6
+epochs: 20
+images: 'data/datasets/voc2010/JPEGImages/'
+desc: 'FCN generated from trained ReseNet50'
+test_images: 'data/datasets/voc2010/JPEGImages/'
+lr_policy: 'step'
+stepsize: 1000
+weight_decay: 0.0005
+test_interval: 100
+mean: False
+tofcn: True
