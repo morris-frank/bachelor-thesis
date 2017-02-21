@@ -49,13 +49,11 @@ class VGG16(object):
 
     def data(self):
         if self.params['split'] == 'train' or self.params['split'] == 'val':
-            self.n.data, self.n.label = L.Data(batch_size=8,
-                                               source=self.params['lmdb'],
-                                               backend=P.Data.LMDB, ntop=2,
-                                               transform_param=dict(
-                                                   crop_size=224, mirror=True,
-                                                   mean_value=list(
-                                                       self.params['mean'])))
+            self.n.data, self.n.label = L.Data(
+                batch_size=8, source=self.params['lmdb'], backend=P.Data.LMDB,
+                ntop=2, transform_param=dict(crop_size=224, mirror=True,
+                                             mean_value=list(
+                                                 self.params['mean'])))
         else:
             self.n.data = L.Input(shape=[dict(dim=[1, 3, 224, 224])])
 
@@ -102,6 +100,24 @@ class VGG16(object):
         self.base_net()
         self.tail()
         return self.n.to_proto()
+
+
+class VGG16_Single(VGG16):
+    def __init__(self, nclasses =2):
+        super().__init__(nclasses=nclasses)
+
+    def data(self):
+        pylayer = 'SingleImageLayer'
+        if self.params['split'] == 'train' or self.params['split'] == 'val':
+            self.n.data, self.n.label = L.Python(
+                module='ba.caffeine.voc_layers',
+                layer=pylayer,
+                ntop=2,
+                param_str=str(self.params)
+                )
+        else:
+            self.n.data = L.Input(shape=[dict(dim=[1, 3, 224, 224])])
+
 
 
 class FCN32s(VGG16):
@@ -173,7 +189,6 @@ class FCN32_PosPatch(FCN32s):
                 )
         else:
             self.n.data = L.Input(shape=[dict(dim=[1, 3, 500, 500])])
-
 
 
 class FCN8s(FCN32s):

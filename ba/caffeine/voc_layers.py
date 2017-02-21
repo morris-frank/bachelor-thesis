@@ -3,11 +3,12 @@
     fcn.berkeleyvision.org
 '''
 import caffe
+from glob import glob
 import numpy as np
 from PIL import Image
+import random
 from scipy.misc import imread
 from scipy.misc import imresize
-import random
 import yaml
 
 
@@ -19,7 +20,10 @@ class SegDataLayer(caffe.Layer):
         self.images = params['images']
         self.labels = params['labels']
         self.splitfile = params['splitfile']
-        self.mean = np.array(params['mean'])
+        if isinstance(params['mean'], str):
+            self.mean = params['mean']
+        else:
+            self.mean = np.array(params['mean'])
         self.extension = params.get('extension', 'jpg')
         self.random = params.get('randomize', True)
         self.seed = params.get('seed', None)
@@ -108,3 +112,114 @@ class PosPatchDataLayer(SegDataLayer):
         label[self.slices[idx]].fill(1)
         label = label[np.newaxis, ...]
         return label
+
+
+class SingleImageLayer(caffe.Layer):
+    '''
+    '''
+
+    def setup(self, bottom, top):
+        from keras.preprocessing.image import ImageDataGenerator
+        params = eval(self.param_str)
+        # self.negatives = params['negatives']
+        self.negatives = 'data/tmp/pascpart/patches/aeroplane_stern/img_augmented/neg/'
+        if isinstance(params['mean'], str):
+            self.mean = params['mean']
+        else:
+            self.mean = np.array(params['mean'])
+        # self.batch_size = params.get('batch_size', 32)
+        self.batch_size = 15
+        self.patch_size = params.get('patch_size', (224, 224))
+        self.patch_per_item = params.get('patch_per_item', 20)
+
+        # self.paths = params['paths']
+        self.paths = 'data/datasets/voc2010/JPEGImages/2009_001501.jpg'
+        # self.bb = params['bb']
+        self.bb = (slice(85, 243, None), slice(21, 206, None))
+        if not isinstance(self.paths, list):
+            self.paths = [self.paths]
+            self.bb = [self.bb]
+        n = len(self.paths)
+        self.samples = np.zeros((n * self.patch_per_item * 2,
+                                 self.patch_size[0], self.patch_size[1], 3))
+        for it, path, bb in zip(range(n), self.paths, self.bb):
+            self.samples[it:it + self.patch_per_item, ...] = self.generateSamples(self.imread(path), bb)
+        self.labels = np.append(np.ones(n * self.patch_per_item),
+                                np.zeros(n * self.patch_per_item))
+
+        negs = glob(self.negatives + '/*png')
+        negs = random.sample(negs, n * self.patch_per_item)
+        for it, neg in zip(range(1, len(negs) + 1), negs):
+            im = self.imread(neg)
+            im = imresize(im, (self.patch_size[0], self.patch_size[1], 3))
+            self.samples[-it, ...] = im
+
+        # two tops: data and label
+        if len(top) != 2:
+            raise Exception("Need to define two tops: data and label.")
+        # data layers have no bottoms
+        if len(bottom) != 0:
+            raise Exception("Do not define a bottom.")
+
+        self.generator = ImageDataGenerator(
+            rotation_range=15,
+            shear_range=0.2,
+            zoom_range=0.2,
+            width_shift_range=0.05,
+            height_shift_range=0.05,
+            horizontal_flip=True
+            )
+
+        top[0].reshape(
+            self.batch_size, 3, self.patch_size[0], self.patch_size[1])
+        top[1].reshape(self.batch_size, 1)
+
+    def bbShape(self, bb):
+        return (bb[0].stop - bb[0].start,
+                bb[1].stop - bb[1].start)
+
+    def generateSamples(self, im, bb, shiftfactor=0.1, count=None):
+        if count is None:
+            count = self.patch_per_item
+        if count % 2 != 0:
+            print('Count in SingleImageLayer is not divisble by two')
+            return
+        bbshape = self.bbShape(bb)
+        shift = (bbshape[0] * shiftfactor, bbshape[1] * shiftfactor)
+
+        xsamples = (shift[0] * (2 * np.random.random(count) - 1)).astype(np.int8)
+        ysamples = (shift[1] * (2 * np.random.random(count) - 1)).astype(np.int8)
+
+        samples = np.zeros((count, self.patch_size[0], self.patch_size[1], 3))
+        for it, xsample, ysample in zip(range(len(xsamples)), xsamples, ysamples):
+            xstart = max(bb[0].start + xsample, 0)
+            xstop = min(bb[0].stop + xsample, im.shape[0])
+            ystart = max(bb[1].start + ysample, 0)
+            ystop = min(bb[1].stop + ysample, im.shape[1])
+            patch = im[xstart:xstop, ystart:ystop]
+            if patch.shape[:-1] != self.patch_size:
+                patch = imresize(patch, (self.patch_size[0],
+                                         self.patch_size[1], 3))
+            samples[it, ...] = patch
+        return samples
+
+    def reshape(self, bottom, top):
+        pass
+
+    def forward(self, bottom, top):
+        # assign output
+        x, y = next(self.generator.flow(
+            self.samples, self.labels, batch_size=self.batch_size))
+        x = x.transpose((0, 3, 1, 2))
+        top[0].data[...] = x
+        top[1].data[...] = y[..., np.newaxis]
+
+    def backward(self, top, propagate_down, bottom):
+        pass
+
+    def imread(self, path):
+        im = imread(path)
+        im = np.array(im, dtype=np.float32)
+        im = im[:, :, ::-1]
+        im -= self.mean
+        return im

@@ -170,8 +170,8 @@ class ReseNet50FCN(ReseNet50):
         else:
             na = ''
         self.n['fc' + na] = L.Convolution(
-            self.n.pool5, kernel_size=7, stride=1, num_output=self.nclasses,
-            pad=2, param=[dict(lr_mult=1, decay_mult=1),
+            self.n.pool5, kernel_size=1, stride=1, num_output=self.nclasses,
+            pad=0, param=[dict(lr_mult=1, decay_mult=1),
                           dict(lr_mult=2, decay_mult=0)])
 
         self.n['upscore' + na] = upsample(self.n['fc' + na], factor=32,
