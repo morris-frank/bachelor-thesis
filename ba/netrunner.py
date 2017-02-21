@@ -32,6 +32,7 @@ class SolverSpec(utils.Bunch):
         self.train_net = normpath(self._dir + '/train.prototxt')
         self.test_net = normpath(self._dir + '/val.prototxt')
         self.snapshot = 1000
+        self.snapshot = 500
         self.snapshot_prefix = normpath(self._dir + '/snapshots/train')
         self.weight_decay = 0.0001
         self.momentum = 0.9
@@ -45,6 +46,7 @@ class SolverSpec(utils.Bunch):
         self.max_iter = 4000
         self.test_iter = 100
         self.test_interval = 500
+        self.test_interval = 5000
         super().__init__(adict)
 
     def write(self):

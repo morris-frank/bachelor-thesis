@@ -3,6 +3,7 @@ from ba import utils
 import copy
 from functools import partial
 from glob import glob
+import keras.preprocessing.image
 import numpy as np
 import os.path
 import scipy.io as sio
@@ -133,8 +134,8 @@ class PascalPartSet(object):
             self.sourcelist.addPreSuffix(self.source, self.extension)
 
         if overwrite['classes'] or overwrite['parts']:
-            self.classlist = []
-            self.partslist = []
+            self.classlist.list = []
+            self.partslist.list = []
             print('Generating List {} and {}'.format(f['classes'], f['parts']))
             for row in tqdm(self.sourcelist):
                 item = PascalPart(row)
@@ -280,7 +281,6 @@ class PascalPartSet(object):
             imdir (str): The path to the images
             n (int): Number of images to produce
         '''
-        import keras.preprocessing.image
         par_imdir = '/'.join(os.path.normpath(imdir).split('/')[:-1])
         bn_imdir = os.path.normpath(imdir).split('/')[-1]
         save_imdir = os.path.normpath(par_imdir) + '_augmented'
@@ -306,7 +306,6 @@ class PascalPartSet(object):
             segdir (str): The path to the segmentations
             n (int): Number of images to produce
         '''
-        import keras.preprocessing.image
         if n < 50:
             return True
         par_imdir = '/'.join(os.path.normpath(imdir).split('/')[:-1])
