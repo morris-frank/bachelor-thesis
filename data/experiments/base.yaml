@@ -1,14 +1,13 @@
-tag: 'base'
+baselr: 10e-14
+desc: 'Test File, doin nuthing'
+epochs: 0
+fc: False
+image_extension: 'jpg'
+images: 'data/datasets/voc2010/JPEGImages/'
+labels: 'data/tmp/segmentations/pascpart_aeroplane_stern/'
+net: ba.caffeine.fcn.FCN8s().write
+test_image_extension: 'jpg'
+test_images: 'data/datasets/voc2010/JPEGImages/'
 train: 'data/tmp/pascpart_aeroplane_stern.txt'
 val: 'data/tmp/pascpart_aeroplane_stern.txt'
 weights: 'data/models/fcn8s/fcn8s-heavy-pascal.caffemodel'
-net: ba.caffeine.fcn.FCN8s().write
-baselr: 10e-14
-epochs: 0
-images: 'data/datasets/voc2010/JPEGImages/'
-labels: 'data/tmp/segmentations/pascpart_aeroplane_stern/'
-image_extension: 'jpg'
-desc: 'Test File, doin nuthing'
-fc: False
-test_images: 'data/datasets/voc2010/JPEGImages/'
-test_image_extension: 'jpg'

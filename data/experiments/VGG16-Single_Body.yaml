@@ -1,0 +1,17 @@
+# val: 'data/tmp/pascpart/patches/aeroplane_body/img_augmented_lmdb_test.txt'
+baselr: 10e-8
+desc: 'VGG16 trained on body patches, sliding window detection'
+epochs: 20
+images: 'data/datasets/voc2010/JPEGImages/'
+learn_fc: True
+lr_policy: 'step'
+mean: [103.939, 116.779, 123.68]
+net: ba.caffeine.fcn.VGG16_Single().write
+sliding_window: True
+stepsize: 1000
+test_images: ''
+test_interval: 100
+train: 'data/tmp/pascpart/patches/aeroplane_body/img_augmented_lmdb_train.txt'
+val: 'data/tmp/pascpart/aeroplane_body.txt'
+weight_decay: 0.0005
+weights: 'data/models/vgg16/VGG_ILSVRC_16_layers.caffemodel'

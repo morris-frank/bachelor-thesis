@@ -153,7 +153,7 @@ class ReseNet50FCN(ReseNet50):
         pylayer = 'PosPatchDataLayer'
         if self.params['split'] == 'train' or self.params['split'] == 'val':
             self.n.data, self.n.label = L.Python(
-                module='ba.caffeine.voc_layers',
+                module='ba.caffeine.datalayers',
                 layer=pylayer,
                 ntop=2,
                 param_str=str(self.params)
@@ -184,3 +184,20 @@ class ReseNet50FCN(ReseNet50):
             self.n.loss = L.SoftmaxWithLoss(self.n.score, self.n.label,
                                             loss_param=dict(normalize=False,
                                                             ignore_label=255))
+
+
+class ReseNet50_Single(ReseNet50):
+    def __init__(self, nclasses =2):
+        super().__init__(nclasses=nclasses)
+
+    def data(self):
+        pylayer = 'SingleImageLayer'
+        if self.params['split'] == 'train' or self.params['split'] == 'val':
+            self.n.data, self.n.label = L.Python(
+                module='ba.caffeine.datalayers',
+                layer=pylayer,
+                ntop=2,
+                param_str=str(self.params)
+                )
+        else:
+            self.n.data = L.Input(shape=[dict(dim=[1, 3, 224, 224])])

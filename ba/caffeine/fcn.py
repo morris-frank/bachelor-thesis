@@ -110,7 +110,7 @@ class VGG16_Single(VGG16):
         pylayer = 'SingleImageLayer'
         if self.params['split'] == 'train' or self.params['split'] == 'val':
             self.n.data, self.n.label = L.Python(
-                module='ba.caffeine.voc_layers',
+                module='ba.caffeine.datalayers',
                 layer=pylayer,
                 ntop=2,
                 param_str=str(self.params)
@@ -128,7 +128,7 @@ class FCN32s(VGG16):
         pylayer = 'SegDataLayer'
         if self.params['split'] == 'train' or self.params['split'] == 'val':
             self.n.data, self.n.label = L.Python(
-                module='ba.caffeine.voc_layers',
+                module='ba.caffeine.datalayers',
                 layer=pylayer,
                 ntop=2,
                 param_str=str(self.params)
@@ -182,7 +182,7 @@ class FCN32_PosPatch(FCN32s):
         pylayer = 'PosPatchDataLayer'
         if self.params['split'] == 'train' or self.params['split'] == 'val':
             self.n.data, self.n.label = L.Python(
-                module='ba.caffeine.voc_layers',
+                module='ba.caffeine.datalayers',
                 layer=pylayer,
                 ntop=2,
                 param_str=str(self.params)

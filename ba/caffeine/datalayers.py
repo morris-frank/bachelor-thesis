@@ -5,6 +5,7 @@
 import caffe
 from glob import glob
 import numpy as np
+import os.path
 from PIL import Image
 import random
 from scipy.misc import imread
@@ -63,7 +64,7 @@ class SegDataLayer(caffe.Layer):
 
         # pick next input
         if self.random:
-            self.idx = random.randint(0, len(self.indices)-1)
+            self.idx = random.randint(0, len(self.indices) - 1)
         else:
             self.idx += 1
             if self.idx == len(self.indices):
@@ -73,25 +74,25 @@ class SegDataLayer(caffe.Layer):
         pass
 
     def load_image(self, idx):
-        """
+        '''
         Load input image and preprocess for Caffe:
         - cast to float
         - switch channels RGB -> BGR
         - subtract mean
         - transpose to channel x height x width order
-        """
+        '''
         im = Image.open('{}/{}.{}'.format(self.images, idx, self.extension))
         in_ = np.array(im, dtype=np.float32)
-        in_ = in_[:,:,::-1]
+        in_ = in_[:, :, ::-1]
         in_ -= self.mean
-        in_ = in_.transpose((2,0,1))
+        in_ = in_.transpose((2, 0, 1))
         return in_
 
     def load_label(self, idx):
-        """
+        '''
         Load label image as 1 x height x width integer array of label indices.
         The leading singleton dimension is required by the loss.
-        """
+        '''
         label = imread('{}/{}.png'.format(self.labels, idx))
         label = (label/255).astype(np.uint8)
         label = label[np.newaxis, ...]
@@ -123,19 +124,32 @@ class SingleImageLayer(caffe.Layer):
         params = eval(self.param_str)
         # self.negatives = params['negatives']
         self.negatives = 'data/tmp/pascpart/patches/aeroplane_stern/img_augmented/neg/'
-        if isinstance(params['mean'], str):
-            self.mean = params['mean']
+        if os.path.isfile(params['mean']):
+            self.mean = np.load(params['mean'])
         else:
             self.mean = np.array(params['mean'])
         # self.batch_size = params.get('batch_size', 32)
-        self.batch_size = 17
+        # self.batch_size = 17
+        self.batch_size = 32
         self.patch_size = params.get('patch_size', (224, 224))
         self.patch_per_item = params.get('patch_per_item', 20)
 
         # self.paths = params['paths']
-        self.paths = 'data/datasets/voc2010/JPEGImages/2009_001501.jpg'
+       	# STERN:
+        # self.paths = 'data/datasets/voc2010/JPEGImages/2009_001501.jpg'
+       	# WING:
+        self.paths = 'data/datasets/voc2010/JPEGImages/2008_000033.jpg'
+       	# BODY:
+        # self.paths = 'data/datasets/voc2010/JPEGImages/2008_006085.jpg'
         # self.bb = params['bb']
-        self.bb = (slice(85, 243, None), slice(21, 206, None))
+        # STERN:
+        # self.bb = (slice(85, 243, None), slice(21, 206, None))
+        # WING:
+        self.bb = (slice(62, 254, None), slice(226, 395, None))
+        # BODY:
+        # self.bb = (slice(123, 238, None), slice(159, 481, None))
+
+
         if not isinstance(self.paths, list):
             self.paths = [self.paths]
             self.bb = [self.bb]
@@ -151,7 +165,8 @@ class SingleImageLayer(caffe.Layer):
         negs = random.sample(negs, n * self.patch_per_item)
         for it, neg in zip(range(1, len(negs) + 1), negs):
             im = self.imread(neg)
-            im = imresize(im, (self.patch_size[0], self.patch_size[1], 3))
+            im = imresize(im, (self.patch_size[0], self.patch_size[1], 3)).astype(np.float32)
+            im -= self.mean
             self.samples[-it, ...] = im
 
         # two tops: data and label
@@ -199,7 +214,8 @@ class SingleImageLayer(caffe.Layer):
             patch = im[xstart:xstop, ystart:ystop]
             if patch.shape[:-1] != self.patch_size:
                 patch = imresize(patch, (self.patch_size[0],
-                                         self.patch_size[1], 3))
+                                         self.patch_size[1], 3)).astype(np.float32)
+                patch -= self.mean
             samples[it, ...] = patch
         return samples
 
@@ -221,5 +237,5 @@ class SingleImageLayer(caffe.Layer):
         im = imread(path)
         im = np.array(im, dtype=np.float32)
         im = im[:, :, ::-1]
-        im -= self.mean
+        # im -= self.mean
         return im

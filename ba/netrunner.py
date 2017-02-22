@@ -269,7 +269,7 @@ class FCNPartRunner(NetRunner):
         splitfile += 'train.txt' if split == 'train' else 'test.txt'
         imgext = utils.prevalentExtension(self.images)
         mean = self.getMean()
-        if not isinstance(mean, bool):
+        if not os.path.isfile(mean) and not isinstance(mean, bool):
             mean = tuple(mean)
         params = dict(
             images=self.images,
@@ -447,10 +447,10 @@ class SlidingFCNPartRunner(FCNPartRunner):
         data, im = self.loadimg(idx, mean=mean)
         data = data.transpose((1, 2, 0))
         hm = np.zeros(data.shape[:-1])
-        for (x, y, window) in utils.sliding_window(data, self.stride,
-                                                   self.kernel_size):
-            score = self.forwardWindow(window)
-            hm[y:y + self.kernel_size, x:x + self.kernel_size] += score
+        for ks in [50, 100, 250]:
+            for (x, y, window) in utils.sliding_window(data, self.stride, ks):
+                score = self.forwardWindow(window)
+                hm[y:y + ks, x:x + ks] += score
         bn = os.path.basename(os.path.splitext(idx)[0])
         bn_hm = self.heatmaps + bn
         imsave(bn_hm + '.png', hm)
