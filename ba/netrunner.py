@@ -91,7 +91,8 @@ class NetRunner(object):
             'solver': None,
             'testset': '',
             'trainset': '',
-            'valset': ''
+            'valset': '',
+            'meanarray': None
             }
         self.__dict__.update(defaults)
         for (attr, value) in kwargs.items():
@@ -165,6 +166,8 @@ class NetRunner(object):
         im = imread(path)
         data = np.array(im, dtype=np.float32)
         data = data[:, :, ::-1]
+        if mean.shape == (224, 224, 3):
+            mean = imresize(mean, data.shape)
         data -= np.array(mean)
         data = data.transpose((2, 0, 1))
         return (data, im)
@@ -225,12 +228,18 @@ class NetRunner(object):
             the mean
         '''
         if self.mean != []:
-            return self.mean
+            if self.meanarray is not None:
+                return self.meanarray, self.mean
+            elif os.path.isfile(self.mean):
+                self.meanarray = np.load(self.mean)
+                return self.meanarray, self.mean
+            else:
+                return self.mean, False
         elif self.trainset.mean != []:
             print('Using mean from samples')
-            return self.trainset.mean
+            return self.trainset.mean, False
         else:
-            return self.calculate_mean()
+            return self.calculate_mean(), False
 
 
 class FCNPartRunner(NetRunner):
@@ -268,8 +277,10 @@ class FCNPartRunner(NetRunner):
         splitfile = self.dir
         splitfile += 'train.txt' if split == 'train' else 'test.txt'
         imgext = utils.prevalentExtension(self.images)
-        mean = self.getMean()
-        if not os.path.isfile(mean) and not isinstance(mean, bool):
+        mean, path = self.getMean()
+        if path:
+            mean = path
+        elif not isinstance(mean, bool):
             mean = tuple(mean)
         params = dict(
             images=self.images,
@@ -355,7 +366,7 @@ class FCNPartRunner(NetRunner):
             mean (tuple, optional): The mean
         '''
         if mean is None:
-            mean = self.getMean()
+            mean, meanpath = self.getMean()
         data, im = self.loadimg(idx, mean=mean)
         self.forward(data)
         score = self.net.blobs[self.net.outputs[0]].data[0][1, ...]
@@ -379,7 +390,7 @@ class FCNPartRunner(NetRunner):
         self.createNet(self.dir + 'deploy.prototxt',
                        self.net_weights,
                        self.gpu[0])
-        mean = self.getMean()
+        mean, meanpath = self.getMean()
         print('Forwarding all in {}'.format(setlist))
         for idx in tqdm(setlist):
             self.forwardIDx(idx, mean=mean)
@@ -443,7 +454,7 @@ class SlidingFCNPartRunner(FCNPartRunner):
             mean (tuple, optional): The mean
         '''
         if mean is None:
-            mean = self.getMean()
+            mean, meanpath = self.getMean()
         data, im = self.loadimg(idx, mean=mean)
         data = data.transpose((1, 2, 0))
         hm = np.zeros(data.shape[:-1])
@@ -451,6 +462,7 @@ class SlidingFCNPartRunner(FCNPartRunner):
             for (x, y, window) in utils.sliding_window(data, self.stride, ks):
                 score = self.forwardWindow(window)
                 hm[y:y + ks, x:x + ks] += score
+        import ipdb; ipdb.set_trace()
         bn = os.path.basename(os.path.splitext(idx)[0])
         bn_hm = self.heatmaps + bn
         imsave(bn_hm + '.png', hm)
