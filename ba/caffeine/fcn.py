@@ -119,7 +119,6 @@ class VGG16_Single(VGG16):
             self.n.data = L.Input(shape=[dict(dim=[1, 3, 224, 224])])
 
 
-
 class FCN32s(VGG16):
     def __init__(self, nclasses=2):
         super().__init__(nclasses=nclasses)

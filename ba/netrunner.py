@@ -182,9 +182,10 @@ class NetRunner(object):
         im = imread(path)
         data = np.array(im, dtype=np.float32)
         data = data[:, :, ::-1]
-        if mean.shape == (224, 224, 3):
-            mean = imresize(mean, data.shape)
-        data -= np.array(mean)
+        if not isinstance(mean, bool) or mean:
+            if mean.shape == (224, 224, 3):
+                mean = imresize(mean, data.shape)
+            data -= np.array(mean)
         data = data.transpose((2, 0, 1))
         return (data, im)
 
