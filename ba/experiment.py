@@ -42,6 +42,12 @@ class Experiment(object):
         if isinstance(self.sysargs.conf, list):
             self.sysargs.conf = self.sysargs.conf[0]
 
+    def loadSlices(self):
+        with open(self.conf['train']) as f:
+            imlist = [l[:-1] for l in f.readlines() if l.strip()]
+        slicelist = self._loadConfYaml(self.conf['slicefile'])
+        return {im: slicelist[im] for im in imlist}
+
     def _loadConfYaml(self, path):
         '''Loads a yaml file.
 
@@ -78,14 +84,17 @@ class Experiment(object):
         if 'test' not in self.conf:
             self.conf['test'] = self.conf['val']
 
+        if 'slicefile' in self.conf:
+            self.conf['slices'] = self.loadSlices()
+
         for step in ['train', 'test', 'val']:
             if os.path.isfile(self.conf[step]):
                 if 'lmdb' in self.conf[step]:
-                    setattr(self, step + 'mode', Mode.LMDB)
+                    setattr(self, step + 'mode', RunMode.LMDB)
                 elif self.conf[step].endswith('txt'):
-                    setattr(self, step + 'mode', Mode.LIST)
+                    setattr(self, step + 'mode', RunMode.LIST)
                 else:
-                    setattr(self, step + 'mode', Mode.SINGLE)
+                    setattr(self, step + 'mode', RunMode.SINGLE)
             else:
                 print('{} is not pointing to a file.'.format(self.conf[step]))
                 sys.exit(1)
@@ -99,6 +108,7 @@ class Experiment(object):
         self.cnn = runner(self.conf['tag'],
                           trainset=self.conf['train'],
                           valset=self.conf['val'],
+                          testset=self.conf['test'],
                           solver_weights=self.conf['weights'],
                           net_generator=self.conf['net'],
                           images=self.conf['images'],
@@ -106,11 +116,19 @@ class Experiment(object):
                           mean=self.conf['mean']
                           )
 
-        spattrs = ['lr_policy', 'stepsize', 'weight_decay', 'base_lr']
-        for spattr in spattrs:
-            if spattr in self.conf:
-                self.cnn._spattr[spattr] = self.conf[spattr]
+        # Extra atrributes for the solver
+        attrs = ['lr_policy', 'stepsize', 'weight_decay', 'base_lr']
+        for attr in attrs:
+            if attr in self.conf:
+                self.cnn._solver_attr[attr] = self.conf[attr]
 
+        # Extra attributes for the network generator
+        attrs = ['slices']
+        for attr in attrs:
+            if attr in self.conf:
+                self.cnn.generator_attr[attr] = self.conf[attr]
+
+        # Boolean switsches for the network generator (default is false)
         switches = ['tofcn', 'learn_fc']
         for switch in switches:
             if switch in self.conf:
@@ -147,7 +165,6 @@ class Experiment(object):
     def runTrain(self):
         '''Trains the given experiment'''
         self.prepareCNN()
-        lastiter = self.cnn.epochs * len(self.cnn.trainset)
         self.cnn.train()
 
     def genData(self, name, source):

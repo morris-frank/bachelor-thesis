@@ -6,11 +6,12 @@ learn_fc: True
 lr_policy: 'step'
 mean: [103.939, 116.779, 123.68]
 net: ba.caffeine.fcn.VGG16_Single().write
+slicefile: 'data/tmp/pascpart/patches/aeroplane_body/seg.yaml'
 sliding_window: True
 stepsize: 1000
 test_images: ''
 test_interval: 100
-train: 'data/tmp/pascpart/patches/aeroplane_lwing_rwing/img_augmented_lmdb_train.txt'
+train: 'data/single_wings.txt'
 val: 'data/tmp/pascpart/aeroplane_lwing_rwing.txt'
 weight_decay: 0.0005
 weights: 'data/models/vgg16/VGG_ILSVRC_16_layers.caffemodel'

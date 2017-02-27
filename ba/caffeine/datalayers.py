@@ -122,50 +122,34 @@ class SingleImageLayer(caffe.Layer):
     def setup(self, bottom, top):
         from keras.preprocessing.image import ImageDataGenerator
         params = eval(self.param_str)
+        self.images = params['images']
+        self.ext = params['extension']
+        self.slices = params['slices']
         # self.negatives = params['negatives']
         self.negatives = 'data/tmp/pascpart/patches/aeroplane_stern/img_augmented/neg/'
-        if os.path.isfile(params['mean']):
+        if isinstance(params['mean'], str):
             self.mean = np.load(params['mean'])
         else:
             self.mean = np.array(params['mean'])
-        # self.batch_size = params.get('batch_size', 32)
-        # self.batch_size = 17
-        self.batch_size = 32
+        self.batch_size = params.get('batch_size', 32)
         self.patch_size = params.get('patch_size', (224, 224))
-        self.patch_per_item = params.get('patch_per_item', 20)
+        self.ppI = params.get('ppI', 20)
 
-        # self.paths = params['paths']
-       	# STERN:
-        # self.paths = 'data/datasets/voc2010/JPEGImages/2009_001501.jpg'
-       	# WING:
-        self.paths = 'data/datasets/voc2010/JPEGImages/2008_000033.jpg'
-       	# BODY:
-        # self.paths = 'data/datasets/voc2010/JPEGImages/2008_006085.jpg'
-        # self.bb = params['bb']
-        # STERN:
-        # self.bb = (slice(85, 243, None), slice(21, 206, None))
-        # WING:
-        self.bb = (slice(62, 254, None), slice(226, 395, None))
-        # BODY:
-        # self.bb = (slice(123, 238, None), slice(159, 481, None))
-
-
-        if not isinstance(self.paths, list):
-            self.paths = [self.paths]
-            self.bb = [self.bb]
-        n = len(self.paths)
-        self.samples = np.zeros((n * self.patch_per_item * 2,
+        n = len(self.slices)
+        self.samples = np.zeros((n * self.ppI * 2,
                                  self.patch_size[0], self.patch_size[1], 3))
-        for it, path, bb in zip(range(n), self.paths, self.bb):
-            self.samples[it:it + self.patch_per_item, ...] = self.generateSamples(self.imread(path), bb)
-        self.labels = np.append(np.ones(n * self.patch_per_item),
-                                np.zeros(n * self.patch_per_item))
+        for it, (path, bb) in zip(range(n), self.slices.items()):
+            im = self.imread('{}{}.{}'.format(self.images, path, self.ext))
+            self.samples[it:it + self.ppI, ...] = self.generateSamples(im, bb)
+        self.labels = np.append(np.ones(n * self.ppI),
+                                np.zeros(n * self.ppI))
 
         negs = glob(self.negatives + '/*png')
-        negs = random.sample(negs, n * self.patch_per_item)
+        negs = random.sample(negs, n * self.ppI)
         for it, neg in zip(range(1, len(negs) + 1), negs):
             im = self.imread(neg)
-            im = imresize(im, (self.patch_size[0], self.patch_size[1], 3)).astype(np.float32)
+            im = imresize(im, (self.patch_size[0], self.patch_size[1], 3))
+            im = im.astype(np.float32)
             im -= self.mean
             self.samples[-it, ...] = im
 
@@ -195,7 +179,7 @@ class SingleImageLayer(caffe.Layer):
 
     def generateSamples(self, im, bb, shiftfactor=0.1, count=None):
         if count is None:
-            count = self.patch_per_item
+            count = self.ppI
         if count % 2 != 0:
             print('Count in SingleImageLayer is not divisble by two')
             return

@@ -10,6 +10,7 @@ import numpy as np
 import os
 from os.path import normpath
 from PIL import Image
+import re
 from scipy.misc import imread
 from scipy.misc import imresize
 from scipy.misc import imsave
@@ -57,7 +58,10 @@ class SolverSpec(utils.Bunch):
             for key, value in sorted(self.__dict__.items(), key=lambda x: x[0]):
                 if not key.startswith('_'):
                     if isinstance(value, str):
-                        f.write('{}: "{}"\n'.format(key, value))
+                        if re.match('[0-9]+e[+-]?[0-9]+', value) is not None:
+                            f.write('{}: {}\n'.format(key, float(value)))
+                        else:
+                            f.write('{}: "{}"\n'.format(key, value))
                     else:
                         f.write('{}: {}\n'.format(key, value))
 
@@ -73,10 +77,11 @@ class NetRunner(object):
             kwargs...
         '''
         self.name = name
-        self._spattr = {}
+        self._solver_attr = {}
         defaults = {
             'dir': './',
             'generator_switches': {},
+            'generator_attr': {},
             'images': './',
             'labels': './',
             'mean': [],
@@ -96,15 +101,39 @@ class NetRunner(object):
         for (attr, value) in kwargs.items():
             if attr in defaults:
                 setattr(self, attr, value)
-            else:
-                self._spattr[attr] = value
 
-        if not isinstance(self.trainset, SetList):
-            self.trainset = SetList(self.trainset)
-        if not isinstance(self.testset, SetList):
-            self.testset = SetList(self.testset)
-        if not isinstance(self.valset, SetList):
-            self.valset = SetList(self.valset)
+    @property
+    def trainset(self):
+        return self.__trainset
+
+    @trainset.setter
+    def trainset(self, trainset):
+        if isinstance(trainset, SetList):
+            self.__trainset = trainset
+        else:
+            self.__trainset = SetList(trainset)
+
+    @property
+    def testset(self):
+        return self.__testset
+
+    @testset.setter
+    def testset(self, testset):
+        if isinstance(testset, SetList):
+            self.__testset = testset
+        else:
+            self.__testset = SetList(testset)
+
+    @property
+    def valset(self):
+        return self.__valset
+
+    @valset.setter
+    def valset(self, valset):
+        if isinstance(valset, SetList):
+            self.__valset = valset
+        else:
+            self.__valset = SetList(valset)
 
     def clear(self):
         '''Clears the nets'''
@@ -137,17 +166,6 @@ class NetRunner(object):
         caffe.set_mode_gpu()
         self.solver = caffe.SGDSolver(solverpath)
         self.solver.net.copy_from(weights)
-
-    def addListFile(self, fpath, split='test_train'):
-        '''Adds a list to run the net on
-
-        Args:
-            fpath (str): The path to the list file
-        '''
-        if 'test' in split:
-            self.testset = SetList(fpath)
-        if 'train' in split:
-            self.trainset = SetList(fpath)
 
     def loadimg(self, path, mean):
         '''Loads an image and prepares it for caffe.
@@ -228,7 +246,7 @@ class NetRunner(object):
         if self.mean != []:
             if self.meanarray is not None:
                 return self.meanarray, self.mean
-            elif os.path.isfile(self.mean):
+            elif isinstance(self.mean, str) and os.path.isfile(self.mean):
                 self.meanarray = np.load(self.mean)
                 return self.meanarray, self.mean
             else:
@@ -253,14 +271,24 @@ class FCNPartRunner(NetRunner):
             kwargs...
         '''
         super().__init__(name=name, **kwargs)
+        self.name = name
         self.images = 'data/datasets/voc2010/JPEGImages/'
-        self.targets()
 
-    def targets(self):
-        '''Building the saving paths from the current state.'''
+    @property
+    def name(self):
+        return self.__name
+
+    @name.setter
+    def name(self, name):
+        '''Sets the name of this network and all Variables that depend on it
+
+        Args:
+            name (str): The new name
+        '''
+        self.__name = name
         self.dir = self.buildroot + '/' + self.name + '/'
-        self.snapshots = self.dir + 'snapshots/'
         self.results = self.resultroot + '/' + self.name + '/'
+        self.snapshots = self.dir + 'snapshots/'
         self.heatmaps = self.results + 'heatmaps/'
 
     def FCNparams(self, split):
@@ -288,7 +316,7 @@ class FCNPartRunner(NetRunner):
             split=split,
             mean=mean
             )
-        return params
+        return {**params, **self.generator_attr}
 
     def write(self, split):
         '''Writes the model file for one split to disk
@@ -306,7 +334,6 @@ class FCNPartRunner(NetRunner):
         Args:
             split (str): The split to prepare for.
         '''
-        self.targets()
         # Create build and snapshot direcotry:
         if 'train' in split:
             utils.touch(self.snapshots)
@@ -327,7 +354,7 @@ class FCNPartRunner(NetRunner):
 
     def writeSolver(self):
         '''Writes the solver definition to disk.'''
-        s = SolverSpec(self.dir, self._spattr)
+        s = SolverSpec(self.dir, self._solver_attr)
         s.write()
 
     def train(self):
@@ -450,10 +477,14 @@ class SlidingFCNPartRunner(FCNPartRunner):
         data = data.transpose((1, 2, 0))
         hm = np.zeros(data.shape[:-1])
         for ks in [50, 100, 250]:
-            for (x, y, window) in utils.sliding_window(data, self.stride, ks):
+            pad = int(ks / 2)
+            padded_data = np.pad(data, ((pad, pad), (pad, pad), (0, 0)), mode='reflect')
+            padded_hm = np.zeros(padded_data.shape[:-1])
+            for (x, y, window) in utils.sliding_window(padded_data, self.stride,
+                                                       ks):
                 score = self.forwardWindow(window)
-                hm[y:y + ks, x:x + ks] += score
-        import ipdb; ipdb.set_trace()
+                padded_hm[y:y + ks, x:x + ks] += score
+            hm += padded_hm[pad:-pad, pad:-pad]
         bn = os.path.basename(os.path.splitext(idx)[0])
         bn_hm = self.heatmaps + bn
         imsave(bn_hm + '.png', hm)
