@@ -1,6 +1,5 @@
-baselr: 10e-14
+base_lr: 10e-14
 desc: 'Test File, doin nuthing'
-epochs: 0
 fc: False
 image_extension: 'jpg'
 images: 'data/datasets/voc2010/JPEGImages/'

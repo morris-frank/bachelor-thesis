@@ -2,9 +2,8 @@ train: 'data/tmp/pascpart/patches/aeroplane_stern/img_augmented_lmdb_train.txt'
 # val: 'data/tmp/pascpart/patches/aeroplane_stern/img_augmented_lmdb_test.txt'
 val: 'data/tmp/pascpart/aeroplane_stern.txt'
 weights: 'data/models/resnet/ResNet-50-model.caffemodel'
-net: ba.caffeine.resnet.ReseNet50().write
-baselr: 10e-6
-epochs: 20
+net: ba.caffeine.resnet.ResNet50().write
+base_lr: 10e-6
 images: 'data/datasets/voc2010/JPEGImages/'
 desc: 'VGG16 trained on Stern patches, sliding window detection'
 learn_fc: True

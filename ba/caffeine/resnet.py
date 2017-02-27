@@ -5,8 +5,8 @@ from caffe import params as P
 from caffe.coord_map import crop
 
 
-class ReseNet50(object):
-
+class ResNet50(object):
+    '''Contains a standard Residual Net with 50 layers.'''
     def __init__(self, nclasses=2):
         self.nclasses = nclasses
         self.n = caffe.NetSpec()
@@ -143,7 +143,7 @@ class ReseNet50(object):
         return self.n.to_proto()
 
 
-class ReseNet50FCN(ReseNet50):
+class ResNet50FCN(ResNet50):
     def __init__(self, nclasses=2):
         super().__init__(nclasses=nclasses)
 
@@ -186,7 +186,7 @@ class ReseNet50FCN(ReseNet50):
                                                             ignore_label=255))
 
 
-class ReseNet50_Single(ReseNet50):
+class ResNet50_Single(ResNet50):
     def __init__(self, nclasses =2):
         super().__init__(nclasses=nclasses)
 

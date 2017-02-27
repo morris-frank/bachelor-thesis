@@ -1,7 +1,6 @@
 # val: 'data/tmp/pascpart/aeroplane_stern.txt'
-baselr: 10e-6
+base_lr: 10e-6
 desc: 'VGG16 trained on Stern patches, sliding window detection'
-epochs: 20
 images: 'data/datasets/voc2010/JPEGImages/'
 learn_fc: True
 lr_policy: 'step'

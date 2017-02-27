@@ -2,9 +2,9 @@ train: 'data/tmp/pascpart/patches/aeroplane_stern/img_augmented_lmdb_train.txt'
 # val: 'data/tmp/pascpart/patches/aeroplane_stern/img_augmented_lmdb_test.txt'
 val: 'data/tmp/pascpart/aeroplane_stern.txt'
 weights: 'data/models/ReseNet50-FCN/snapshots/classifier_train_iter_4000.caffemodel'
-net: ba.caffeine.resnet.ReseNet50FCN().write
+net: ba.caffeine.resnet.ResNet50FCN().write
 labels: 'data/tmp/pascpart/patches/aeroplane_stern/seg.yaml'
-baselr: 10e-6
+base_lr: 10e-6
 epochs: 20
 images: 'data/datasets/voc2010/JPEGImages/'
 desc: 'FCN generated from trained ReseNet50'

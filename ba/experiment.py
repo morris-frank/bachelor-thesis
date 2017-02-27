@@ -1,10 +1,18 @@
 import argparse
 import ba
 from ba import utils
+from enum import Enum
 from glob import glob
 import os
 import sys
 import yaml
+
+
+class RunMode(Enum):
+    '''Contains the different possible modes for each step of an experiment.'''
+    SINGLE = 0
+    LMDB = 1
+    LIST = 2
 
 
 class Experiment(object):
@@ -67,34 +75,49 @@ class Experiment(object):
             sys.exit()
         else:
             self.conf['net'] = eval(self.conf['net'])
+        if 'test' not in self.conf:
+            self.conf['test'] = self.conf['val']
 
-    def prepareFCN(self):
+        for step in ['train', 'test', 'val']:
+            if os.path.isfile(self.conf[step]):
+                if 'lmdb' in self.conf[step]:
+                    setattr(self, step + 'mode', Mode.LMDB)
+                elif self.conf[step].endswith('txt'):
+                    setattr(self, step + 'mode', Mode.LIST)
+                else:
+                    setattr(self, step + 'mode', Mode.SINGLE)
+            else:
+                print('{} is not pointing to a file.'.format(self.conf[step]))
+                sys.exit(1)
+
+    def prepareCNN(self):
         '''Prepares a NetRunner from the given configuration.'''
         if self.conf['sliding_window']:
             runner = ba.SlidingFCNPartRunner
         else:
             runner = ba.FCNPartRunner
-        self.fcn = runner(self.conf['tag'],
+        self.cnn = runner(self.conf['tag'],
                           trainset=self.conf['train'],
                           valset=self.conf['val'],
                           solver_weights=self.conf['weights'],
                           net_generator=self.conf['net'],
-                          baselr=self.conf['baselr'],
-                          epochs=self.conf['epochs'],
                           images=self.conf['images'],
                           labels=self.conf['labels'],
                           mean=self.conf['mean']
                           )
-        if 'lr_policy' in self.conf:
-            self.fcn._spattr['lr_policy'] = self.conf['lr_policy']
-        if 'stepsize' in self.conf:
-            self.fcn._spattr['stepsize'] = self.conf['stepsize']
-        if 'weight_decay' in self.conf:
-            self.fcn._spattr['weight_decay'] = self.conf['weight_decay']
-        if 'tofcn' in self.conf:
-            self.fcn.generator_switches['tofcn'] = self.conf['tofcn']
-        self.fcn.gpu = self.sysargs.gpu
-        self.fcn.generator_switches['learn_fc'] = self.conf['learn_fc']
+
+        spattrs = ['lr_policy', 'stepsize', 'weight_decay', 'base_lr']
+        for spattr in spattrs:
+            if spattr in self.conf:
+                self.cnn._spattr[spattr] = self.conf[spattr]
+
+        switches = ['tofcn', 'learn_fc']
+        for switch in switches:
+            if switch in self.conf:
+                self.cnn.generator_switches[switch] = self.conf.get(switch,
+                                                                    False)
+
+        self.cnn.gpu = self.sysargs.gpu
 
     def runTests(self):
         '''Tests the given experiment, Normally depends on user input. If --default
@@ -104,8 +127,8 @@ class Experiment(object):
         weights = glob('{}*caffemodel'.format(snapdir))
         if len(weights) < 1:
             print('No weights found for {}'.format(self.conf['tag']))
-            self.prepareFCN()
-            self.fcn.write('deploy')
+            self.prepareCNN()
+            self.cnn.write('deploy')
             return False
         for w in weights:
             bn = os.path.basename(w)
@@ -114,18 +137,18 @@ class Experiment(object):
                                        defaulting=self.sysargs.default):
                 continue
             print('TESTING ' + bn)
-            self.prepareFCN()
-            self.fcn.net_weights = w
+            self.prepareCNN()
+            self.cnn.net_weights = w
             if self.conf['test_images'] != '':
-                self.fcn.images = self.conf['test_images']
-            self.fcn.forwardVal()
-            self.fcn.clear()
+                self.cnn.images = self.conf['test_images']
+            self.cnn.forwardVal()
+            self.cnn.clear()
 
     def runTrain(self):
         '''Trains the given experiment'''
-        self.prepareFCN()
-        lastiter = self.fcn.epochs * len(self.fcn.trainset)
-        self.fcn.train()
+        self.prepareCNN()
+        lastiter = self.cnn.epochs * len(self.cnn.trainset)
+        self.cnn.train()
 
     def genData(self, name, source):
         '''Generates the training data for that experiment'''

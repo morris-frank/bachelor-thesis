@@ -298,42 +298,6 @@ class PascalPartSet(object):
         for _ in range(0, int(n / 50)):
             img_generator.next()
 
-    def augmentDual(self, imdir, segdir, n):
-        '''Generates augmentet images and segmentations
-
-        Args:
-            imdir (str): The path to the images
-            segdir (str): The path to the segmentations
-            n (int): Number of images to produce
-        '''
-        if n < 50:
-            return True
-        par_imdir = '/'.join(os.path.normpath(imdir).split('/')[:-1])
-        bn_imdir = os.path.normpath(imdir).split('/')[-1]
-        par_segdir = '/'.join(os.path.normpath(segdir).split('/')[:-1])
-        bn_segdir = os.path.normpath(segdir).split('/')[-1]
-        img_generator = self.augmenter.flow_from_directory(
-            directory=par_imdir,
-            classes=bn_segdir,
-            target_size=(224, 224),
-            class_mode='binary',
-            save_to_dir=imdir,
-            save_format='png',
-            batch_size=50
-            )
-        seg_generator = self.augmenter.flow_from_directory(
-            directory=par_segdir,
-            classes=bn_segdir,
-            target_size=(224, 224),
-            class_mode='binary',
-            save_to_dir=segdir,
-            save_format='png',
-            batch_size=50
-            )
-        generator = zip(img_generator, seg_generator)
-        for _ in range(0, int(n / 50)):
-            iter(generator)
-
 
 class PascalPart(object):
 

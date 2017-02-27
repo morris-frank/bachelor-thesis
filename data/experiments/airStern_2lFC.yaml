@@ -1,6 +1,5 @@
-baselr: 10e-14
+base_lr: 10e-14
 desc: 'Trained on whole images. Retrained FC-Layers'
-epochs: 20
 images: 'data/datasets/voc2010/JPEGImages/'
 labels: 'data/tmp/segmentations/pascpart_aeroplane_stern/'
 learn_fc: True

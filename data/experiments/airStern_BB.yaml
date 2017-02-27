@@ -1,6 +1,5 @@
-baselr: 10e-14
+base_lr: 10e-14
 desc: 'Trained on patches. Run on Images. Retrianed FC-Layers'
-epochs: 20
 fc: True
 images: 'data/tmp/segmentations/pascpart_aeroplane_stern_bb_patches/'
 labels: 'data/tmp/segmentations/pascpart_aeroplane_stern_bb/'

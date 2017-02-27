@@ -1,6 +1,5 @@
-baselr: 10e-8
+base_lr: 10e-8
 desc: 'FCN32s refined with positive filled patches with transplants from airStern_patchDetection'
-epochs: 10
 images: 'data/datasets/voc2010/JPEGImages/'
 labels: 'data/tmp/pascpart/patches/aeroplane_stern/seg.yaml'
 lr_policy: 'step'

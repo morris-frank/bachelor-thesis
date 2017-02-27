@@ -1,6 +1,5 @@
-baselr: 10e-8
+base_lr: 10e-8
 desc: 'FCN8s trained from airStern_patchDetection'
-epochs: 10
 images: 'data/datasets/voc2010/JPEGImages/'
 labels: 'data/tmp/pascpart/segmentations/aeroplane_stern/'
 lr_policy: 'step'

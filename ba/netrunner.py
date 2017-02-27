@@ -75,9 +75,7 @@ class NetRunner(object):
         self.name = name
         self._spattr = {}
         defaults = {
-            'baselr': 1,
             'dir': './',
-            'epochs': 1,
             'generator_switches': {},
             'images': './',
             'labels': './',
@@ -330,9 +328,6 @@ class FCNPartRunner(NetRunner):
     def writeSolver(self):
         '''Writes the solver definition to disk.'''
         s = SolverSpec(self.dir, self._spattr)
-        s.base_lr = float(self.baselr)
-        # s.lr_policy = 'fixed'
-        # # s.lr_policy = self.lr_policy
         s.write()
 
     def train(self):
@@ -345,10 +340,6 @@ class FCNPartRunner(NetRunner):
             self.solver_weights,
             ','.join(str(x) for x in self.gpu),
             self.dir + logf))
-
-    def test(self):
-        # TODO(doc): Add docstring
-        self.prepare('test')
 
     def forwardVal(self):
         '''Will forward the whole validation set through the network'''
