@@ -16,8 +16,14 @@ from scipy.misc import imresize
 from scipy.misc import imsave
 import sys
 import tempfile
+import threading
 from tqdm import tqdm
 import warnings
+
+
+sys.path.append('../telenotify')
+notifier_config = '../telenotify/config.yaml'
+from telenotify import Notifier
 
 
 class SolverSpec(utils.Bunch):
@@ -258,6 +264,18 @@ class NetRunner(object):
         else:
             return self.calculate_mean(), False
 
+    def notifiy(self, logfile):
+        '''Starts notifier thread on a given caffe - logfile
+
+        Args:
+            logfile (str): The Full path to the log file
+
+        Returns:
+            the thread?
+        '''
+        notifier = Notifier(configfile=notifier_config)
+        threading.Thread(target=notifier._start, args=(logfile, )).start()
+
 
 class FCNPartRunner(NetRunner):
     '''A NetRunner specific for FCNs'''
@@ -363,6 +381,8 @@ class FCNPartRunner(NetRunner):
         self.prepare('train')
         logf = '{}_{}_train.log'.format(
             datetime.datetime.now().strftime('%y_%m_%d_'), self.name)
+        utils.touch(self.dir + logf, clear=True)
+        self.notifiy(self.dir + logf)
         os.system('caffe train -solver {} -weights {} -gpu {} 2>&1 | tee {}'.format(
             self.dir + 'solver.prototxt',
             self.solver_weights,
@@ -478,7 +498,7 @@ class SlidingFCNPartRunner(FCNPartRunner):
         data = data.transpose((1, 2, 0))
         hm = np.zeros(data.shape[:-1])
         for ks in [50, 100, 250]:
-            pad = int(ks / 2)
+            pad = int(ks)
             padded_data = np.pad(data, ((pad, pad), (pad, pad), (0, 0)), mode='reflect')
             padded_hm = np.zeros(padded_data.shape[:-1])
             for (x, y, window) in utils.sliding_window(padded_data, self.stride,
