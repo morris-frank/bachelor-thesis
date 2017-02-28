@@ -5,7 +5,7 @@ images: 'data/datasets/voc2010/JPEGImages/'
 learn_fc: True
 lr_policy: 'step'
 mean: 'data/models/resnet/ResNet_mean.npy'
-net: ba.caffeine.resnet.ResNet50_Single().write
+net: ba.caffeine.resnet.ResNet_Single(nconv3=4, nconv4=6).write
 slicefile: 'data/tmp/pascpart/patches/aeroplane_stern/seg.yaml'
 sliding_window: True
 stepsize: 1000
