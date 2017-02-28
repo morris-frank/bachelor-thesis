@@ -305,7 +305,7 @@ class ResNet_FCN(ResNet):
         if self.params['split'] == 'deploy':
             self.n.prob = L.Softmax(self.n['fc' + na])
         else:
-            self.n.loss = L.SoftmaxWithLoss(self.n.score, self.n.label,
+            self.n.loss = L.SoftmaxWithLoss(self.n['fc' + na], self.n.label,
                                             loss_param=dict(normalize=False,
                                                             ignore_label=255))
 
