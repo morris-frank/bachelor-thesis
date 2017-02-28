@@ -227,8 +227,7 @@ class ResNet(object):
             self.n.conv1_relu, kernel_size=3, stride=2, pool=P.Pooling.MAX)
         # Change naming convention if we build a Net larger ResNet50
         # e.g. ResNet101
-        if self.nconv4 > 6:
-            an = False
+        an = self.nconv4 <= 6
         res2c = self.ResBlock('pool1', 3, '2', 64, ds=False)
         res3d = self.ResBlock(res2c, self.nconv3, '3', 128, alephnaming=an)
         res4f = self.ResBlock(res3d, self.nconv4, '4', 256, alephnaming=an)
