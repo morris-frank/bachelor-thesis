@@ -6,6 +6,7 @@ labels: 'data/tmp/pascpart/patches/aeroplane_stern/seg.yaml'
 lr_policy: 'step'
 mean: 'data/models/resnet/ResNet_mean.npy'
 net: ba.caffeine.resnet.ResNet_FCN(nconv3=4, nconv4=23).write
+slicefile: 'data/tmp/pascpart/patches/aeroplane_stern/seg.yaml'
 stepsize: 1000
 test_images: 'data/datasets/voc2010/JPEGImages/'
 test_interval: 100

@@ -2,10 +2,8 @@ from ba import caffeine
 from ba.set import SetList
 from ba import utils
 import caffe
-from collections import namedtuple
 import copy
 import datetime
-from functools import partial
 import numpy as np
 import os
 from os.path import normpath
@@ -15,11 +13,9 @@ from scipy.misc import imread
 from scipy.misc import imresize
 from scipy.misc import imsave
 import sys
-import tempfile
 import threading
 from tqdm import tqdm
-import warnings
-
+import yaml
 
 sys.path.append('../telenotify')
 notifier_config = '../telenotify/config.yaml'
@@ -335,7 +331,8 @@ class FCNPartRunner(NetRunner):
             split=split,
             mean=mean
             )
-        return {**params, **self.generator_attr}
+        params.update(self.generator_attr)
+        return params
 
     def write(self, split):
         '''Writes the model file for one split to disk
@@ -390,7 +387,7 @@ class FCNPartRunner(NetRunner):
             self.dir + logf))
 
     def forwardVal(self):
-        '''Will forward the whole validation set through the network'''
+        '''Will forward the whole validation set through the network.'''
         imgext = '.' + utils.prevalentExtension(self.images)
         self.valset.addPreSuffix(self.images, imgext)
         self.forwardList(setlist=self.valset)
@@ -407,14 +404,17 @@ class FCNPartRunner(NetRunner):
         if mean is None:
             mean, meanpath = self.getMean()
         data, im = self.loadimg(idx, mean=mean)
-        self.forward(data)
-        score = self.net.blobs[self.net.outputs[0]].data[0][1, ...]
         bn = os.path.basename(os.path.splitext(idx)[0])
         bn_hm = self.heatmaps + bn
-        imsave(bn_hm + '.png', score)
         bn_ov = self.heatmaps[:-1] + '_overlays/' + bn
+        self.forward(data)
+        score = self.net.blobs[self.net.outputs[0]].data[0][1, ...]
+        # I'm really not sure if this is necessary or useful?
+        score /= np.sum(score)
+        imsave(bn_hm + '.png', score)
         score = imresize(score, im.shape[:-1])
         utils.apply_overlay(im, score, bn_ov + '.png')
+        return {bn: utils.scoreToRegion(score, im)}
 
     def forwardList(self, setlist=None):
         '''Will forward a whole setlist through the network. Will default to the
@@ -430,9 +430,14 @@ class FCNPartRunner(NetRunner):
                        self.net_weights,
                        self.gpu[0])
         mean, meanpath = self.getMean()
+        scoreboxes = {}
         print('Forwarding all in {}'.format(setlist))
         for idx in tqdm(setlist):
-            self.forwardIDx(idx, mean=mean)
+            scoreboxes.update(self.forwardIDx(idx, mean=mean))
+            import ipdb; ipdb.set_trace()
+        scoreboxf = self.results[:-1] + '.yaml'
+        with open(scoreboxf, 'w') as f:
+            yaml.dump(scoreboxes, f)
 
 
 class SlidingFCNPartRunner(FCNPartRunner):

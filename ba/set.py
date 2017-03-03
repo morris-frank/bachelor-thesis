@@ -1,10 +1,10 @@
-import os
+from ba import utils
+from scipy.misc import imread
 from tqdm import tqdm
 import numpy as np
-import warnings
-from scipy.misc import imread
+import os
 import random
-from ba import utils
+import warnings
 
 
 class SetList(object):

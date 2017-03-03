@@ -3,17 +3,13 @@ from ba import utils
 import copy
 from functools import partial
 from glob import glob
-import keras.preprocessing.image
 import numpy as np
 import os.path
 import scipy.io as sio
 from scipy.misc import imread
 from scipy.misc import imsave
 import scipy.ndimage
-import tempfile
 from tqdm import tqdm
-import yaml
-
 
 class PascalPartSet(object):
     _builddir = 'data/tmp/'
@@ -32,14 +28,6 @@ class PascalPartSet(object):
         self.source = root
         self.classes = classes
         self.parts = parts
-        self.augmenter = keras.preprocessing.image.ImageDataGenerator(
-            rotation_range=15,
-            shear_range=0.2,
-            zoom_range=0.2,
-            width_shift_range=0.05,
-            height_shift_range=0.05,
-            horizontal_flip=True
-            )
         if dolists:
             self.genLists()
 
@@ -182,6 +170,7 @@ class PascalPartSet(object):
             negatives (int, optional): How many negative samples to generate
             augment (int, optional): How many augmentations per image
         '''
+        import yaml
         cbdir = '{}patches/{}/'.format(self.build, '_'.join(self.classes))
         pbdir = '{}patches/{}/'.format(self.build, self.tag)
         d = {
@@ -281,12 +270,21 @@ class PascalPartSet(object):
             imdir (str): The path to the images
             n (int): Number of images to produce
         '''
+        import keras.preprocessing.image
+        augmenter = keras.preprocessing.image.ImageDataGenerator(
+            rotation_range=15,
+            shear_range=0.2,
+            zoom_range=0.2,
+            width_shift_range=0.05,
+            height_shift_range=0.05,
+            horizontal_flip=True
+            )
         par_imdir = '/'.join(os.path.normpath(imdir).split('/')[:-1])
         bn_imdir = os.path.normpath(imdir).split('/')[-1]
         save_imdir = os.path.normpath(par_imdir) + '_augmented'
         utils.rm(save_imdir + '/' + bn_imdir)
         os.makedirs(save_imdir + '/' + bn_imdir)
-        img_generator = self.augmenter.flow_from_directory(
+        img_generator = augmenter.flow_from_directory(
             directory=par_imdir,
             target_size=(224, 224),
             class_mode='binary',
