@@ -17,9 +17,9 @@ import threading
 from tqdm import tqdm
 import yaml
 
+
 sys.path.append('../telenotify')
 notifier_config = '../telenotify/config.yaml'
-from telenotify import Notifier
 
 
 class SolverSpec(utils.Bunch):
@@ -269,6 +269,7 @@ class NetRunner(object):
         Returns:
             the thread?
         '''
+        from telenotify import Notifier
         notifier = Notifier(configfile=notifier_config)
         threading.Thread(target=notifier._start, args=(logfile, )).start()
 
@@ -363,7 +364,8 @@ class FCNPartRunner(NetRunner):
             self.write('val')
         if 'deploy' in split:
             bnw = os.path.basename(self.net_weights[:-len('.caffemodel')])
-            self.heatmaps = self.results + bnw + '/' + 'heatmaps/'
+            self.results += bnw + '/'
+            self.heatmaps = self.results + 'heatmaps/'
             utils.touch(self.heatmaps)
             utils.touch(self.heatmaps[:-1] + '_overlays/')
             self.write('deploy')
@@ -400,6 +402,9 @@ class FCNPartRunner(NetRunner):
         Args:
             idx (str): The index (basename) of the image to forward
             mean (tuple, optional): The mean
+
+        Return:
+            The score and coordinates of the highest scoring region
         '''
         if mean is None:
             mean, meanpath = self.getMean()
@@ -431,13 +436,12 @@ class FCNPartRunner(NetRunner):
                        self.gpu[0])
         mean, meanpath = self.getMean()
         scoreboxes = {}
+        scoreboxf = self.results[:-1] + '.scores.yaml'
         print('Forwarding all in {}'.format(setlist))
         for idx in tqdm(setlist):
             scoreboxes.update(self.forwardIDx(idx, mean=mean))
-            import ipdb; ipdb.set_trace()
-        scoreboxf = self.results[:-1] + '.yaml'
-        with open(scoreboxf, 'w') as f:
-            yaml.dump(scoreboxes, f)
+            with open(scoreboxf, 'w') as f:
+                yaml.dump(scoreboxes, f)
 
 
 class SlidingFCNPartRunner(FCNPartRunner):

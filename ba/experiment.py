@@ -5,7 +5,6 @@ from enum import Enum
 from glob import glob
 import os
 import sys
-import yaml
 
 
 class RunMode(Enum):
@@ -45,31 +44,13 @@ class Experiment(object):
     def loadSlices(self):
         with open(self.conf['train']) as f:
             imlist = [l[:-1] for l in f.readlines() if l.strip()]
-        slicelist = self._loadConfYaml(self.conf['slicefile'])
+        slicelist = utils.loadYAML(self.conf['slicefile'])
         return {im: slicelist[im] for im in imlist}
-
-    def _loadConfYaml(self, path):
-        '''Loads a yaml file.
-
-        Args:
-            path (str): The filepath of the file
-
-        Returns:
-            The dictionary from the contents
-        '''
-        with open(path, 'r') as f:
-            try:
-                contents = yaml.load(f)
-            except yaml.YAMLError as e:
-                print(e)
-                sendWarning('Configuration {} not loadable'.format(path))
-                sys.exit()
-        return contents
 
     def loadConf(self):
         '''Open a YAML Configuration file and make a Bunch from it'''
-        defaults = self._loadConfYaml('data/experiments/defaults.yaml')
-        self.conf = self._loadConfYaml(self.sysargs.conf)
+        defaults = utils.loadYAML('data/experiments/defaults.yaml')
+        self.conf = utils.loadYAML(self.sysargs.conf)
         if 'tag' not in self.conf:
             self.conf['tag'] = os.path.basename(
                 os.path.splitext(self.sysargs.conf)[0])
@@ -102,9 +83,9 @@ class Experiment(object):
     def prepareCNN(self):
         '''Prepares a NetRunner from the given configuration.'''
         if self.conf['sliding_window']:
-            runner = ba.SlidingFCNPartRunner
+            runner = ba.netrunner.SlidingFCNPartRunner
         else:
-            runner = ba.FCNPartRunner
+            runner = ba.netrunner.FCNPartRunner
         self.cnn = runner(self.conf['tag'],
                           trainset=self.conf['train'],
                           valset=self.conf['val'],

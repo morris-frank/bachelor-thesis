@@ -231,7 +231,7 @@ def _merge_regions(r1, r2):
 
 
 def selective_search(
-        im_orig, scale=1.0, sigma=0.8, min_size=50):
+        im_orig, scale=1.0, sigma=0.8, min_size=200):
     '''Selective Search
 
     Args:
