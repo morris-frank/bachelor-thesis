@@ -1,6 +1,7 @@
+import ba.eval
 from ba import caffeine
 from ba.set import SetList
-from ba import utils
+import ba.utils
 import caffe
 import copy
 import datetime
@@ -12,6 +13,7 @@ import re
 from scipy.misc import imread
 from scipy.misc import imresize
 from scipy.misc import imsave
+import skimage
 import sys
 import threading
 from tqdm import tqdm
@@ -22,7 +24,7 @@ sys.path.append('../telenotify')
 notifier_config = '../telenotify/config.yaml'
 
 
-class SolverSpec(utils.Bunch):
+class SolverSpec(ba.utils.Bunch):
 
     def __init__(self, dir, adict={}):
         '''Constructs a new SolverSpec object.
@@ -231,7 +233,7 @@ class NetRunner(object):
         try:
             self.trainset.mean = np.load(self.dir + 'mean.npy')
         except FileNotFoundError:
-            imgext = '.' + utils.prevalentExtension(self.images)
+            imgext = '.' + ba.utils.prevalentExtension(self.images)
             self.trainset.addPreSuffix(self.images, imgext)
             self.trainset.calculate_mean()
             self.trainset.rmPreSuffix(self.images, imgext)
@@ -318,7 +320,7 @@ class FCNPartRunner(NetRunner):
         '''
         splitfile = self.dir
         splitfile += 'train.txt' if split == 'train' else 'test.txt'
-        imgext = utils.prevalentExtension(self.images)
+        imgext = ba.utils.prevalentExtension(self.images)
         mean, path = self.getMean()
         if path:
             mean = path
@@ -353,7 +355,7 @@ class FCNPartRunner(NetRunner):
         '''
         # Create build and snapshot direcotry:
         if 'train' in split:
-            utils.touch(self.snapshots)
+            ba.utils.touch(self.snapshots)
             self.trainset.target = self.dir + 'train.txt'
             self.trainset.write()
             self.write('train')
@@ -366,8 +368,8 @@ class FCNPartRunner(NetRunner):
             bnw = os.path.basename(self.net_weights[:-len('.caffemodel')])
             self.results += bnw + '/'
             self.heatmaps = self.results + 'heatmaps/'
-            utils.touch(self.heatmaps)
-            utils.touch(self.heatmaps[:-1] + '_overlays/')
+            ba.utils.touch(self.heatmaps)
+            ba.utils.touch(self.heatmaps[:-1] + '_overlays/')
             self.write('deploy')
 
     def writeSolver(self):
@@ -380,7 +382,7 @@ class FCNPartRunner(NetRunner):
         self.prepare('train')
         logf = '{}_{}_train.log'.format(
             datetime.datetime.now().strftime('%y_%m_%d_'), self.name)
-        utils.touch(self.dir + logf, clear=True)
+        ba.utils.touch(self.dir + logf, clear=True)
         self.notifiy(self.dir + logf)
         os.system('caffe train -solver {} -weights {} -gpu {} 2>&1 | tee {}'.format(
             self.dir + 'solver.prototxt',
@@ -390,7 +392,7 @@ class FCNPartRunner(NetRunner):
 
     def forwardVal(self):
         '''Will forward the whole validation set through the network.'''
-        imgext = '.' + utils.prevalentExtension(self.images)
+        imgext = '.' + ba.utils.prevalentExtension(self.images)
         self.valset.addPreSuffix(self.images, imgext)
         self.forwardList(setlist=self.valset)
         self.valset.rmPreSuffix(self.images, imgext)
@@ -414,12 +416,12 @@ class FCNPartRunner(NetRunner):
         bn_ov = self.heatmaps[:-1] + '_overlays/' + bn
         self.forward(data)
         score = self.net.blobs[self.net.outputs[0]].data[0][1, ...]
-        # I'm really not sure if this is necessary or useful?
-        score /= np.sum(score)
         imsave(bn_hm + '.png', score)
         score = imresize(score, im.shape[:-1])
-        utils.apply_overlay(im, score, bn_ov + '.png')
-        return {bn: utils.scoreToRegion(score, im)}
+        score = skimage.img_as_float(score)
+        ba.utils.apply_overlay(im, score, bn_ov + '.png')
+        region, rscore = ba.eval.scoreToRegion(score, im)
+        return {bn: {'region': list(region), 'score': float(rscore)}}
 
     def forwardList(self, setlist=None):
         '''Will forward a whole setlist through the network. Will default to the
@@ -510,7 +512,7 @@ class SlidingFCNPartRunner(FCNPartRunner):
             pad = int(ks)
             padded_data = np.pad(data, ((pad, pad), (pad, pad), (0, 0)), mode='reflect')
             padded_hm = np.zeros(padded_data.shape[:-1])
-            for (x, y, window) in utils.sliding_window(padded_data, self.stride,
+            for (x, y, window) in ba.utils.sliding_window(padded_data, self.stride,
                                                        ks):
                 score = self.forwardWindow(window)
                 padded_hm[y:y + ks, x:x + ks] += score
@@ -519,4 +521,4 @@ class SlidingFCNPartRunner(FCNPartRunner):
         bn_hm = self.heatmaps + bn
         imsave(bn_hm + '.png', hm)
         bn_ov = self.heatmaps[:-1] + '_overlays/' + bn
-        utils.apply_overlay(im, hm, bn_ov + '.png')
+        ba.utils.apply_overlay(im, hm, bn_ov + '.png')

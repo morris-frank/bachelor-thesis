@@ -2,9 +2,11 @@ from glob import glob
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
 import os.path
 import sys
 import yaml
+
 
 class Bunch(object):
     '''Serves as a dictionary in the form of an object.'''
@@ -24,6 +26,27 @@ class Bunch(object):
         '''
         return self.__dict__.__str__()
 
+
+def _prepareImagePlot(image):
+    '''Prepares a PyPlot figure with an image.
+
+    Args:
+        image (image): The image
+
+    Returns:
+        the figure
+    '''
+    xS = 3
+    yS = xS / image.shape[1] * image.shape[0]
+    fig = plt.figure(frameon=False, figsize=(xS,yS), dpi=image.shape[1]/xS)
+    plt.axis('off')
+    ax = plt.Axes(fig, [0.,0.,1.,1.])
+    ax.set_axis_off()
+    fig.add_axes(ax)
+    plt.imshow(image, interpolation='none')
+    return fig
+
+
 def apply_overlay(image, overlay, path, label=''):
     '''Overlay overlay onto image and add label as text
     and save to path (full path with extension!)
@@ -34,18 +57,47 @@ def apply_overlay(image, overlay, path, label=''):
         path (str): The path to save the result to.
         label (str, optional): A label for the heatmap.
     '''
-    xS = 3
-    yS = xS / image.shape[1] * image.shape[0]
-    fig = plt.figure(frameon=False, figsize=(xS,yS), dpi=image.shape[1]/xS)
-    plt.axis('off')
-    ax = plt.Axes(fig, [0.,0.,1.,1.])
-    ax.set_axis_off()
-    fig.add_axes(ax)
-    plt.imshow(image, interpolation='none')
+    fig = _prepareImagePlot(image)
     plt.imshow(overlay, cmap='viridis', alpha=0.5, interpolation='none')
     if label != '':
         patch = mpatches.Patch(color='yellow', label=label)
         plt.legend(handles=[patch])
+    fig.savefig(path, pad_inches=0, dpi=fig.dpi)
+    plt.close(fig)
+
+
+def apply_rect(image, rects, path, colors='black', labels=''):
+    '''Overlay rectangle onto image and save to path
+    (full path with extension!)
+
+    Args:
+        image (image): The image to use as 'background'.
+        rects (tuple, list[tuple]): (xmin, ymin, xmax, ymax)
+        path (str): The full path to save the result to.
+        color (str, list[str], optional): The color for the rectangles
+        labels (str, list[str], optional): The labels for the rectangles
+    '''
+    fig = _prepareImagePlot(image)
+    if not isinstance(rects, list):
+        rects = [rects]
+    if not isinstance(colors, list):
+        colors = [colors]
+    if len(colors) < len(rects):
+        colors = [colors[0]] * len(rects)
+    if not isinstance(labels, list):
+        labels = [labels]
+    if len(labels) < len(rects):
+        labels = [labels[0]] * len(rects)
+    for rect, color, label in zip(rects, colors, labels):
+        height = rect[2] - rect[0]
+        width = rect[3] - rect[1]
+        ca = plt.gca()
+        ca.add_patch(Rectangle((rect[1], rect[0]), width, height, fill=None,
+                               alpha=1, ec=color, label=label))
+        if label != '':
+            bbox_props = dict(boxstyle='square', fc='w', ec='w')
+            ca.text(rect[3] - 3, rect[0] + 5, label, ha='right', va='top',
+                    size='xx-small', bbox=bbox_props)
     fig.savefig(path, pad_inches=0, dpi=fig.dpi)
     plt.close(fig)
 
@@ -118,6 +170,9 @@ def touch(path, clear=False):
     Args:
         path (str): The path to touch
         clear (bool): If the file shall be truncated
+
+    Returns:
+        The given path
     '''
     dir_ = os.path.dirname(path)
     if dir_ != '':
@@ -186,6 +241,7 @@ def rm(path):
         print('Tried deleting {}, but that does not even exist'.format(path))
     else:
         os.system('rm -r {}'.format(path))
+
 
 def loadYAML(path):
     '''Loads a YAML file.
