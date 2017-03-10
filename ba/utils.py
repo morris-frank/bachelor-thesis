@@ -46,8 +46,7 @@ def _prepareImagePlot(image):
     plt.imshow(image, interpolation='none')
     return fig
 
-
-def apply_overlay(image, overlay, path, label=''):
+def apply_overlay(image, overlay, path, label='', fig=None):
     '''Overlay overlay onto image and add label as text
     and save to path (full path with extension!)
 
@@ -56,17 +55,22 @@ def apply_overlay(image, overlay, path, label=''):
         overlay (image): The image to overly over the image.
         path (str): The path to save the result to.
         label (str, optional): A label for the heatmap.
+        fig (plt.figure, optional): An optional figure to work on
     '''
-    fig = _prepareImagePlot(image)
+    if fig is None:
+        _fig = _prepareImagePlot(image)
+    else:
+        _fig = fig
     plt.imshow(overlay, cmap='viridis', alpha=0.5, interpolation='none')
     if label != '':
         patch = mpatches.Patch(color='yellow', label=label)
         plt.legend(handles=[patch])
-    fig.savefig(path, pad_inches=0, dpi=fig.dpi)
-    plt.close(fig)
+    if fig is None:
+        _fig.savefig(path, pad_inches=0, dpi=_fig.dpi)
+        plt.close(_fig)
 
 
-def apply_rect(image, rects, path, colors='black', labels=''):
+def apply_rect(image, rects, path, colors='black', labels='', fig=None):
     '''Overlay rectangle onto image and save to path
     (full path with extension!)
 
@@ -75,9 +79,13 @@ def apply_rect(image, rects, path, colors='black', labels=''):
         rects (tuple, list[tuple]): (xmin, ymin, xmax, ymax)
         path (str): The full path to save the result to.
         color (str, list[str], optional): The color for the rectangles
-        labels (str, list[str], optional): The labels for the rectangles
+        labels (str, list[str], optional): The for the rectangles
+        fig (plt.figure, optional): An optional figure to work on
     '''
-    fig = _prepareImagePlot(image)
+    if fig is None:
+        _fig = _prepareImagePlot(image)
+    else:
+        _fig = fig
     if not isinstance(rects, list):
         rects = [rects]
     if not isinstance(colors, list):
@@ -98,8 +106,9 @@ def apply_rect(image, rects, path, colors='black', labels=''):
             bbox_props = dict(boxstyle='square', fc='w', ec='w')
             ca.text(rect[3] - 3, rect[0] + 5, label, ha='right', va='top',
                     size='xx-small', bbox=bbox_props)
-    fig.savefig(path, pad_inches=0, dpi=fig.dpi)
-    plt.close(fig)
+    if fig is None:
+        _fig.savefig(path, pad_inches=0, dpi=_fig.dpi)
+        plt.close(_fig)
 
 
 def query_boolean(question, default='yes', defaulting=False):

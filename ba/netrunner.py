@@ -440,10 +440,11 @@ class FCNPartRunner(NetRunner):
         scoreboxes = {}
         scoreboxf = self.results[:-1] + '.scores.yaml'
         print('Forwarding all in {}'.format(setlist))
-        for idx in tqdm(setlist):
+        for i, idx in enumerate(tqdm(setlist)):
             scoreboxes.update(self.forwardIDx(idx, mean=mean))
-            with open(scoreboxf, 'w') as f:
-                yaml.dump(scoreboxes, f)
+            if i % 10 == 0:
+                with open(scoreboxf, 'w') as f:
+                    yaml.dump(scoreboxes, f)
 
 
 class SlidingFCNPartRunner(FCNPartRunner):
