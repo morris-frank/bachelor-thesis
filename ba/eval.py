@@ -199,10 +199,10 @@ def scoreToRegion(heatmap, image):
     bbscores = skimage.transform.integrate(integral_scores, starts, ends)
 
     # Get the score density per region:
-    # for idx, (start, end) in enumerate(zip(starts, ends)):
-    #     area = (end[0] - start[0]) * (end[1] - start[1])
-    #     if area > 0:
-    #         bbscores[idx] /= area
+    for idx, (start, end) in enumerate(zip(starts, ends)):
+        area = (end[0] - start[0]) * (end[1] - start[1])
+        if area > 0:
+            bbscores[idx] /= area
 
     # Get the maximum performing region:
     bbidx = bbscores.argmax()
