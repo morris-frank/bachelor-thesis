@@ -48,9 +48,8 @@ class SolverSpec(ba.utils.Bunch):
         self.gamma = 0.1
         self.test_initialization = False
         self.iter_size = 1
-        self.max_iter = 4000
+        self.max_iter = 2000
         self.test_iter = 100
-        self.test_interval = 500
         self.test_interval = 5000
         super().__init__(adict)
 
@@ -343,6 +342,7 @@ class FCNPartRunner(NetRunner):
         Args:
             split (str): The split (test|train|deploy)
         '''
+        ba.utils.touch(self.dir)
         with open(self.dir + split + '.prototxt', 'w') as f:
             f.write(str(self.net_generator(self.FCNparams(split),
                                            self.generator_switches)))
@@ -503,12 +503,18 @@ class SlidingFCNPartRunner(FCNPartRunner):
         Args:
             idx (str): The index (basename) of the image to forward
             mean (tuple, optional): The mean
+
+        Return:
+            The score and coordinates of the highest scoring region
         '''
         if mean is None:
             mean, meanpath = self.getMean()
         data, im = self.loadimg(idx, mean=mean)
         data = data.transpose((1, 2, 0))
         hm = np.zeros(data.shape[:-1])
+        bn = os.path.basename(os.path.splitext(idx)[0])
+        bn_hm = self.heatmaps + bn
+        bn_ov = self.heatmaps[:-1] + '_overlays/' + bn
         for ks in [50, 100, 250]:
             pad = int(ks)
             padded_data = np.pad(data, ((pad, pad), (pad, pad), (0, 0)), mode='reflect')
@@ -518,8 +524,10 @@ class SlidingFCNPartRunner(FCNPartRunner):
                 score = self.forwardWindow(window)
                 padded_hm[y:y + ks, x:x + ks] += score
             hm += padded_hm[pad:-pad, pad:-pad]
-        bn = os.path.basename(os.path.splitext(idx)[0])
-        bn_hm = self.heatmaps + bn
+
         imsave(bn_hm + '.png', hm)
-        bn_ov = self.heatmaps[:-1] + '_overlays/' + bn
+        hm = imresize(hm, im.shape[:-1])
+        hm = skimage.img_as_float(hm)
         ba.utils.apply_overlay(im, hm, bn_ov + '.png')
+        region, rscore = ba.eval.scoreToRegion(hm, im)
+        return {bn: {'region': list(region), 'score': float(rscore)}}

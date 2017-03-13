@@ -8,6 +8,8 @@ DSSSOURCE = 'data/datasets/pascalparts/Annotations_Part/'
 def main(args):
     e = Experiment(argv=args)
     e.loadConf()
+    if e.sysargs.tofcn:
+        e.convertToFCN()
     if e.sysargs.data:
         e.genData(DATASET, DSSSOURCE)
     if e.sysargs.train:

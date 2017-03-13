@@ -33,6 +33,7 @@ class Experiment(object):
                             help='The YAML conf file')
         parser.add_argument('--test', action='store_true')
         parser.add_argument('--train', action='store_true')
+        parser.add_argument('--tofcn', action='store_true')
         parser.add_argument('--data', action='store_true')
         parser.add_argument('--default', action='store_true')
         parser.add_argument('--gpu', type=int, nargs='+', default=0,
@@ -98,7 +99,8 @@ class Experiment(object):
                           )
 
         # Extra atrributes for the solver
-        attrs = ['lr_policy', 'stepsize', 'weight_decay', 'base_lr']
+        attrs = ['lr_policy', 'stepsize', 'weight_decay', 'base_lr',
+                 'test_iter', 'test_interval']
         for attr in attrs:
             if attr in self.conf:
                 self.cnn._solver_attr[attr] = self.conf[attr]
@@ -153,4 +155,37 @@ class Experiment(object):
         ppset = ba.PascalPartSet(name, source, ['lwing', 'rwing'], 'aeroplane')
         ppset.saveSegmentations(augment=2)
         if self.conf['sliding_window']:
-            ppset.saveBoundingBoxes('data/datasets/voc2010/JPEGImages/', negatives=2, augment=2)
+            ppset.saveBoundingBoxes('data/datasets/voc2010/JPEGImages/',
+                                    negatives=2, augment=2)
+
+    def convertToFCN(self):
+        import caffe
+        caffe.set_mode_gpu()
+        gpu = self.sysargs.gpu
+        if isinstance(gpu, list):
+            gpu = gpu[0]
+        caffe.set_device(gpu)
+        oldTag = self.conf['tag']
+        newTag = oldTag + '_FCN'
+        oldSnaps = 'data/models/{}/snapshots/'.format(oldTag)
+        newSnaps = ba.utils.touch('data/models/{}/snapshots/'.format(newTag))
+        oldDeploy = 'data/models/{}/deploy.prototxt'.format(oldTag)
+        newDeploy = 'data/models/{}/deploy.prototxt'.format(newTag)
+        weights = glob('{}*caffemodel'.format(oldSnaps))
+        if len(weights) < 1:
+            print('No weights found for {}'.format(self.conf['tag']))
+            return False
+        for w in weights:
+            bn = os.path.basename(w)
+            new_weights = newSnaps + 'classifier_' + bn
+            if not utils.query_boolean('You want to convert {}?'.format(bn),
+                                       default='yes',
+                                       defaulting=self.sysargs.default):
+                continue
+            print('CONVERTING ' + bn)
+            old_net = caffe.Net(oldDeploy, w, caffe.TEST)
+            new_net = caffe.Net(newDeploy, w, caffe.TEST)
+            old_params = ['fc']
+            new_params = ['fc_conv']
+            ba.caffeine.surgery.convertToFCN(
+                new_net, old_net, new_params, old_params, new_weights)

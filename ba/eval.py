@@ -6,13 +6,11 @@ import numpy as np
 import skimage.transform
 from scipy.ndimage import distance_transform_edt as euclidean_distance_transform
 from scipy.misc import imread, imresize
+# For the cpython implementation:
+from selective_search import selective_search as selective_search_cpy
 import sys
 from tqdm import tqdm
 import yaml
-
-# For the cpython implementation:
-sys.path.append('../selective_search_py/')
-from selective_search import selective_search as selective_search_cpy
 
 
 def evalYAML(predf, gtf, images, heatmaps=None):
