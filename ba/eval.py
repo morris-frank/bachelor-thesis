@@ -78,6 +78,7 @@ def evalYAML(predf, gtf, images, heatmaps=None):
 
     with open(outputfile, 'w') as f:
         yaml.dump(results, f)
+    return meanIOU, meanDistErr, meanScalErr
 
 
 def rectDistance(a, b):

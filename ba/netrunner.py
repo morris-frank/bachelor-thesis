@@ -91,6 +91,7 @@ class NetRunner(object):
             'net_generator': None,
             'net_weights': '',
             'net': None,
+            'notifier': None,
             'random': True,
             'results': './',
             'solver_weights': '',
@@ -261,18 +262,27 @@ class NetRunner(object):
         else:
             return self.calculate_mean(), False
 
-    def notifiy(self, logfile):
+    def LOGNotifiy(self, logfile):
         '''Starts notifier thread on a given caffe - logfile
 
         Args:
             logfile (str): The Full path to the log file
-
-        Returns:
-            the thread?
         '''
         from telenotify import Notifier
         notifier = Notifier(configfile=notifier_config)
         threading.Thread(target=notifier._start, args=(logfile, )).start()
+
+    def notify(self, message):
+        '''Sends message to telegram
+
+        Args:
+            message (str): The message
+        '''
+        from telenotify import Notifier
+        if self.notifier is None:
+            self.notifier = Notifier(configfile=notifier_config)
+        threading.Thread(target=self.notifier._send_telegram_msg,
+                         args=(self.name, message)).start()
 
 
 class FCNPartRunner(NetRunner):
@@ -383,12 +393,14 @@ class FCNPartRunner(NetRunner):
         logf = '{}_{}_train.log'.format(
             datetime.datetime.now().strftime('%y_%m_%d_'), self.name)
         ba.utils.touch(self.dir + logf, clear=True)
-        self.notifiy(self.dir + logf)
+        self.LOGNotifiy(self.dir + logf)
+        self.notify('Started training for {}'.format(self.name))
         os.system('caffe train -solver {} -weights {} -gpu {} 2>&1 | tee {}'.format(
             self.dir + 'solver.prototxt',
             self.solver_weights,
             ','.join(str(x) for x in self.gpu),
             self.dir + logf))
+        self.notify('Finished training for {}'.format(self.name))
 
     def forwardVal(self):
         '''Will forward the whole validation set through the network.'''
@@ -396,6 +408,32 @@ class FCNPartRunner(NetRunner):
         self.valset.addPreSuffix(self.images, imgext)
         self.forwardList(setlist=self.valset)
         self.valset.rmPreSuffix(self.images, imgext)
+
+    def test(self, slicefile=None):
+        '''Will test the net.
+
+        Args:
+            slicefile (str, optional): The path for the seg.yaml, if given
+                will perform SelecSearch and BB errors..
+        '''
+        self.forwardTest()
+        self.notify('Forwarded testing set for {}'.format(self.name))
+        scoreboxf = self.results[:-1] + '.scores.yaml'
+        if slicefile is not None:
+            meanIOU, meanDistErr, meanScalErr = ba.eval.evalYAML(
+                scoreboxf, slicefile, self.images, self.heatmaps)
+            self.notify('''Evaluated for {}\n
+                        Mean IOU:{}\n
+                        Mean Distance Error: {}\n
+                        Mean Scaling error: {}'''.format(
+                            self.name, meanIOU, meanDistErr, meanScalErr))
+
+    def forwardTest(self):
+        '''Will forward the whole validation set through the network.'''
+        imgext = '.' + ba.utils.prevalentExtension(self.images)
+        self.testset.addPreSuffix(self.images, imgext)
+        self.forwardList(setlist=self.testset)
+        self.testset.rmPreSuffix(self.images, imgext)
 
     def forwardIDx(self, idx, mean=None):
         '''Will forward one single idx-image from the source set and saves the
@@ -431,7 +469,7 @@ class FCNPartRunner(NetRunner):
             setlist (SetList, optional): The set to put forward
         '''
         if setlist is None:
-            return self.forwardVal()
+            return self.forwardTest()
         self.prepare('deploy')
         self.createNet(self.dir + 'deploy.prototxt',
                        self.net_weights,

@@ -9,9 +9,9 @@ slicefile: 'data/tmp/pascpart/patches/aeroplane_body/seg.yaml'
 sliding_window: True
 stepsize: 1000
 test_images: ''
-test_interval: 40
+test_interval: 50
+test: 'data/tmp/pascpart/aeroplane_body.txt'
 train: 'data/single_body.txt'
-# val: 'data/tmp/pascpart/aeroplane_body.txt'
 val: 'data/tmp/pascpart/patches/aeroplane_stern/img_augmented_lmdb_test.txt'
 weight_decay: 0.0005
 weights: 'data/models/resnet/ResNet-50-model.caffemodel'

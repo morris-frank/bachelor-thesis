@@ -1,4 +1,3 @@
-# val: 'data/tmp/pascpart/patches/aeroplane_lwing_rwing/img_augmented_lmdb_test.txt'
 base_lr: 10e-6
 desc: 'ResNet-50 refined on a single Stern patch, sliding window detection'
 images: 'data/datasets/voc2010/JPEGImages/'
@@ -10,8 +9,9 @@ slicefile: 'data/tmp/pascpart/patches/aeroplane_lwing_rwing/seg.yaml'
 sliding_window: True
 stepsize: 1000
 test_images: ''
-test_interval: 100
+test_interval: 50
+test: 'data/tmp/pascpart/aeroplane_lwing_rwing.txt'
 train: 'data/single_wings.txt'
-val: 'data/tmp/pascpart/aeroplane_lwing_rwing.txt'
+val: 'data/tmp/pascpart/patches/aeroplane_lwing_rwing/img_augmented_lmdb_test.txt'
 weight_decay: 0.0005
 weights: 'data/models/resnet/ResNet-50-model.caffemodel'

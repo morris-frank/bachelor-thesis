@@ -63,6 +63,7 @@ class Experiment(object):
             sys.exit()
         else:
             self.conf['net'] = eval(self.conf['net'])
+
         if 'test' not in self.conf:
             self.conf['test'] = self.conf['val']
 
@@ -142,7 +143,10 @@ class Experiment(object):
             self.cnn.net_weights = w
             if self.conf['test_images'] != '':
                 self.cnn.images = self.conf['test_images']
-            self.cnn.forwardVal()
+            if 'slicefile' in self.conf:
+                self.cnn.test()
+            else:
+                self.cnn.test()
             self.cnn.clear()
 
     def runTrain(self):
