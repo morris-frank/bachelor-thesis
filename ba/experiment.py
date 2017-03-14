@@ -144,7 +144,7 @@ class Experiment(object):
             if self.conf['test_images'] != '':
                 self.cnn.images = self.conf['test_images']
             if 'slicefile' in self.conf:
-                self.cnn.test()
+                self.cnn.test(self.conf['slicefile'])
             else:
                 self.cnn.test()
             self.cnn.clear()

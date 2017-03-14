@@ -272,17 +272,22 @@ class NetRunner(object):
         notifier = Notifier(configfile=notifier_config)
         threading.Thread(target=notifier._start, args=(logfile, )).start()
 
-    def notify(self, message):
+    def notify(self, message='', matrix=None):
         '''Sends message to telegram
 
         Args:
-            message (str): The message
+            message (str, optional): The message
+            matrix (smth, optional): A matrix to print
         '''
         from telenotify import Notifier
         if self.notifier is None:
             self.notifier = Notifier(configfile=notifier_config)
-        threading.Thread(target=self.notifier._send_telegram_msg,
-                         args=(self.name, message)).start()
+        if matrix is None:
+            threading.Thread(target=self.notifier.sendMessage,
+                             args=(message, )).start()
+        else:
+            threading.Thread(target=self.notifier.sendMatrix,
+                             args=(matrix, message)).start()
 
 
 class FCNPartRunner(NetRunner):
@@ -416,17 +421,20 @@ class FCNPartRunner(NetRunner):
             slicefile (str, optional): The path for the seg.yaml, if given
                 will perform SelecSearch and BB errors..
         '''
-        self.forwardTest()
-        self.notify('Forwarded testing set for {}'.format(self.name))
+        self.prepare('deploy')
+        #self.forwardTest()
         scoreboxf = self.results[:-1] + '.scores.yaml'
+        weightname = os.path.splitext(os.path.basename(self.net_weights))[0]
         if slicefile is not None:
-            meanIOU, meanDistErr, meanScalErr = ba.eval.evalYAML(
+            meanIOU, meanDistErr, meanScalErr, nResults = ba.eval.evalYAML(
                 scoreboxf, slicefile, self.images, self.heatmaps)
-            self.notify('''Evaluated for {}\n
-                        Mean IOU:{}\n
-                        Mean Distance Error: {}\n
-                        Mean Scaling error: {}'''.format(
-                            self.name, meanIOU, meanDistErr, meanScalErr))
+            resMat = [['Network', self.name],
+                      ['Weights', weightname],
+                      ['Datums', nResults],
+                      ['Mean IOU', meanIOU],
+                      ['Mean Distance error', meanDistErr],
+                      ['Mean Scaling error', meanScalErr]]
+            self.notify(matrix=resMat)
 
     def forwardTest(self):
         '''Will forward the whole validation set through the network.'''
@@ -477,12 +485,17 @@ class FCNPartRunner(NetRunner):
         mean, meanpath = self.getMean()
         scoreboxes = {}
         scoreboxf = self.results[:-1] + '.scores.yaml'
+        weightname = os.path.splitext(os.path.basename(self.net_weights))[0]
         print('Forwarding all in {}'.format(setlist))
         for i, idx in enumerate(tqdm(setlist)):
             scoreboxes.update(self.forwardIDx(idx, mean=mean))
             if i % 10 == 0:
                 with open(scoreboxf, 'w') as f:
                     yaml.dump(scoreboxes, f)
+        self.notify('Forwarded {} for weights {} of {}'.format(setlist.source,
+                                                               weightname,
+                                                               self.name))
+
 
 
 class SlidingFCNPartRunner(FCNPartRunner):
