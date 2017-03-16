@@ -1,12 +1,13 @@
-tag: '_'
-train: ''
-val: ''
-solver_weights: ''
-net_weights: ''
 baselr: 1
 images: ''
 labels: ''
-test_images: ''
-sliding_window: False
 mean: []
+net_weights: ''
 net:
+sliding_window: False
+solver_weights: ''
+tag: '_'
+test_images: ''
+tofcn: False
+train: ''
+val: ''

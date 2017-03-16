@@ -131,8 +131,7 @@ class SingleImageLayer(caffe.Layer):
             self.mean = np.load(params['mean'])
         else:
             self.mean = np.array(params['mean'])
-        self.batch_size = params.get('batch_size', 32)
-        self.batch_size = params.get('batch_size', 24)
+        self.batch_size = params.get('batch_size', 18)
         self.patch_size = params.get('patch_size', (224, 224))
         self.ppI = params.get('ppI', 20)
 

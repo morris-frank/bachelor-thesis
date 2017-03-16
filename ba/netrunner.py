@@ -36,7 +36,6 @@ class SolverSpec(ba.utils.Bunch):
         self._dir = dir
         self.train_net = normpath(self._dir + '/train.prototxt')
         self.test_net = normpath(self._dir + '/val.prototxt')
-        self.snapshot = 1000
         self.snapshot = 500
         self.snapshot_prefix = normpath(self._dir + '/snapshots/train')
         self.weight_decay = 0.0001
@@ -71,6 +70,9 @@ class SolverSpec(ba.utils.Bunch):
 
 class NetRunner(object):
     '''A Wrapper for a caffe Network'''
+    resultDB = 'data/experiments/experimentDB.yaml'
+    buildroot = 'data/models/'
+    resultroot = 'data/results/'
 
     def __init__(self, name, **kwargs):
         '''Constructs a new NetRunner
@@ -292,8 +294,6 @@ class NetRunner(object):
 
 class FCNPartRunner(NetRunner):
     '''A NetRunner specific for FCNs'''
-    buildroot = 'data/models/'
-    resultroot = 'data/results/'
 
     def __init__(self, name, **kwargs):
         '''Constructs a new FCNPartRunner
@@ -422,7 +422,7 @@ class FCNPartRunner(NetRunner):
                 will perform SelecSearch and BB errors..
         '''
         self.prepare('deploy')
-        #self.forwardTest()
+        self.forwardTest()
         scoreboxf = self.results[:-1] + '.scores.yaml'
         weightname = os.path.splitext(os.path.basename(self.net_weights))[0]
         if slicefile is not None:
@@ -431,10 +431,17 @@ class FCNPartRunner(NetRunner):
             resMat = [['Network', self.name],
                       ['Weights', weightname],
                       ['Datums', nResults],
-                      ['Mean IOU', meanIOU],
-                      ['Mean Distance error', meanDistErr],
-                      ['Mean Scaling error', meanScalErr]]
+                      ['Mean_IOU', meanIOU],
+                      ['Mean_distance_error', meanDistErr],
+                      ['Mean_scaling_error', meanScalErr]]
             self.notify(matrix=resMat)
+            iteration = weightname.split('_')[:-1]
+            db = ba.utils.loadYAML(self.resultDB)
+            if self.name not in db:
+                db[self.name] = {}
+            db[self.name][iteration] = resMat
+            with open(self.resultDB, 'w') as f:
+                yaml.dump(db, f)
 
     def forwardTest(self):
         '''Will forward the whole validation set through the network.'''
@@ -523,7 +530,6 @@ class SlidingFCNPartRunner(FCNPartRunner):
             The parameter dictionary
         '''
         params = super().FCNparams(split)
-        params['batch_size'] = 10
         if split == 'train':
             params['lmdb'] = self.trainset.source[:-4]
         elif split == 'val':

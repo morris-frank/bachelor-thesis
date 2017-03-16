@@ -31,11 +31,12 @@ class Experiment(object):
         parser = argparse.ArgumentParser(description='Runs a experiment')
         parser.add_argument('conf', type=str, nargs=1,
                             help='The YAML conf file')
-        parser.add_argument('--test', action='store_true')
-        parser.add_argument('--train', action='store_true')
-        parser.add_argument('--tofcn', action='store_true')
         parser.add_argument('--data', action='store_true')
         parser.add_argument('--default', action='store_true')
+        parser.add_argument('--pyramid', action='store_true')
+        parser.add_argument('--test', action='store_true')
+        parser.add_argument('--tofcn', action='store_true')
+        parser.add_argument('--train', action='store_true')
         parser.add_argument('--gpu', type=int, nargs='+', default=0,
                             help='The GPU to use.')
         self.sysargs = parser.parse_args(args=self.argv)
@@ -101,7 +102,7 @@ class Experiment(object):
 
         # Extra atrributes for the solver
         attrs = ['lr_policy', 'stepsize', 'weight_decay', 'base_lr',
-                 'test_iter', 'test_interval']
+                 'test_iter', 'test_interval', 'max_iter', 'snapshot']
         for attr in attrs:
             if attr in self.conf:
                 self.cnn._solver_attr[attr] = self.conf[attr]
@@ -162,7 +163,17 @@ class Experiment(object):
             ppset.saveBoundingBoxes('data/datasets/voc2010/JPEGImages/',
                                     negatives=2, augment=2)
 
+    def pyramidTraining(self):
+        from ba import SetList
+        hyperTrainSet = SetList(self.conf['train'])
+        bname = self.conf['tag']
+        while len(hyperTrainSet) > 0:
+            self.conf['tag'] = '{}_{}samples'.format(bname, len(hyperTrainSet))
+            self.runTrain()
+            hyperTrainSet.list.pop()
+
     def convertToFCN(self):
+        '''Converts the source weights to an FCN'''
         import caffe
         caffe.set_mode_gpu()
         gpu = self.sysargs.gpu

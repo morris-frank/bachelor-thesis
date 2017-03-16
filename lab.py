@@ -12,10 +12,13 @@ def main(args):
         e.convertToFCN()
     if e.sysargs.data:
         e.genData(DATASET, DSSSOURCE)
-    if e.sysargs.train:
-        e.runTrain()
-    if e.sysargs.test:
-        e.runTests()
+    if e.sysargs.pyramid:
+        e.pyramidTraining()
+    else:
+        if e.sysargs.train:
+            e.runTrain()
+        if e.sysargs.test:
+            e.runTests()
 
 
 if __name__ == '__main__':
