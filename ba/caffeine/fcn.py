@@ -94,6 +94,7 @@ class VGG16(object):
         Retruns:
             The network as prototxt
         '''
+        self.__init__()
         self.params.update(params)
         self.switches.update(switches)
         self.data()

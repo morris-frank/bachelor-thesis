@@ -22,7 +22,7 @@ class SegDataLayer(caffe.Layer):
         self.labels = params['labels']
         self.splitfile = params['splitfile']
         if isinstance(params['mean'], str):
-            self.mean = params['mean']
+            self.mean = np.load(params['mean'])
         else:
             self.mean = np.array(params['mean'])
         self.extension = params.get('extension', 'jpg')
@@ -84,7 +84,10 @@ class SegDataLayer(caffe.Layer):
         im = Image.open('{}/{}.{}'.format(self.images, idx, self.extension))
         in_ = np.array(im, dtype=np.float32)
         in_ = in_[:, :, ::-1]
-        in_ -= self.mean
+        try:
+            in_ -= self.mean
+        except Exception:
+            pass
         in_ = in_.transpose((2, 0, 1))
         return in_
 

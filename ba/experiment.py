@@ -1,6 +1,6 @@
 import argparse
 import ba
-from ba import utils
+import ba.utils
 from enum import Enum
 from glob import glob
 import os
@@ -14,7 +14,7 @@ class RunMode(Enum):
     LIST = 2
 
 
-class Experiment(object):
+class Experiment(ba.utils.NotifierClass):
     '''A class to contain everything needed for an experiment'''
 
     def __init__(self, argv):
@@ -31,9 +31,10 @@ class Experiment(object):
         parser = argparse.ArgumentParser(description='Runs a experiment')
         parser.add_argument('conf', type=str, nargs=1,
                             help='The YAML conf file')
+        parser.add_argument('--cascade', action='store_true')
         parser.add_argument('--data', action='store_true')
         parser.add_argument('--default', action='store_true')
-        parser.add_argument('--pyramid', action='store_true')
+        parser.add_argument('--prepare', action='store_true')
         parser.add_argument('--test', action='store_true')
         parser.add_argument('--tofcn', action='store_true')
         parser.add_argument('--train', action='store_true')
@@ -46,13 +47,13 @@ class Experiment(object):
     def loadSlices(self):
         with open(self.conf['train']) as f:
             imlist = [l[:-1] for l in f.readlines() if l.strip()]
-        slicelist = utils.loadYAML(self.conf['slicefile'])
+        slicelist = ba.utils.loadYAML(self.conf['slicefile'])
         return {im: slicelist[im] for im in imlist}
 
     def loadConf(self):
         '''Open a YAML Configuration file and make a Bunch from it'''
-        defaults = utils.loadYAML('data/experiments/defaults.yaml')
-        self.conf = utils.loadYAML(self.sysargs.conf)
+        defaults = ba.utils.loadYAML('data/experiments/defaults.yaml')
+        self.conf = ba.utils.loadYAML(self.sysargs.conf)
         if 'tag' not in self.conf:
             self.conf['tag'] = os.path.basename(
                 os.path.splitext(self.sysargs.conf)[0])
@@ -135,7 +136,7 @@ class Experiment(object):
             return False
         for w in weights:
             bn = os.path.basename(w)
-            if not utils.query_boolean('You want to test for {}?'.format(bn),
+            if not ba.utils.query_boolean('You want to test for {}?'.format(bn),
                                        default='yes',
                                        defaulting=self.sysargs.default):
                 continue
@@ -163,16 +164,46 @@ class Experiment(object):
             ppset.saveBoundingBoxes('data/datasets/voc2010/JPEGImages/',
                                     negatives=2, augment=2)
 
-    def pyramidTraining(self):
+    def _cascade(self, fptr):
         from ba import SetList
         hyperTrainSet = SetList(self.conf['train'])
         bname = self.conf['tag']
         while len(hyperTrainSet) > 0:
             self.conf['tag'] = '{}_{}samples'.format(bname, len(hyperTrainSet))
-            self.runTrain()
+            fptr()
             hyperTrainSet.list.pop()
+        self.conf['tag'] = bname
 
-    def convertToFCN(self):
+    def cascadeTraining(self):
+        self._cascade(self.runTrain)
+
+    def cascadeTesting(self):
+        self._cascade(self.runTests)
+
+    def cascadePrepare(self):
+        self._cascade(self.prepare)
+
+    def cascadeToFCN(self):
+        from ba import SetList
+        hyperTrainSet = SetList(self.conf['train'])
+        bname = self.conf['tag']
+        while len(hyperTrainSet) > 0:
+            self.conf['tag'] = '{}_{}samples'.format(bname, len(hyperTrainSet))
+            newTag = '{}_FCN_{}samples'.format(bname, len(hyperTrainSet))
+            self.convertToFCN(newTag=newTag)
+            hyperTrainSet.list.pop()
+        self.conf['tag'] = bname
+        self.notify('Finished cascade FCN conversion for {}'.format(bname))
+
+    def prepare(self):
+        print('Preparing all phases for {}.'.format(self.conf['tag']))
+        old_weights = self.conf['weights']
+        self.conf['weights'] = ''
+        self.prepareCNN()
+        self.cnn.prepare()
+        self.conf['weights'] = old_weights
+
+    def convertToFCN(self, newTag=None):
         '''Converts the source weights to an FCN'''
         import caffe
         caffe.set_mode_gpu()
@@ -181,7 +212,8 @@ class Experiment(object):
             gpu = gpu[0]
         caffe.set_device(gpu)
         oldTag = self.conf['tag']
-        newTag = oldTag + '_FCN'
+        if newTag is None:
+            newTag = oldTag + '_FCN'
         oldSnaps = 'data/models/{}/snapshots/'.format(oldTag)
         newSnaps = ba.utils.touch('data/models/{}/snapshots/'.format(newTag))
         oldDeploy = 'data/models/{}/deploy.prototxt'.format(oldTag)
@@ -193,7 +225,7 @@ class Experiment(object):
         for w in weights:
             bn = os.path.basename(w)
             new_weights = newSnaps + 'classifier_' + bn
-            if not utils.query_boolean('You want to convert {}?'.format(bn),
+            if not ba.utils.query_boolean('You want to convert {}?'.format(w),
                                        default='yes',
                                        defaulting=self.sysargs.default):
                 continue

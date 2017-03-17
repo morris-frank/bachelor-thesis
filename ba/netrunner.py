@@ -20,10 +20,6 @@ from tqdm import tqdm
 import yaml
 
 
-sys.path.append('../telenotify')
-notifier_config = '../telenotify/config.yaml'
-
-
 class SolverSpec(ba.utils.Bunch):
 
     def __init__(self, dir, adict={}):
@@ -68,7 +64,7 @@ class SolverSpec(ba.utils.Bunch):
                         f.write('{}: {}\n'.format(key, value))
 
 
-class NetRunner(object):
+class NetRunner(ba.utils.NotifierClass):
     '''A Wrapper for a caffe Network'''
     resultDB = 'data/experiments/experimentDB.yaml'
     buildroot = 'data/models/'
@@ -93,7 +89,6 @@ class NetRunner(object):
             'net_generator': None,
             'net_weights': '',
             'net': None,
-            'notifier': None,
             'random': True,
             'results': './',
             'solver_weights': '',
@@ -264,33 +259,6 @@ class NetRunner(object):
         else:
             return self.calculate_mean(), False
 
-    def LOGNotifiy(self, logfile):
-        '''Starts notifier thread on a given caffe - logfile
-
-        Args:
-            logfile (str): The Full path to the log file
-        '''
-        from telenotify import Notifier
-        notifier = Notifier(configfile=notifier_config)
-        threading.Thread(target=notifier._start, args=(logfile, )).start()
-
-    def notify(self, message='', matrix=None):
-        '''Sends message to telegram
-
-        Args:
-            message (str, optional): The message
-            matrix (smth, optional): A matrix to print
-        '''
-        from telenotify import Notifier
-        if self.notifier is None:
-            self.notifier = Notifier(configfile=notifier_config)
-        if matrix is None:
-            threading.Thread(target=self.notifier.sendMessage,
-                             args=(message, )).start()
-        else:
-            threading.Thread(target=self.notifier.sendMatrix,
-                             args=(matrix, message)).start()
-
 
 class FCNPartRunner(NetRunner):
     '''A NetRunner specific for FCNs'''
@@ -399,7 +367,6 @@ class FCNPartRunner(NetRunner):
             datetime.datetime.now().strftime('%y_%m_%d_'), self.name)
         ba.utils.touch(self.dir + logf, clear=True)
         self.LOGNotifiy(self.dir + logf)
-        self.notify('Started training for {}'.format(self.name))
         os.system('caffe train -solver {} -weights {} -gpu {} 2>&1 | tee {}'.format(
             self.dir + 'solver.prototxt',
             self.solver_weights,

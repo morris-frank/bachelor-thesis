@@ -8,6 +8,43 @@ import sys
 import yaml
 
 
+sys.path.append('../telenotify')
+notifier_config = '../telenotify/config.yaml'
+
+
+class NotifierClass(object):
+    '''A class containing an notifer'''
+    def __init__(self):
+        notifier = None
+
+    def LOGNotifiy(self, logfile):
+        '''Starts notifier thread on a given caffe - logfile
+
+        Args:
+            logfile (str): The Full path to the log file
+        '''
+        from telenotify import Notifier
+        notifier = Notifier(configfile=notifier_config)
+        threading.Thread(target=notifier._start, args=(logfile, )).start()
+
+    def notify(self, message='', matrix=None):
+        '''Sends message to telegram
+
+        Args:
+            message (str, optional): The message
+            matrix (smth, optional): A matrix to print
+        '''
+        from telenotify import Notifier
+        if self.notifier is None:
+            self.notifier = Notifier(configfile=notifier_config)
+        if matrix is None:
+            threading.Thread(target=self.notifier.sendMessage,
+                             args=(message, )).start()
+        else:
+            threading.Thread(target=self.notifier.sendMatrix,
+                             args=(matrix, message)).start()
+
+
 class Bunch(object):
     '''Serves as a dictionary in the form of an object.'''
     def __init__(self, adict):

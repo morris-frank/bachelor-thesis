@@ -256,6 +256,7 @@ class ResNet(object):
 
     def write(self, params, switches):
         '''Returns the Prototxt for this network'''
+        self.__init__()
         self.params.update(params)
         self.switches.update(switches)
         self.data()
