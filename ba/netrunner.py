@@ -77,6 +77,7 @@ class NetRunner(ba.utils.NotifierClass):
             name (str): The name of this network (for save paths etc..)
             kwargs...
         '''
+        super().__init__(**kwargs)
         self.name = name
         self._solver_attr = {}
         defaults = {
@@ -291,6 +292,17 @@ class FCNPartRunner(NetRunner):
         self.snapshots = self.dir + 'snapshots/'
         self.heatmaps = self.results + 'heatmaps/'
 
+    @property
+    def net_weights(self):
+        return self.__net_weights
+
+    @net_weights.setter
+    def net_weights(self, net_weights):
+        self.__net_weights = net_weights
+        bnw = os.path.basename(net_weights[:-len('.caffemodel')])
+        self.results = '/'.join([self.resultroot, self.name, bnw]) + '/'
+        self.heatmaps = self.results + 'heatmaps/'
+
     def FCNparams(self, split):
         '''Builds the dict for a net_generator.
 
@@ -348,9 +360,6 @@ class FCNPartRunner(NetRunner):
             self.valset.write()
             self.write('val')
         if 'deploy' in split:
-            bnw = os.path.basename(self.net_weights[:-len('.caffemodel')])
-            self.results += bnw + '/'
-            self.heatmaps = self.results + 'heatmaps/'
             ba.utils.touch(self.heatmaps)
             ba.utils.touch(self.heatmaps[:-1] + '_overlays/')
             self.write('deploy')

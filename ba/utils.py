@@ -14,7 +14,7 @@ notifier_config = '../telenotify/config.yaml'
 
 class NotifierClass(object):
     '''A class containing an notifer'''
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         notifier = None
 
     def LOGNotifiy(self, logfile):

@@ -17,12 +17,13 @@ class RunMode(Enum):
 class Experiment(ba.utils.NotifierClass):
     '''A class to contain everything needed for an experiment'''
 
-    def __init__(self, argv):
+    def __init__(self, argv, **kwargs):
         '''Initialize the new experiment from the cli args
 
         Args:
             argv (str): The options string
         '''
+        super().__init__(**kwargs)
         self.argv = argv
         self.parseArgs()
 
@@ -206,11 +207,11 @@ class Experiment(ba.utils.NotifierClass):
     def convertToFCN(self, newTag=None):
         '''Converts the source weights to an FCN'''
         import caffe
-        caffe.set_mode_gpu()
-        gpu = self.sysargs.gpu
-        if isinstance(gpu, list):
-            gpu = gpu[0]
-        caffe.set_device(gpu)
+        caffe.set_mode_cpu()
+        # gpu = self.sysargs.gpu
+        # if isinstance(gpu, list):
+        #     gpu = gpu[0]
+        # caffe.set_device(gpu)
         oldTag = self.conf['tag']
         if newTag is None:
             newTag = oldTag + '_FCN'
