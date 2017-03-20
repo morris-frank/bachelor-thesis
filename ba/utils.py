@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 import os.path
 import sys
+import threading
 import yaml
 
 
@@ -15,7 +16,7 @@ notifier_config = '../telenotify/config.yaml'
 class NotifierClass(object):
     '''A class containing an notifer'''
     def __init__(self, *args, **kwargs):
-        notifier = None
+        self.notifier = None
 
     def LOGNotifiy(self, logfile):
         '''Starts notifier thread on a given caffe - logfile
@@ -298,7 +299,7 @@ def loadYAML(path):
     Return:
         Returns the content of the file
     '''
-    with open(path, 'r') as f:
+    with open(touch(path), 'r') as f:
         try:
             content = yaml.load(f)
         except yaml.YAMLError as e:

@@ -15,7 +15,6 @@ from scipy.misc import imresize
 from scipy.misc import imsave
 import skimage
 import sys
-import threading
 from tqdm import tqdm
 import yaml
 
@@ -66,9 +65,9 @@ class SolverSpec(ba.utils.Bunch):
 
 class NetRunner(ba.utils.NotifierClass):
     '''A Wrapper for a caffe Network'''
-    resultDB = 'data/experiments/experimentDB.yaml'
     buildroot = 'data/models/'
     resultroot = 'data/results/'
+    resultDB = self.resultroot + 'experimentDB.yaml'
 
     def __init__(self, name, **kwargs):
         '''Constructs a new NetRunner
@@ -407,12 +406,14 @@ class FCNPartRunner(NetRunner):
             resMat = [['Network', self.name],
                       ['Weights', weightname],
                       ['Datums', nResults],
-                      ['Mean_IOU', meanIOU],
-                      ['Mean_distance_error', meanDistErr],
-                      ['Mean_scaling_error', meanScalErr]]
+                      ['MeanIOU', meanIOU],
+                      ['MeanDistErr', meanDistErr],
+                      ['MeanScalErr', meanScalErr]]
             self.notify(matrix=resMat)
-            iteration = weightname.split('_')[:-1]
+            iteration = weightname.split('_')[-1]
             db = ba.utils.loadYAML(self.resultDB)
+            if db is None:
+                db = {}
             if self.name not in db:
                 db[self.name] = {}
             db[self.name][iteration] = resMat
