@@ -1,10 +1,12 @@
 import argparse
 import ba
 import ba.utils
+import copy
 from enum import Enum
 from glob import glob
 import os
 import random
+import re
 import sys
 
 
@@ -73,9 +75,9 @@ class Experiment(ba.utils.NotifierClass):
         if 'slicefile' in self.conf:
             self.conf['slices'] = self.load_slices()
 
-        if 'test_sizes' in self.conf:
-            if not isinstance(self.conf['test_sizes'], list):
-                print('test_sizes shall be a list of integers.')
+        if 'train_sizes' in self.conf:
+            if not isinstance(self.conf['train_sizes'], list):
+                print('train_sizes shall be a list of integers.')
                 sys.exit()
 
         for step in ['train', 'test', 'val']:
@@ -138,26 +140,16 @@ class Experiment(ba.utils.NotifierClass):
                                  negatives=2, augment=2)
 
     def prepare(self):
-        self._multi_scale_exec(self._prepare)
+        self._multi_or_single_scale_exec(self._prepare)
 
     def test(self):
-        if 'set_sizes' in self.conf:
-            self._multi_scale_exec(self._test, self.conf['set_sizes'])
-        else:
-            self._test()
+        self._multi_or_single_scale_exec(self._test)
 
     def train(self):
-        if 'set_sizes' in self.conf:
-            self._multi_scale_exec(self._train, self.conf['set_sizes'])
-        else:
-            self._train()
+        self._multi_or_single_scale_exec(self._train)
 
-    def convert_to_FCN(self, newTag=None):
-        if 'set_sizes' in self.conf:
-            self._multi_scale_convert_to_FCN(
-                self._train, self.conf['set_sizes'])
-        else:
-            self._convert_to_FCN()
+    def convert_to_FCN(self):
+        self._multi_or_single_scale_exec(self._convert_to_FCN)
 
     def _prepare(self):
         print('Preparing all phases for {}.'.format(self.conf['tag']))
@@ -199,13 +191,14 @@ class Experiment(ba.utils.NotifierClass):
         self.prepare_network()
         self.cnn.train()
 
-    def _convert_to_FCN(self):
+    def _convert_to_FCN(self, newTag=None):
         '''Converts the source weights to an FCN'''
         import caffe
         caffe.set_mode_cpu()
         oldTag = self.conf['tag']
         if newTag is None:
-            newTag = oldTag + '_FCN'
+            mgroups = re.match('(.*_)([0-9]+samples)', oldTag).groups()
+            newTag =  '{}FCN_{}'.format(mgroups[0], mgroups[1])
         oldSnaps = 'data/models/{}/snapshots/'.format(oldTag)
         newSnaps = ba.utils.touch('data/models/{}/snapshots/'.format(newTag))
         oldDeploy = 'data/models/{}/deploy.prototxt'.format(oldTag)
@@ -229,32 +222,25 @@ class Experiment(ba.utils.NotifierClass):
             ba.caffeine.surgery.convertToFCN(
                 new_net, old_net, new_params, old_params, new_weights)
 
-    def _multi_scale_convert_to_FCN(self, set_sizes):
-        from ba import SetList
-        hyperTrainSet = SetList(self.conf['train'])
-        bname = self.conf['tag']
-        for set_size in set_sizes:
-            if set_size == 0:
-                self.cnn.trainset.list = hyperTrainSet.list
-            else:
-                self.cnn.trainset.list = random.sample(hyperTrainSet.list, set_size)
-                # self.cnn.testset.set = self.cnn.testset.set - self.cnn.trainset.set
-            self.conf['tag'] = '{}_{}samples'.format(bname, set_size)
-            newTag = '{}_FCN_{}samples'.format(bname, set_size)
-            self.convert_to_FCN(newTag=newTag)
-        self.conf['tag'] = bname
-        self.notify('Finished cascade FCN conversion for {}'.format(bname))
+    def _multi_or_single_scale_exec(self, fptr):
+        if 'train_sizes' in self.conf:
+            self._multi_scale_exec(fptr, self.conf['train_sizes'])
+        else:
+            fptr()
 
     def _multi_scale_exec(self, fptr, set_sizes):
         from ba import SetList
+        old_train_conf = self.conf['train']
         hyperTrainSet = SetList(self.conf['train'])
+        self.conf['train'] = copy.deepcopy(hyperTrainSet)
         bname = self.conf['tag']
         for set_size in set_sizes:
             if set_size == 0:
-                self.cnn.trainset.list = hyperTrainSet.list
+                self.conf['train'].list = hyperTrainSet.list
             else:
-                self.cnn.trainset.list = random.sample(hyperTrainSet.list, set_size)
+                self.conf['train'].list = random.sample(hyperTrainSet.list, set_size)
                 # self.cnn.testset.set = self.cnn.testset.set - self.cnn.trainset.set
             self.conf['tag'] = '{}_{}samples'.format(bname, set_size)
             fptr()
         self.conf['tag'] = bname
+        self.conf['train'] = old_train_conf

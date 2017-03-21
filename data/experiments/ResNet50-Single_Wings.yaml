@@ -12,8 +12,8 @@ snapshot: 100
 stepsize: 500
 test_images: ''
 test_interval: 100
-test_sizes: [1, 10, 50, 100, 150, 250]
 test: 'data/tmp/pascpart/aeroplane_lwing_rwing.txt'
+train_sizes: [1, 10, 50, 100, 150, 250]
 train: 'data/single_wings.txt'
 val: 'data/tmp/pascpart/patches/aeroplane_lwing_rwing/img_augmented_lmdb_test.txt'
 weight_decay: 0.0005
