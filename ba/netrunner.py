@@ -67,7 +67,7 @@ class NetRunner(ba.utils.NotifierClass):
     '''A Wrapper for a caffe Network'''
     buildroot = 'data/models/'
     resultroot = 'data/results/'
-    resultDB = self.resultroot + 'experimentDB.yaml'
+    resultDB = 'data/results/experimentDB.yaml'
 
     def __init__(self, name, **kwargs):
         '''Constructs a new NetRunner

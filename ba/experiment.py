@@ -4,6 +4,7 @@ import ba.utils
 from enum import Enum
 from glob import glob
 import os
+import random
 import sys
 
 
@@ -25,14 +26,13 @@ class Experiment(ba.utils.NotifierClass):
         '''
         super().__init__(**kwargs)
         self.argv = argv
-        self.parseArgs()
+        self.parse_arguments()
 
-    def parseArgs(self):
+    def parse_arguments(self):
         '''Parse the arguments for an experiment script'''
         parser = argparse.ArgumentParser(description='Runs a experiment')
         parser.add_argument('conf', type=str, nargs=1,
                             help='The YAML conf file')
-        parser.add_argument('--cascade', action='store_true')
         parser.add_argument('--data', action='store_true')
         parser.add_argument('--default', action='store_true')
         parser.add_argument('--prepare', action='store_true')
@@ -45,13 +45,13 @@ class Experiment(ba.utils.NotifierClass):
         if isinstance(self.sysargs.conf, list):
             self.sysargs.conf = self.sysargs.conf[0]
 
-    def loadSlices(self):
+    def load_slices(self):
         with open(self.conf['train']) as f:
             imlist = [l[:-1] for l in f.readlines() if l.strip()]
         slicelist = ba.utils.loadYAML(self.conf['slicefile'])
         return {im: slicelist[im] for im in imlist}
 
-    def loadConf(self):
+    def load_conf(self):
         '''Open a YAML Configuration file and make a Bunch from it'''
         defaults = ba.utils.loadYAML('data/experiments/defaults.yaml')
         self.conf = ba.utils.loadYAML(self.sysargs.conf)
@@ -71,7 +71,12 @@ class Experiment(ba.utils.NotifierClass):
             self.conf['test'] = self.conf['val']
 
         if 'slicefile' in self.conf:
-            self.conf['slices'] = self.loadSlices()
+            self.conf['slices'] = self.load_slices()
+
+        if 'test_sizes' in self.conf:
+            if not isinstance(self.conf['test_sizes'], list):
+                print('test_sizes shall be a list of integers.')
+                sys.exit()
 
         for step in ['train', 'test', 'val']:
             if os.path.isfile(self.conf[step]):
@@ -85,7 +90,7 @@ class Experiment(ba.utils.NotifierClass):
                 print('{} is not pointing to a file.'.format(self.conf[step]))
                 sys.exit(1)
 
-    def prepareCNN(self):
+    def prepare_network(self):
         '''Prepares a NetRunner from the given configuration.'''
         if self.conf['sliding_window']:
             runner = ba.netrunner.SlidingFCNPartRunner
@@ -124,7 +129,45 @@ class Experiment(ba.utils.NotifierClass):
 
         self.cnn.gpu = self.sysargs.gpu
 
-    def runTests(self):
+    def generate_data(self, name, source):
+        '''Generates the training data for that experiment'''
+        ppset = ba.PascalPartSet(name, source, ['lwing', 'rwing'], 'aeroplane')
+        ppset.saveSegmentations(augment=2)
+        if self.conf['sliding_window']:
+            ppset.saveBoundingBoxes('data/datasets/voc2010/JPEGImages/',
+                                    negatives=2, augment=2)
+
+    def prepare(self):
+        self._multi_scale_exec(self._prepare)
+
+    def test(self):
+        if 'set_sizes' in self.conf:
+            self._multi_scale_exec(self._test, self.conf['set_sizes'])
+        else:
+            self._test()
+
+    def train(self):
+        if 'set_sizes' in self.conf:
+            self._multi_scale_exec(self._train, self.conf['set_sizes'])
+        else:
+            self._train()
+
+    def convert_to_FCN(self, newTag=None):
+        if 'set_sizes' in self.conf:
+            self._multi_scale_convert_to_FCN(
+                self._train, self.conf['set_sizes'])
+        else:
+            self._convert_to_FCN()
+
+    def _prepare(self):
+        print('Preparing all phases for {}.'.format(self.conf['tag']))
+        old_weights = self.conf['weights']
+        self.conf['weights'] = ''
+        self.prepare_network()
+        self.cnn.prepare()
+        self.conf['weights'] = old_weights
+
+    def _test(self):
         '''Tests the given experiment, Normally depends on user input. If --default
         flag is set will test EVERY snapshot previously saved.
         '''
@@ -132,17 +175,16 @@ class Experiment(ba.utils.NotifierClass):
         weights = glob('{}*caffemodel'.format(snapdir))
         if len(weights) < 1:
             print('No weights found for {}'.format(self.conf['tag']))
-            self.prepareCNN()
+            self.prepare_network()
             self.cnn.write('deploy')
             return False
         for w in weights:
             bn = os.path.basename(w)
             if not ba.utils.query_boolean('You want to test for {}?'.format(bn),
-                                       default='yes',
-                                       defaulting=self.sysargs.default):
+                                          default='yes', defaulting=self.sysargs.default):
                 continue
             print('TESTING ' + bn)
-            self.prepareCNN()
+            self.prepare_network()
             self.cnn.net_weights = w
             if self.conf['test_images'] != '':
                 self.cnn.images = self.conf['test_images']
@@ -152,66 +194,15 @@ class Experiment(ba.utils.NotifierClass):
                 self.cnn.test()
             self.cnn.clear()
 
-    def runTrain(self):
+    def _train(self):
         '''Trains the given experiment'''
-        self.prepareCNN()
+        self.prepare_network()
         self.cnn.train()
 
-    def genData(self, name, source):
-        '''Generates the training data for that experiment'''
-        ppset = ba.PascalPartSet(name, source, ['lwing', 'rwing'], 'aeroplane')
-        ppset.saveSegmentations(augment=2)
-        if self.conf['sliding_window']:
-            ppset.saveBoundingBoxes('data/datasets/voc2010/JPEGImages/',
-                                    negatives=2, augment=2)
-
-    def _cascade(self, fptr):
-        from ba import SetList
-        hyperTrainSet = SetList(self.conf['train'])
-        bname = self.conf['tag']
-        while len(hyperTrainSet) > 0:
-            self.conf['tag'] = '{}_{}samples'.format(bname, len(hyperTrainSet))
-            fptr()
-            hyperTrainSet.list.pop()
-        self.conf['tag'] = bname
-
-    def cascadeTraining(self):
-        self._cascade(self.runTrain)
-
-    def cascadeTesting(self):
-        self._cascade(self.runTests)
-
-    def cascadePrepare(self):
-        self._cascade(self.prepare)
-
-    def cascadeToFCN(self):
-        from ba import SetList
-        hyperTrainSet = SetList(self.conf['train'])
-        bname = self.conf['tag']
-        while len(hyperTrainSet) > 0:
-            self.conf['tag'] = '{}_{}samples'.format(bname, len(hyperTrainSet))
-            newTag = '{}_FCN_{}samples'.format(bname, len(hyperTrainSet))
-            self.convertToFCN(newTag=newTag)
-            hyperTrainSet.list.pop()
-        self.conf['tag'] = bname
-        self.notify('Finished cascade FCN conversion for {}'.format(bname))
-
-    def prepare(self):
-        print('Preparing all phases for {}.'.format(self.conf['tag']))
-        old_weights = self.conf['weights']
-        self.conf['weights'] = ''
-        self.prepareCNN()
-        self.cnn.prepare()
-        self.conf['weights'] = old_weights
-
-    def convertToFCN(self, newTag=None):
+    def _convert_to_FCN(self):
         '''Converts the source weights to an FCN'''
         import caffe
         caffe.set_mode_cpu()
-        # gpu = self.sysargs.gpu
-        # if isinstance(gpu, list):
-        #     gpu = gpu[0]
-        # caffe.set_device(gpu)
         oldTag = self.conf['tag']
         if newTag is None:
             newTag = oldTag + '_FCN'
@@ -237,3 +228,33 @@ class Experiment(ba.utils.NotifierClass):
             new_params = ['fc_conv']
             ba.caffeine.surgery.convertToFCN(
                 new_net, old_net, new_params, old_params, new_weights)
+
+    def _multi_scale_convert_to_FCN(self, set_sizes):
+        from ba import SetList
+        hyperTrainSet = SetList(self.conf['train'])
+        bname = self.conf['tag']
+        for set_size in set_sizes:
+            if set_size == 0:
+                self.cnn.trainset.list = hyperTrainSet.list
+            else:
+                self.cnn.trainset.list = random.sample(hyperTrainSet.list, set_size)
+                # self.cnn.testset.set = self.cnn.testset.set - self.cnn.trainset.set
+            self.conf['tag'] = '{}_{}samples'.format(bname, set_size)
+            newTag = '{}_FCN_{}samples'.format(bname, set_size)
+            self.convert_to_FCN(newTag=newTag)
+        self.conf['tag'] = bname
+        self.notify('Finished cascade FCN conversion for {}'.format(bname))
+
+    def _multi_scale_exec(self, fptr, set_sizes):
+        from ba import SetList
+        hyperTrainSet = SetList(self.conf['train'])
+        bname = self.conf['tag']
+        for set_size in set_sizes:
+            if set_size == 0:
+                self.cnn.trainset.list = hyperTrainSet.list
+            else:
+                self.cnn.trainset.list = random.sample(hyperTrainSet.list, set_size)
+                # self.cnn.testset.set = self.cnn.testset.set - self.cnn.trainset.set
+            self.conf['tag'] = '{}_{}samples'.format(bname, set_size)
+            fptr()
+        self.conf['tag'] = bname

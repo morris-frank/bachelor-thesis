@@ -3,7 +3,7 @@ desc: 'ResNet-50 refined on a single Stern patch, sliding window detection'
 images: 'data/datasets/voc2010/JPEGImages/'
 learn_fc: True
 lr_policy: 'step'
-max_iter: 1000
+max_iter: 600
 mean: 'data/models/resnet/ResNet_mean.npy'
 net: ba.caffeine.resnet.ResNet_Single(nconv3=4, nconv4=6).write
 slicefile: 'data/tmp/pascpart/patches/aeroplane_lwing_rwing/seg.yaml'
@@ -11,7 +11,8 @@ sliding_window: True
 snapshot: 100
 stepsize: 500
 test_images: ''
-test_interval: 50
+test_interval: 100
+test_sizes: [1, 10, 50, 100, 150, 250]
 test: 'data/tmp/pascpart/aeroplane_lwing_rwing.txt'
 train: 'data/single_wings.txt'
 val: 'data/tmp/pascpart/patches/aeroplane_lwing_rwing/img_augmented_lmdb_test.txt'

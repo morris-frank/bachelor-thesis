@@ -7,30 +7,17 @@ DSSSOURCE = 'data/datasets/pascalparts/Annotations_Part/'
 
 def main(args):
     e = Experiment(argv=args)
-    e.loadConf()
+    e.load_conf()
     if e.sysargs.data:
-        e.genData(DATASET, DSSSOURCE)
-    if e.sysargs.cascade:
-        if e.sysargs.prepare:
-            e.cascadePrepare()
-        if e.sysargs.tofcn:
-            e.cascadeToFCN()
-        if e.sysargs.train:
-            e.cascadeTraining()
-        if e.sysargs.test:
-            e.cascadeTesting()
-        if not any([e.sysargs.train, e.sysargs.test,
-                   e.sysargs.tofcn, e.sysargs.prepare]):
-            print('Switch cascade needs switch train, test, tofcn or prepare.')
-    else:
-        if e.sysargs.prepare:
-            e.prepare()
-        if e.sysargs.tofcn:
-            e.convertToFCN()
-        if e.sysargs.train:
-            e.runTrain()
-        if e.sysargs.test:
-            e.runTests()
+        e.generate_data(DATASET, DSSSOURCE)
+    if e.sysargs.prepare:
+        e.prepare()
+    if e.sysargs.tofcn:
+        e.convert_to_FCN()
+    if e.sysargs.train:
+        e.train()
+    if e.sysargs.test:
+        e.test()
 
 
 if __name__ == '__main__':

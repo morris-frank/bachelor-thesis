@@ -26,6 +26,14 @@ class SetList(object):
         if source != '':
             self.load()
 
+    @property
+    def set(self):
+        return set(self.list)
+
+    @set.setter
+    def set(self, set):
+        self.list = list(set)
+
     def __len__(self):
         '''Returns the length of this Set'''
         return len(self.list)
