@@ -52,14 +52,14 @@ class SetList(object):
         whole content and does not append to it.'''
         utils.touch(self.source)
         if os.path.isdir(self.source):
-            self.loadDir(self.source)
+            self.load_directory(self.source)
             self.source = ''
             self.target = ''
         else:
             with open(self.source) as f:
                 self.list = [l[:-1] for l in f.readlines() if l.strip()]
 
-    def loadDir(self, dir):
+    def load_directory(self, dir):
         '''Loads the contents of a dirctory into the list
 
         Args:
@@ -79,7 +79,7 @@ class SetList(object):
         '''Shuffles the list'''
         random.shuffle(self.list)
 
-    def addPreSuffix(self, prefix='', suffix=''):
+    def add_pre_suffix(self, prefix='', suffix=''):
         '''Adds a prefix and a suffix to every element of the list.
 
         Args:
@@ -88,7 +88,7 @@ class SetList(object):
         '''
         self.list = [prefix + x + suffix for x in self]
 
-    def rmPreSuffix(self, prefix='', suffix=''):
+    def rm_pre_suffix(self, prefix='', suffix=''):
         '''Removes a prefix and a suffix from every element of the list.
 
         Args:

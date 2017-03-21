@@ -23,14 +23,14 @@ def evalYAML(predf, gtf, images, heatmaps=None):
         images (str): The path to the original images
         heatmaps (str, optional): The path to the original heatmaps
     '''
-    preds = ba.utils.loadYAML(predf)
-    gts = ba.utils.loadYAML(gtf)
+    preds = ba.utils.load_YAML(predf)
+    gts = ba.utils.load_YAML(gtf)
     outputfile = '.'.join(predf.split('.')[:-2] + ['evals', 'yaml'])
     outputdir = ba.utils.touch('.'.join(predf.split('.')[:-2]) + '/evals/')
     results = {}
-    ext_img = ba.utils.prevalentExtension(images)
+    ext_img = ba.utils.prevalent_extension(images)
     if heatmaps is not None:
-        ext_hm = ba.utils.prevalentExtension(heatmaps)
+        ext_hm = ba.utils.prevalent_extension(heatmaps)
     print('Evaluating {}'.format(predf))
     for idx, pred in tqdm(preds.items()):
         rect = pred['region']

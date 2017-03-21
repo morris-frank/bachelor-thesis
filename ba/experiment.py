@@ -48,13 +48,13 @@ class Experiment(ba.utils.NotifierClass):
     def load_slices(self):
         with open(self.conf['train']) as f:
             imlist = [l[:-1] for l in f.readlines() if l.strip()]
-        slicelist = ba.utils.loadYAML(self.conf['slicefile'])
+        slicelist = ba.utils.load_YAML(self.conf['slicefile'])
         return {im: slicelist[im] for im in imlist}
 
     def load_conf(self):
         '''Open a YAML Configuration file and make a Bunch from it'''
-        defaults = ba.utils.loadYAML('data/experiments/defaults.yaml')
-        self.conf = ba.utils.loadYAML(self.sysargs.conf)
+        defaults = ba.utils.load_YAML('data/experiments/defaults.yaml')
+        self.conf = ba.utils.load_YAML(self.sysargs.conf)
         if 'tag' not in self.conf:
             self.conf['tag'] = os.path.basename(
                 os.path.splitext(self.sysargs.conf)[0])
@@ -132,10 +132,10 @@ class Experiment(ba.utils.NotifierClass):
     def generate_data(self, name, source):
         '''Generates the training data for that experiment'''
         ppset = ba.PascalPartSet(name, source, ['lwing', 'rwing'], 'aeroplane')
-        ppset.saveSegmentations(augment=2)
+        ppset.segmentations(augment=2)
         if self.conf['sliding_window']:
-            ppset.saveBoundingBoxes('data/datasets/voc2010/JPEGImages/',
-                                    negatives=2, augment=2)
+            ppset.bounding_boxes('data/datasets/voc2010/JPEGImages/',
+                                 negatives=2, augment=2)
 
     def prepare(self):
         self._multi_scale_exec(self._prepare)

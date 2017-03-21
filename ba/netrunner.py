@@ -141,7 +141,7 @@ class NetRunner(ba.utils.NotifierClass):
         del self.net
         del self.solver
 
-    def createNet(self, model, weights, gpu):
+    def create_net(self, model, weights, gpu):
         '''Creates the net inside the runner.
 
         Args:
@@ -154,7 +154,7 @@ class NetRunner(ba.utils.NotifierClass):
         caffe.set_mode_gpu()
         self.net = caffe.Net(model, weights, caffe.TEST)
 
-    def createSolver(self, solverpath, weights, gpu):
+    def create_solver(self, solverpath, weights, gpu):
         '''Creates a Solver to Train a network
 
         Args:
@@ -168,7 +168,7 @@ class NetRunner(ba.utils.NotifierClass):
         self.solver = caffe.SGDSolver(solverpath)
         self.solver.net.copy_from(weights)
 
-    def loadimg(self, path, mean):
+    def load_img(self, path, mean):
         '''Loads an image and prepares it for caffe.
 
         Args:
@@ -230,14 +230,14 @@ class NetRunner(ba.utils.NotifierClass):
         try:
             self.trainset.mean = np.load(self.dir + 'mean.npy')
         except FileNotFoundError:
-            imgext = '.' + ba.utils.prevalentExtension(self.images)
-            self.trainset.addPreSuffix(self.images, imgext)
+            imgext = '.' + ba.utils.prevalent_extension(self.images)
+            self.trainset.add_pre_suffix(self.images, imgext)
             self.trainset.calculate_mean()
-            self.trainset.rmPreSuffix(self.images, imgext)
+            self.trainset.rm_pre_suffix(self.images, imgext)
             np.save(self.dir + 'mean.npy', self.trainset.mean)
         return self.trainset.mean
 
-    def getMean(self):
+    def get_mean(self):
         '''Returns the mean for this NetRunner. If we have a train set with a
         mean that is returned otherwise we try to import the mean saved from
         the training phase.
@@ -302,7 +302,7 @@ class FCNPartRunner(NetRunner):
         self.results = '/'.join([self.resultroot, self.name, bnw]) + '/'
         self.heatmaps = self.results + 'heatmaps/'
 
-    def FCNparams(self, split):
+    def generator_params(self, split):
         '''Builds the dict for a net_generator.
 
         Args:
@@ -313,8 +313,8 @@ class FCNPartRunner(NetRunner):
         '''
         splitfile = self.dir
         splitfile += 'train.txt' if split == 'train' else 'test.txt'
-        imgext = ba.utils.prevalentExtension(self.images)
-        mean, path = self.getMean()
+        imgext = ba.utils.prevalent_extension(self.images)
+        mean, path = self.get_mean()
         if path:
             mean = path
         elif not isinstance(mean, bool):
@@ -338,8 +338,13 @@ class FCNPartRunner(NetRunner):
         '''
         ba.utils.touch(self.dir)
         with open(self.dir + split + '.prototxt', 'w') as f:
-            f.write(str(self.net_generator(self.FCNparams(split),
+            f.write(str(self.net_generator(self.generator_params(split),
                                            self.generator_switches)))
+
+    def write_solver(self):
+        '''Writes the solver definition to disk.'''
+        s = SolverSpec(self.dir, self._solver_attr)
+        s.write()
 
     def prepare(self, split='train_test_deploy'):
         '''Prepares the enviroment for phases.
@@ -353,7 +358,7 @@ class FCNPartRunner(NetRunner):
             self.trainset.target = self.dir + 'train.txt'
             self.trainset.write()
             self.write('train')
-            self.writeSolver()
+            self.write_solver()
         if 'train' in split or 'test' in split:
             self.valset.target = self.dir + 'test.txt'
             self.valset.write()
@@ -362,11 +367,6 @@ class FCNPartRunner(NetRunner):
             ba.utils.touch(self.heatmaps)
             ba.utils.touch(self.heatmaps[:-1] + '_overlays/')
             self.write('deploy')
-
-    def writeSolver(self):
-        '''Writes the solver definition to disk.'''
-        s = SolverSpec(self.dir, self._solver_attr)
-        s.write()
 
     def train(self):
         '''Trains the network'''
@@ -382,13 +382,6 @@ class FCNPartRunner(NetRunner):
             self.dir + logf))
         self.notify('Finished training for {}'.format(self.name))
 
-    def forwardVal(self):
-        '''Will forward the whole validation set through the network.'''
-        imgext = '.' + ba.utils.prevalentExtension(self.images)
-        self.valset.addPreSuffix(self.images, imgext)
-        self.forwardList(setlist=self.valset)
-        self.valset.rmPreSuffix(self.images, imgext)
-
     def test(self, slicefile=None):
         '''Will test the net.
 
@@ -397,7 +390,7 @@ class FCNPartRunner(NetRunner):
                 will perform SelecSearch and BB errors..
         '''
         self.prepare('deploy')
-        self.forwardTest()
+        self.forward_test()
         scoreboxf = self.results[:-1] + '.scores.yaml'
         weightname = os.path.splitext(os.path.basename(self.net_weights))[0]
         if slicefile is not None:
@@ -411,7 +404,7 @@ class FCNPartRunner(NetRunner):
                       ['MeanScalErr', meanScalErr]]
             self.notify(matrix=resMat)
             iteration = weightname.split('_')[-1]
-            db = ba.utils.loadYAML(self.resultDB)
+            db = ba.utils.load_YAML(self.resultDB)
             if db is None:
                 db = {}
             if self.name not in db:
@@ -420,14 +413,7 @@ class FCNPartRunner(NetRunner):
             with open(self.resultDB, 'w') as f:
                 yaml.dump(db, f)
 
-    def forwardTest(self):
-        '''Will forward the whole validation set through the network.'''
-        imgext = '.' + ba.utils.prevalentExtension(self.images)
-        self.testset.addPreSuffix(self.images, imgext)
-        self.forwardList(setlist=self.testset)
-        self.testset.rmPreSuffix(self.images, imgext)
-
-    def forwardIDx(self, idx, mean=None):
+    def forward_single(self, idx, mean=None):
         '''Will forward one single idx-image from the source set and saves the
         scoring heatmaps and heatmaps to disk.
 
@@ -439,8 +425,8 @@ class FCNPartRunner(NetRunner):
             The score and coordinates of the highest scoring region
         '''
         if mean is None:
-            mean, meanpath = self.getMean()
-        data, im = self.loadimg(idx, mean=mean)
+            mean, meanpath = self.get_mean()
+        data, im = self.load_img(idx, mean=mean)
         bn = os.path.basename(os.path.splitext(idx)[0])
         bn_hm = self.heatmaps + bn
         bn_ov = self.heatmaps[:-1] + '_overlays/' + bn
@@ -453,7 +439,7 @@ class FCNPartRunner(NetRunner):
         region, rscore = ba.eval.scoreToRegion(score, im)
         return {bn: {'region': list(region), 'score': float(rscore)}}
 
-    def forwardList(self, setlist=None):
+    def forward_list(self, setlist=None):
         '''Will forward a whole setlist through the network. Will default to the
         validation set.
 
@@ -461,18 +447,18 @@ class FCNPartRunner(NetRunner):
             setlist (SetList, optional): The set to put forward
         '''
         if setlist is None:
-            return self.forwardTest()
+            return self.forward_test()
         self.prepare('deploy')
-        self.createNet(self.dir + 'deploy.prototxt',
+        self.create_net(self.dir + 'deploy.prototxt',
                        self.net_weights,
                        self.gpu[0])
-        mean, meanpath = self.getMean()
+        mean, meanpath = self.get_mean()
         scoreboxes = {}
         scoreboxf = self.results[:-1] + '.scores.yaml'
         weightname = os.path.splitext(os.path.basename(self.net_weights))[0]
         print('Forwarding all in {}'.format(setlist))
         for i, idx in enumerate(tqdm(setlist)):
-            scoreboxes.update(self.forwardIDx(idx, mean=mean))
+            scoreboxes.update(self.forward_single(idx, mean=mean))
             if i % 10 == 0:
                 with open(scoreboxf, 'w') as f:
                     yaml.dump(scoreboxes, f)
@@ -480,6 +466,19 @@ class FCNPartRunner(NetRunner):
                                                                weightname,
                                                                self.name))
 
+    def forward_val(self):
+        '''Will forward the whole validation set through the network.'''
+        imgext = '.' + ba.utils.prevalent_extension(self.images)
+        self.valset.add_pre_suffix(self.images, imgext)
+        self.forward_list(setlist=self.valset)
+        self.valset.rm_pre_suffix(self.images, imgext)
+
+    def forward_test(self):
+        '''Will forward the whole validation set through the network.'''
+        imgext = '.' + ba.utils.prevalent_extension(self.images)
+        self.testset.add_pre_suffix(self.images, imgext)
+        self.forward_list(setlist=self.testset)
+        self.testset.rm_pre_suffix(self.images, imgext)
 
 
 class SlidingFCNPartRunner(FCNPartRunner):
@@ -497,7 +496,7 @@ class SlidingFCNPartRunner(FCNPartRunner):
         self.stride = 25
         self.kernel_size = 50
 
-    def FCNparams(self, split):
+    def generator_params(self, split):
         '''Builds the dict for a net_generator.
 
         Args:
@@ -506,14 +505,14 @@ class SlidingFCNPartRunner(FCNPartRunner):
         Returns:
             The parameter dictionary
         '''
-        params = super().FCNparams(split)
+        params = super().generator_params(split)
         if split == 'train':
             params['lmdb'] = self.trainset.source[:-4]
         elif split == 'val':
             params['lmdb'] = self.valset.source[:-4]
         return params
 
-    def forwardWindow(self, window):
+    def forward_window(self, window):
         '''Forwards a single window from the sliding window through the network.
 
         Args:
@@ -529,7 +528,7 @@ class SlidingFCNPartRunner(FCNPartRunner):
         score = self.net.blobs[self.net.outputs[0]].data[0][1, ...]
         return score * np.ones(inshape)
 
-    def forwardIDx(self, idx, mean=None):
+    def forward_single(self, idx, mean=None):
         '''Will slide a window over the idx-image from the source and forward
         that slice through the network. Saves the scoring heatmaps and heatmaps
         to disk.
@@ -542,8 +541,8 @@ class SlidingFCNPartRunner(FCNPartRunner):
             The score and coordinates of the highest scoring region
         '''
         if mean is None:
-            mean, meanpath = self.getMean()
-        data, im = self.loadimg(idx, mean=mean)
+            mean, meanpath = self.get_mean()
+        data, im = self.load_img(idx, mean=mean)
         data = data.transpose((1, 2, 0))
         hm = np.zeros(data.shape[:-1])
         bn = os.path.basename(os.path.splitext(idx)[0])
@@ -555,7 +554,7 @@ class SlidingFCNPartRunner(FCNPartRunner):
             padded_hm = np.zeros(padded_data.shape[:-1])
             for (x, y, window) in ba.utils.sliding_window(padded_data, self.stride,
                                                        ks):
-                score = self.forwardWindow(window)
+                score = self.forward_window(window)
                 padded_hm[y:y + ks, x:x + ks] += score
             hm += padded_hm[pad:-pad, pad:-pad]
 

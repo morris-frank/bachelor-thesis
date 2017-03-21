@@ -231,7 +231,7 @@ def touch(path, clear=False):
     return path
 
 
-def prevalentExtension(path):
+def prevalent_extension(path):
     '''Looks at a directory and returns the most prevalent file extension of
     the files in this directory.
 
@@ -260,7 +260,7 @@ def sliding_window(image, stride, kernel_size):
             yield (x, y, image[y:y + kernel_size, x:x + kernel_size])
 
 
-def sliceOverlap(x1, x2, w):
+def slice_overlap(x1, x2, w):
     '''Calculates the overlap between two same sized rectangles.
 
     Args:
@@ -290,7 +290,7 @@ def rm(path):
         os.system('rm -r {}'.format(path))
 
 
-def loadYAML(path):
+def load_YAML(path):
     '''Loads a YAML file.
 
     Args:

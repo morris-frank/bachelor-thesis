@@ -29,7 +29,7 @@ class PascalPartSet(object):
         self.classes = classes
         self.parts = parts
         if dolists:
-            self.genLists()
+            self.generate_lists()
 
     @property
     def parts(self):
@@ -66,7 +66,7 @@ class PascalPartSet(object):
             raise OSError('source attribute must be path to a dir')
         else:
             self.__source = source
-            self.extension = '.' + utils.prevalentExtension(source)
+            self.extension = '.' + utils.prevalent_extension(source)
 
     @property
     def name(self):
@@ -81,45 +81,32 @@ class PascalPartSet(object):
     def write(self):
         '''Writes the generated lists to disk'''
         for l in [self.sourcelist, self.classlist, self.partslist]:
-            l.rmPreSuffix(self.source, self.extension)
+            l.rm_pre_suffix(self.source, self.extension)
             l.write()
-            l.addPreSuffix(self.source, self.extension)
+            l.add_pre_suffix(self.source, self.extension)
 
-    def loadLists(self):
-        '''Loads the *.txt lists for this set.'''
-        f = {
-            'source': self.build + self.name + '.txt',
-            'classes': self.build + '_'.join(self.classes) + '.txt',
-            'parts': self.build + self.tag + '.txt'
-            }
-        self.sourcelist = SetList(f['source'])
-        self.classlist = SetList(f['classes'])
-        self.partslist = SetList(f['parts'])
-        self.sourcelist.addPreSuffix(self.source, self.extension)
-        self.classlist.addPreSuffix(self.source, self.extension)
-        self.partslist.addPreSuffix(self.source, self.extension)
-
-    def genLists(self):
+    def generate_lists(self):
         '''Generates the *.txt lists for this set.'''
         f = {
             'source': self.build + self.name + '.txt',
             'classes': self.build + '_'.join(self.classes) + '.txt',
             'parts': self.build + self.tag + '.txt'
             }
-        overwrite = {
-            'source': utils.query_overwrite(f['source'], default='no'),
-            'classes': utils.query_overwrite(f['classes'], default='no'),
-            'parts': utils.query_overwrite(f['parts'], default='no')
-            }
+        overwrite = {}
+        for _list, name in [(self.sourcelist, 'source'),
+                          (self.classlist, 'classes'),
+                          (self.partslist, 'parts')]:
+            overwrite[name] = utils.query_overwrite(f[name], default='no')
+            _list = SetList(f[name])
+            _list.add_pre_suffix(self.source, self.extension)
 
-        self.loadLists()
         if not sum(overwrite.values()):
             return True
 
         if overwrite['source']:
             print('Generating List {}'.format(f['source']))
-            self.sourcelist.loadDir(self.source)
-            self.sourcelist.addPreSuffix(self.source, self.extension)
+            self.sourcelist.load_directory(self.source)
+            self.sourcelist.add_pre_suffix(self.source, self.extension)
 
         if overwrite['classes'] or overwrite['parts']:
             self.classlist.list = []
@@ -133,7 +120,7 @@ class PascalPartSet(object):
                         self.partslist.list.append(row)
         self.write()
 
-    def saveSegmentations(self, augment=0):
+    def segmentations(self, augment=0):
         '''Saves the segmentations for selected classes or parts.
 
         Args:
@@ -162,7 +149,7 @@ class PascalPartSet(object):
                 item.target = d['classes'] + idx
                 item.save(mode='class')
 
-    def saveBoundingBoxes(self, imgdir, negatives=0, augment=0):
+    def bounding_boxes(self, imgdir, negatives=0, augment=0):
         '''Saves the bounding box patches for classes and parts.
 
         Args:
@@ -181,7 +168,7 @@ class PascalPartSet(object):
             'class_seg': utils.touch(cbdir + 'seg/')
             }
         if utils.query_overwrite(pbdir, default='yes'):
-            ext = utils.prevalentExtension(imgdir)
+            ext = utils.prevalent_extension(imgdir)
 
             classSegDB = {}
             classDBPath = d['class_seg'][:-1] + '.yaml'
@@ -197,13 +184,13 @@ class PascalPartSet(object):
 
                 # Save Class patches
                 item.target = d['class_seg'] + idx
-                bb = item.saveBB(mode='class')
+                bb = item.bounding_box(mode='class')
                 classSegDB[idx] = bb
                 imsave(d['class_img'] + idx + '.png', im[bb])
 
                 # Save positive patch
                 item.target = d['patch_seg'] + idx
-                bb = item.saveBB(mode='parts')
+                bb = item.bounding_box(mode='parts')
                 if bb is None:
                     continue
                 patchSegDB[idx] = bb
@@ -215,7 +202,7 @@ class PascalPartSet(object):
                     w = [bb[0].stop - x1[0], bb[1].stop - x1[1]]
                     subim = [im.shape[0] - w[0], im.shape[1] - w[1]]
                     checkidx = 0
-                    while checkidx < 30 and utils.sliceOverlap(x1, x2, w) > 0.3:
+                    while checkidx < 30 and utils.slice_overlap(x1, x2, w) > 0.3:
                         checkidx += 1
                         x2 = (np.random.random(2) * subim).astype(int)
                     if checkidx >= 30:
@@ -229,12 +216,11 @@ class PascalPartSet(object):
                 yaml.dump(patchSegDB, f)
 
         if utils.query_overwrite(pbdir + 'img_augmented/', default='yes'):
-            self.augmentSingle(pbdir + 'img/pos/', len(self.classlist) * augment)
-            self.augmentSingle(pbdir + 'img/neg/', len(self.classlist) * augment)
-            # self.augmentDual(d['patch_pos'], d['patch_seg'], len(self.classlist)*augment)
-            self.genLMDB(pbdir + 'img_augmented/')
+            self.augment_single(pbdir + 'img/pos/', len(self.classlist) * augment)
+            self.augment_single(pbdir + 'img/neg/', len(self.classlist) * augment)
+            self.generate_LMDB(pbdir + 'img_augmented/')
 
-    def genLMDB(self, path):
+    def generate_LMDB(self, path):
         '''Generates the LMDB for the trainingset.
 
         Args:
@@ -249,9 +235,9 @@ class PascalPartSet(object):
             utils.rm(d + '.txt')
         wh = 224
         trainlist = SetList(absp + '/pos/')
-        trainlist.addPreSuffix(absp + '/pos/', '.png 1')
+        trainlist.add_pre_suffix(absp + '/pos/', '.png 1')
         negList = SetList(absp + '/neg/')
-        negList.addPreSuffix(absp + '/neg/', '.png 0')
+        negList.add_pre_suffix(absp + '/neg/', '.png 0')
         n = {'pos': int(len(trainlist) * 0.2), 'neg': int(len(negList) * 0.2)}
         testlist = copy.deepcopy(trainlist)
         testlist.list = testlist.list[:n['pos']] + negList.list[:n['neg']]
@@ -263,7 +249,7 @@ class PascalPartSet(object):
         os.system('convert_imageset --resize_height={} --resize_height={} --shuffle "/" "{}" "{}" '.format(wh, wh, trainlist.target, target['train']))
         os.system('convert_imageset --resize_height={} --resize_height={} --shuffle "/" "{}" "{}" '.format(wh, wh, testlist.target, target['test']))
 
-    def augmentSingle(self, imdir, n):
+    def augment_single(self, imdir, n):
         '''Generates augmentet images
 
         Args:
@@ -298,7 +284,6 @@ class PascalPartSet(object):
 
 
 class PascalPart(object):
-
     def __init__(self, source=''):
         '''Constructs a new PascalPart.
 
@@ -332,7 +317,7 @@ class PascalPart(object):
         if mat[3].size and mat[3][0].size:
             for part in mat[3][0]:
                 self.parts[part[0][0]] = part[1].astype('float')
-        self.genSumOfParts()
+        self.unionize()
 
     def save(self, mode='parts'):
         '''Saves the segmentations binarly samesized to input
@@ -344,9 +329,9 @@ class PascalPart(object):
         if mode == 'class':
             self.itemsave(self.target, self.segmentation)
         elif len(self.parts) > 0:
-            self.itemsave(self.target, self.sumOfParts)
+            self.itemsave(self.target, self.union)
 
-    def saveBB(self, mode='parts'):
+    def bounding_box(self, mode='parts'):
         '''Saves the segmentations in their respective patches (bounding boxes)
 
         Args:
@@ -357,11 +342,11 @@ class PascalPart(object):
             The bounding box slice for that patch
         '''
         if mode == 'class':
-            patch, bb = self.getSingularBB(self.segmentation.astype(int))
+            patch, bb = self._singularize(self.segmentation.astype(int))
             self.itemsave(self.target, patch)
             return bb
         elif len(self.parts) > 0:
-            patch, bb = self.getSingularBB(self.sumOfParts.astype(int))
+            patch, bb = self._singularize(self.union.astype(int))
             self.itemsave(self.target, patch)
             return bb
 
@@ -377,16 +362,16 @@ class PascalPart(object):
                 if part in self.parts:
                     newparts[part] = self.parts[part]
         self.parts = newparts
-        self.genSumOfParts()
+        self.unionize()
 
-    def genSumOfParts(self):
+    def unionize(self):
         '''Generate the sum of the parts or the union of segmentations.'''
         if len(self.parts) > 0:
-            self.sumOfParts = next(iter(self.parts.values())) * 0
+            self.union = next(iter(self.parts.values())) * 0
             for part in self.parts:
-                self.sumOfParts += self.parts[part]
+                self.union += self.parts[part]
 
-    def getSingularBB(self, img):
+    def _singularize(self, img):
         '''Produces the cut part and bounding box slice for a single connected
         component in an image
 
