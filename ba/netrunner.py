@@ -14,6 +14,7 @@ from scipy.misc import imread
 from scipy.misc import imresize
 from scipy.misc import imsave
 import skimage
+import subprocess
 import sys
 from tqdm import tqdm
 import yaml
@@ -137,9 +138,12 @@ class NetRunner(ba.utils.NotifierClass):
             self.__valset = SetList(valset)
 
     def clear(self):
-        '''Clears the nets'''
+        '''Clears the nets and joins notifier threads'''
         del self.net
         del self.solver
+        if len(self.notifier_threads) > 0:
+            for thread in self.notifier_threads:
+                thread.join(timeout=1.0)
 
     def create_net(self, model, weights, gpu):
         '''Creates the net inside the runner.
@@ -375,12 +379,15 @@ class FCNPartRunner(NetRunner):
             datetime.datetime.now().strftime('%y_%m_%d_'), self.name)
         ba.utils.touch(self.dir + logf, clear=True)
         self.LOGNotifiy(self.dir + logf)
-        os.system('caffe train -solver {} -weights {} -gpu {} 2>&1 | tee {}'.format(
+        return_code = subprocess.call(
+            'caffe train -solver {} -weights {} -gpu {} 2>&1 | tee {}'.format(
             self.dir + 'solver.prototxt',
             self.solver_weights,
             ','.join(str(x) for x in self.gpu),
-            self.dir + logf))
-        self.notifier._send_telegram_photo(self.notifier.lossgraph(logf), logf)
+            self.dir + logf), shell=True)
+        if return_code > 0:
+            self.notifier._send_telegram_photo(self.notifier.lossgraph(logf), logf)
+        return return_code
 
     def test(self, slicefile=None):
         '''Will test the net.

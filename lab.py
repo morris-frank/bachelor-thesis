@@ -7,7 +7,6 @@ DSSSOURCE = 'data/datasets/pascalparts/Annotations_Part/'
 
 def main(args):
     e = Experiment(argv=args)
-    e.load_conf()
     if e.sysargs.data:
         e.generate_data(DATASET, DSSSOURCE)
     if e.sysargs.prepare:
@@ -18,6 +17,7 @@ def main(args):
         e.train()
     if e.sysargs.test:
         e.test()
+    e.exit()
 
 
 if __name__ == '__main__':

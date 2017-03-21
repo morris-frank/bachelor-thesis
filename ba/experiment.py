@@ -29,6 +29,11 @@ class Experiment(ba.utils.NotifierClass):
         super().__init__(**kwargs)
         self.argv = argv
         self.parse_arguments()
+        self.load_conf()
+
+    def exit(self):
+        if self.cnn is not None:
+            self.cnn.clear()
 
     def parse_arguments(self):
         '''Parse the arguments for an experiment script'''
@@ -41,11 +46,15 @@ class Experiment(ba.utils.NotifierClass):
         parser.add_argument('--test', action='store_true')
         parser.add_argument('--tofcn', action='store_true')
         parser.add_argument('--train', action='store_true')
+        parser.add_argument('--bs', type=int, nargs=1, default=0,
+                            help='The batch size for training.')
         parser.add_argument('--gpu', type=int, nargs='+', default=0,
                             help='The GPU to use.')
         self.sysargs = parser.parse_args(args=self.argv)
         if isinstance(self.sysargs.conf, list):
             self.sysargs.conf = self.sysargs.conf[0]
+        if isinstance(self.sysargs.bs, list):
+            self.sysargs.bs = self.sysargs.bs[0]
 
     def load_slices(self):
         with open(self.conf['train']) as f:
@@ -79,6 +88,9 @@ class Experiment(ba.utils.NotifierClass):
             if not isinstance(self.conf['train_sizes'], list):
                 print('train_sizes shall be a list of integers.')
                 sys.exit()
+
+        if self.sysargs.bs > 0:
+            self.conf['batch_size'] = self.sysargs.bs
 
         for step in ['train', 'test', 'val']:
             if os.path.isfile(self.conf[step]):
@@ -190,7 +202,7 @@ class Experiment(ba.utils.NotifierClass):
     def _train(self):
         '''Trains the given experiment'''
         self.prepare_network()
-        self.cnn.train()
+        return self.cnn.train()
 
     def _convert_to_FCN(self, newTag=None):
         '''Converts the source weights to an FCN'''
@@ -242,6 +254,8 @@ class Experiment(ba.utils.NotifierClass):
                 self.conf['train'].list = random.sample(hyper_set.list, set_size)
                 # self.cnn.testset.set = self.cnn.testset.set - self.cnn.trainset.set
             self.conf['tag'] = '{}_{}samples'.format(bname, set_size)
-            fptr()
+            return_code = fptr()
+            if return_code < 0:
+                break
         self.conf['tag'] = bname
         self.conf['train'] = old_train_conf

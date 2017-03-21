@@ -17,6 +17,12 @@ class NotifierClass(object):
     '''A class containing an notifer'''
     def __init__(self, *args, **kwargs):
         self.notifier = None
+        self.notifier_threads = []
+
+    def _new_notifer_thread(self, target, args):
+        self.notifier_threads.append(
+            threading.Thread(target=target, args=args))
+        self.notifier_threads[-1].start()
 
     def LOGNotifiy(self, logfile):
         '''Starts notifier thread on a given caffe - logfile
@@ -27,8 +33,8 @@ class NotifierClass(object):
         from telenotify import Notifier
         if self.notifier is None:
             self.notifier = Notifier(configfile=notifier_config)
-        threading.Thread(target=self.notifier._start,
-                         args=(logfile, )).start()
+            self._new_notifer_thread(self.notifier._start,
+                                     (logfile, ))
 
     def notify(self, message='', matrix=None):
         '''Sends message to telegram
@@ -41,11 +47,11 @@ class NotifierClass(object):
         if self.notifier is None:
             self.notifier = Notifier(configfile=notifier_config)
         if matrix is None:
-            threading.Thread(target=self.notifier.sendMessage,
-                             args=(message, )).start()
+            self._new_notifer_thread(self.notifier.sendMessage,
+                                     (message, ))
         else:
-            threading.Thread(target=self.notifier.sendMatrix,
-                             args=(matrix, message)).start()
+            self._new_notifer_thread(self.notifier.sendMatrix,
+                                     (matrix, message))
 
 
 class Bunch(object):
