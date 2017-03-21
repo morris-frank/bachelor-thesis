@@ -117,7 +117,8 @@ class Experiment(ba.utils.NotifierClass):
                 self.cnn._solver_attr[attr] = self.conf[attr]
 
         # Extra attributes for the network generator
-        attrs = ['slices']
+        attrs = ['slices', 'batch_size', 'patch_size', 'ppI',
+                 'images', 'negatives']
         for attr in attrs:
             if attr in self.conf:
                 self.cnn.generator_attr[attr] = self.conf[attr]
@@ -231,14 +232,14 @@ class Experiment(ba.utils.NotifierClass):
     def _multi_scale_exec(self, fptr, set_sizes):
         from ba import SetList
         old_train_conf = self.conf['train']
-        hyperTrainSet = SetList(self.conf['train'])
-        self.conf['train'] = copy.deepcopy(hyperTrainSet)
+        hyper_set = SetList(self.conf['train'])
+        self.conf['train'] = copy.deepcopy(hyper_set)
         bname = self.conf['tag']
         for set_size in set_sizes:
-            if set_size == 0:
-                self.conf['train'].list = hyperTrainSet.list
+            if set_size == 0 or set_size > len(hyper_set.list):
+                self.conf['train'].list = hyper_set.list
             else:
-                self.conf['train'].list = random.sample(hyperTrainSet.list, set_size)
+                self.conf['train'].list = random.sample(hyper_set.list, set_size)
                 # self.cnn.testset.set = self.cnn.testset.set - self.cnn.trainset.set
             self.conf['tag'] = '{}_{}samples'.format(bname, set_size)
             fptr()

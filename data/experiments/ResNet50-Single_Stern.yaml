@@ -1,4 +1,5 @@
 base_lr: 10e-6
+batch_size: 10
 desc: 'ResNet-50 refined on a single Stern patch, sliding window detection'
 images: 'data/datasets/voc2010/JPEGImages/'
 learn_fc: True

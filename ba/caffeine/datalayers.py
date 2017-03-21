@@ -126,14 +126,15 @@ class SingleImageLayer(caffe.Layer):
         from keras.preprocessing.image import ImageDataGenerator
         params = eval(self.param_str)
         self.images = params['images']
-        self.ext = params['extension']
         self.slices = params['slices']
-        # self.negatives = params['negatives']
-        self.negatives = 'data/tmp/pascpart/patches/aeroplane_stern/img_augmented/neg/'
         if isinstance(params['mean'], str):
             self.mean = np.load(params['mean'])
         else:
             self.mean = np.array(params['mean'])
+        self.ext = params.get('extension', 'jpg')
+        self.negatives = params.get(
+            'negatives',
+            'data/tmp/pascpart/patches/aeroplane_stern/img_augmented/neg/')
         self.batch_size = params.get('batch_size', 18)
         self.patch_size = params.get('patch_size', (224, 224))
         self.ppI = params.get('ppI', 20)
@@ -143,7 +144,7 @@ class SingleImageLayer(caffe.Layer):
                                  self.patch_size[0], self.patch_size[1], 3))
         for it, (path, bb) in zip(range(n), self.slices.items()):
             im = self.imread('{}{}.{}'.format(self.images, path, self.ext))
-            self.samples[it:it + self.ppI, ...] = self.generateSamples(im, bb)
+            self.samples[it:it + self.ppI, ...] = self.generate_samples(im, bb)
         self.labels = np.append(np.ones(n * self.ppI),
                                 np.zeros(n * self.ppI))
 
@@ -176,17 +177,17 @@ class SingleImageLayer(caffe.Layer):
             self.batch_size, 3, self.patch_size[0], self.patch_size[1])
         top[1].reshape(self.batch_size, 1)
 
-    def bbShape(self, bb):
+    def bounding_box_shape(self, bb):
         return (bb[0].stop - bb[0].start,
                 bb[1].stop - bb[1].start)
 
-    def generateSamples(self, im, bb, shiftfactor=0.1, count=None):
+    def generate_samples(self, im, bb, shiftfactor=0.1, count=None):
         if count is None:
             count = self.ppI
         if count % 2 != 0:
             print('Count in SingleImageLayer is not divisble by two')
             return
-        bbshape = self.bbShape(bb)
+        bbshape = self.bounding_box_shape(bb)
         shift = (bbshape[0] * shiftfactor, bbshape[1] * shiftfactor)
 
         xsamples = (shift[0] * (2 * np.random.random(count) - 1)).astype(np.int8)

@@ -380,7 +380,7 @@ class FCNPartRunner(NetRunner):
             self.solver_weights,
             ','.join(str(x) for x in self.gpu),
             self.dir + logf))
-        self.notify('Finished training for {}'.format(self.name))
+        self.notifier._send_telegram_photo(self.notifier.lossgraph(logf), logf)
 
     def test(self, slicefile=None):
         '''Will test the net.

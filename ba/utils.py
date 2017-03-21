@@ -25,8 +25,10 @@ class NotifierClass(object):
             logfile (str): The Full path to the log file
         '''
         from telenotify import Notifier
-        notifier = Notifier(configfile=notifier_config)
-        threading.Thread(target=notifier._start, args=(logfile, )).start()
+        if self.notifier is None:
+            self.notifier = Notifier(configfile=notifier_config)
+        threading.Thread(target=self.notifier._start,
+                         args=(logfile, )).start()
 
     def notify(self, message='', matrix=None):
         '''Sends message to telegram
