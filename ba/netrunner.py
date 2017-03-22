@@ -360,7 +360,7 @@ class FCNPartRunner(NetRunner):
         if 'train' in split:
             ba.utils.touch(self.snapshots)
             self.trainset.target = self.dir + 'train.txt'
-            self.trainset.write()
+            # self.trainset.write()
             self.write('train')
             self.write_solver()
         if 'train' in split or 'test' in split:
@@ -385,7 +385,7 @@ class FCNPartRunner(NetRunner):
             self.solver_weights,
             ','.join(str(x) for x in self.gpu),
             self.dir + logf), shell=True)
-        if return_code > 0:
+        if return_code >= 0:
             self.notifier._send_telegram_photo(self.notifier.lossgraph(logf), logf)
         return return_code
 

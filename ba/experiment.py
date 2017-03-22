@@ -28,6 +28,7 @@ class Experiment(ba.utils.NotifierClass):
         '''
         super().__init__(**kwargs)
         self.argv = argv
+        self.cnn = None
         self.parse_arguments()
         self.load_conf()
 
@@ -248,14 +249,14 @@ class Experiment(ba.utils.NotifierClass):
         self.conf['train'] = copy.deepcopy(hyper_set)
         bname = self.conf['tag']
         for set_size in set_sizes:
+            self.conf['tag'] = '{}_{}samples'.format(bname, set_size)
             if set_size == 0 or set_size > len(hyper_set.list):
                 self.conf['train'].list = hyper_set.list
             else:
                 self.conf['train'].list = random.sample(hyper_set.list, set_size)
                 # self.cnn.testset.set = self.cnn.testset.set - self.cnn.trainset.set
-            self.conf['tag'] = '{}_{}samples'.format(bname, set_size)
             return_code = fptr()
-            if return_code < 0:
+            if return_code is not None and return_code < 0:
                 break
         self.conf['tag'] = bname
         self.conf['train'] = old_train_conf
