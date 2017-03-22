@@ -11,7 +11,8 @@ test_images: 'data/datasets/voc2010/JPEGImages/'
 test_interval: 50
 test: 'data/tmp/pascpart/aeroplane_lwing_rwing.txt'
 tofcn: True
+train_sizes: [1, 10, 50, 100, 150, 250]
 train: 'data/single_wings.txt'
-val: 'data/tmp/pascpart/patches/aeroplane_lwing_rwing/img_augmented_lmdb_test.txt'
+val: 'data/tmp/pascpart/aeroplane_lwing_rwing.txt'
 weight_decay: 0.0005
 weights: 'data/models/ReseNet50-Single-FCN_Wings/snapshots/classifier_train_iter_500.caffemodel'
