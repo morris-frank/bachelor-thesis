@@ -7,6 +7,7 @@ from glob import glob
 import os
 import random
 import re
+import shutil
 import sys
 
 
@@ -82,7 +83,24 @@ class Experiment(ba.utils.NotifierClass):
         if 'test' not in self.conf:
             self.conf['test'] = self.conf['val']
 
-        if 'slicefile' in self.conf:
+        for step in ['train', 'test', 'val']:
+            if os.path.isfile(self.conf[step]):
+                if 'lmdb' in self.conf[step]:
+                    setattr(self, step + 'mode', RunMode.LMDB)
+                elif self.conf[step].endswith('txt'):
+                    setattr(self, step + 'mode', RunMode.LIST)
+                else:
+                    setattr(self, step + 'mode', RunMode.SINGLE)
+            elif isinstance(self.conf[step], bool) and self.conf[step] is True:
+                self.conf[step] = 'data/models/{}/{}.txt'.format(
+                    self.conf['tag'], step)
+                print(self.conf[step])
+            else:
+                print('{} is not pointing to a file or True.'.format(
+                    self.conf[step]))
+                sys.exit(1)
+
+        if self.sysargs.train and 'slicefile' in self.conf:
             self.conf['slices'] = self.load_slices()
 
         if 'train_sizes' in self.conf:
@@ -92,18 +110,6 @@ class Experiment(ba.utils.NotifierClass):
 
         if self.sysargs.bs > 0:
             self.conf['batch_size'] = self.sysargs.bs
-
-        for step in ['train', 'test', 'val']:
-            if os.path.isfile(self.conf[step]):
-                if 'lmdb' in self.conf[step]:
-                    setattr(self, step + 'mode', RunMode.LMDB)
-                elif self.conf[step].endswith('txt'):
-                    setattr(self, step + 'mode', RunMode.LIST)
-                else:
-                    setattr(self, step + 'mode', RunMode.SINGLE)
-            else:
-                print('{} is not pointing to a file.'.format(self.conf[step]))
-                sys.exit(1)
 
     def prepare_network(self):
         '''Prepares a NetRunner from the given configuration.'''
@@ -186,6 +192,8 @@ class Experiment(ba.utils.NotifierClass):
             return False
         for w in weights:
             bn = os.path.basename(w)
+            if '500' not in bn:
+                continue
             if not ba.utils.query_boolean('You want to test for {}?'.format(bn),
                                           default='yes', defaulting=self.sysargs.default):
                 continue
@@ -205,32 +213,34 @@ class Experiment(ba.utils.NotifierClass):
         self.prepare_network()
         return self.cnn.train()
 
-    def _convert_to_FCN(self, newTag=None):
+    def _convert_to_FCN(self, new_tag=None):
         '''Converts the source weights to an FCN'''
         import caffe
         caffe.set_mode_cpu()
-        oldTag = self.conf['tag']
-        if newTag is None:
-            mgroups = re.match('(.*_)([0-9]+samples)', oldTag).groups()
-            newTag =  '{}FCN_{}'.format(mgroups[0], mgroups[1])
-        oldSnaps = 'data/models/{}/snapshots/'.format(oldTag)
-        newSnaps = ba.utils.touch('data/models/{}/snapshots/'.format(newTag))
-        oldDeploy = 'data/models/{}/deploy.prototxt'.format(oldTag)
-        newDeploy = 'data/models/{}/deploy.prototxt'.format(newTag)
-        weights = glob('{}*caffemodel'.format(oldSnaps))
+        old_tag = self.conf['tag']
+        if new_tag is None:
+            mgroups = re.match('(.*_)([0-9]+samples)', old_tag).groups()
+            new_tag =  '{}FCN_{}'.format(mgroups[0], mgroups[1])
+        old_dir = 'data/models/{}/'.format(old_tag)
+        new_dir = 'data/models/{}/'.format(new_tag)
+        for f in ['train.txt', 'test.txt']:
+            if os.path.isfile(old_dir + f):
+                shutil.copy2(old_dir + f, new_dir)
+        new_snap_dir = ba.utils.touch('{}snapshots/'.format(new_dir))
+        weights = glob('{}*caffemodel'.format(old_dir + 'snapshots/'))
         if len(weights) < 1:
             print('No weights found for {}'.format(self.conf['tag']))
             return False
         for w in weights:
             bn = os.path.basename(w)
-            new_weights = newSnaps + 'classifier_' + bn
+            new_weights = new_snap_dir + 'classifier_' + bn
             if not ba.utils.query_boolean('You want to convert {}?'.format(w),
                                        default='yes',
                                        defaulting=self.sysargs.default):
                 continue
             print('CONVERTING ' + bn)
-            old_net = caffe.Net(oldDeploy, w, caffe.TEST)
-            new_net = caffe.Net(newDeploy, w, caffe.TEST)
+            old_net = caffe.Net(old_dir + 'deploy.prototxt', w, caffe.TEST)
+            new_net = caffe.Net(new_dir + 'deploy.prototxt', w, caffe.TEST)
             old_params = ['fc']
             new_params = ['fc_conv']
             ba.caffeine.surgery.convertToFCN(
@@ -250,6 +260,9 @@ class Experiment(ba.utils.NotifierClass):
         bname = self.conf['tag']
         for set_size in set_sizes:
             self.conf['tag'] = '{}_{}samples'.format(bname, set_size)
+            if not ba.utils.query_boolean('You want to run {} for {}?'.format(fptr.__name__, set_size),
+                                          default='yes', defaulting=self.sysargs.default):
+                continue
             if set_size == 0 or set_size > len(hyper_set.list):
                 self.conf['train'].list = hyper_set.list
             else:
