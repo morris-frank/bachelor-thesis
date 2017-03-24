@@ -139,8 +139,10 @@ class NetRunner(ba.utils.NotifierClass):
 
     def clear(self):
         '''Clears the nets and joins notifier threads'''
-        del self.net
-        del self.solver
+        if self.net is not None:
+            del self.net
+        if self.solver is not None:
+            del self.solver
         if len(self.notifier_threads) > 0:
             for thread in self.notifier_threads:
                 thread.join(timeout=1.0)
@@ -400,23 +402,39 @@ class FCNPartRunner(NetRunner):
         self.forward_test()
         scoreboxf = self.results[:-1] + '.scores.yaml'
         weightname = os.path.splitext(os.path.basename(self.net_weights))[0]
+        iteration = weightname.split('_')[-1]
         if slicefile is not None:
-            meanIOU, meanDistErr, meanScalErr, nResults = ba.eval.evalYAML(
-                scoreboxf, slicefile, self.images, self.heatmaps)
-            resMat = [['Network', self.name],
-                      ['Weights', weightname],
-                      ['Datums', nResults],
-                      ['MeanIOU', meanIOU],
-                      ['MeanDistErr', meanDistErr],
-                      ['MeanScalErr', meanScalErr]]
-            self.notify(matrix=resMat)
-            iteration = weightname.split('_')[-1]
             db = ba.utils.load_YAML(self.resultDB)
             if db is None:
                 db = {}
             if self.name not in db:
                 db[self.name] = {}
-            db[self.name][iteration] = resMat
+            ofile = ba.eval.evalYAML(
+                scoreboxf, slicefile, self.images, self.heatmaps)
+            # ofile = '.'.join(scoreboxf.split('.')[:-2] + ['evals', 'yaml'])
+            trainset = ba.SetList(self.dir + 'train.txt')
+            _soltestset = list(self.testset.set - trainset.set)
+            if trainset is not None and self.testset is not None:
+                v_iou, v_dist, v_scal, v_n = ba.eval.extract_mean_evals(
+                    _soltestset, ofile)
+                v_mat = [['Network', self.name],
+                         ['Weights', weightname],
+                         ['Datums', v_n],
+                         ['MeanIOU', v_iou],
+                         ['MeanDistErr', v_dist],
+                         ['MeanScalErr', v_scal]]
+                db[self.name][str(iteration + '_test')] = v_mat
+                self.notify(matrix=v_mat)
+            if trainset is not None and len(trainset.list) > 0:
+                t_iou, t_dist, t_scal, t_n = ba.eval.extract_mean_evals(
+                    trainset.list, ofile)
+                t_mat = [['Network', self.name],
+                         ['Weights', weightname],
+                         ['Datums', t_n],
+                         ['MeanIOU', t_iou],
+                         ['MeanDistErr', t_dist],
+                         ['MeanScalErr', t_scal]]
+                db[self.name][str(iteration + '_train')] = t_mat
             with open(self.resultDB, 'w') as f:
                 yaml.dump(db, f)
 
