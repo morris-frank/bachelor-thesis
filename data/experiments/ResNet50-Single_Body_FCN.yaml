@@ -13,6 +13,6 @@ test: 'data/tmp/pascpart/aeroplane_body.txt'
 tofcn: True
 train_sizes: [1, 10, 50, 100, 150, 250]
 train: 'data/single_body.txt'
-val: 'data/tmp/pascpart/aeroplane_body.txt'
+val: True
 weight_decay: 0.0005
 weights: 'data/models/ReseNet50-Single-FCN_Body/snapshots/classifier_train_iter_500.caffemodel'
