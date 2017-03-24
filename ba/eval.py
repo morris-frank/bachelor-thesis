@@ -1,6 +1,7 @@
 # For the pure python implementation:
 from ba.selectivesearch import selective_search as selective_search_py
 import ba.utils
+import copy
 from matplotlib import pyplot as plt
 import numpy as np
 import skimage.transform
@@ -11,6 +12,18 @@ from selective_search import selective_search as selective_search_cpy
 import sys
 from tqdm import tqdm
 import yaml
+
+
+def extract_mean_evals(itemlist, evalf):
+    evals = ba.utils.load_YAML(evalf)
+    _evals = copy.deepcopy(evals)
+    for e in _evals:
+        if e not in itemlist:
+            del evals[e]
+    meanIOU = float(np.mean([i['iOU'] for i in evals.values()]))
+    meanDistErr = float(np.mean([i['disterr'] for i in evals.values()]))
+    meanScalErr = float(np.mean([i['scalingerr'] for i in evals.values()]))
+    return meanIOU, meanDistErr, meanScalErr, len(evals)
 
 
 def evalYAML(predf, gtf, images, heatmaps=None):
@@ -68,17 +81,9 @@ def evalYAML(predf, gtf, images, heatmaps=None):
             fig.savefig(imout, pad_inches=0, dpi=fig.dpi)
             plt.close(fig)
 
-    meanIOU = float(np.mean([i['iOU'] for i in results.values()]))
-    meanDistErr = float(np.mean([i['disterr'] for i in results.values()]))
-    meanScalErr = float(np.mean([i['scalingerr'] for i in results.values()]))
-
-    results['mean_iOU'] = meanIOU
-    results['mean_disterr'] = meanDistErr
-    results['mean_scalingerr'] = meanScalErr
-
     with open(outputfile, 'w') as f:
         yaml.dump(results, f)
-    return meanIOU, meanDistErr, meanScalErr, len(results)
+    return outputfile
 
 
 def rectDistance(a, b):
