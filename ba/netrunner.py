@@ -440,7 +440,7 @@ class FCNPartRunner(NetRunner):
                 db[self.name][str(iteration + '_train')] = t_mat
             with open(self.resultDB, 'w') as f:
                 yaml.dump(db, f)
-            ba.utils.touch(self.resultDB + '.lock')
+            ba.utils.rm(self.resultDB + '.lock')
 
     def forward_single(self, idx, mean=None):
         '''Will forward one single idx-image from the source set and saves the
