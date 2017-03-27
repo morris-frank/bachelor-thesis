@@ -1,5 +1,5 @@
-import ba.eval
 from ba import caffeine
+import ba.eval
 from ba.set import SetList
 import ba.utils
 import caffe
@@ -16,6 +16,7 @@ from scipy.misc import imsave
 import skimage
 import subprocess
 import sys
+import time
 from tqdm import tqdm
 import yaml
 
@@ -403,16 +404,19 @@ class FCNPartRunner(NetRunner):
         weightname = os.path.splitext(os.path.basename(self.net_weights))[0]
         iteration = weightname.split('_')[-1]
         if slicefile is not None:
-            db = ba.utils.load_YAML(self.resultDB)
-            if db is None:
-                db = {}
-            if self.name not in db:
-                db[self.name] = {}
             ofile = ba.eval.evalYAML(
                 scoreboxf, slicefile, self.images, self.heatmaps)
             # ofile = '.'.join(scoreboxf.split('.')[:-2] + ['evals', 'yaml'])
             trainset = ba.SetList(self.dir + 'train.txt')
             _soltestset = list(self.testset.set - trainset.set)
+            while(os.path.isfile(self.resultDB + '.lock')):
+                time.sleep(1)
+            db = ba.utils.load_YAML(self.resultDB)
+            ba.utils.touch(self.resultDB + '.lock')
+            if db is None:
+                db = {}
+            if self.name not in db:
+                db[self.name] = {}
             if trainset is not None and self.testset is not None:
                 v_iou, v_dist, v_scal, v_n = ba.eval.extract_mean_evals(
                     _soltestset, ofile)
@@ -436,6 +440,7 @@ class FCNPartRunner(NetRunner):
                 db[self.name][str(iteration + '_train')] = t_mat
             with open(self.resultDB, 'w') as f:
                 yaml.dump(db, f)
+            ba.utils.touch(self.resultDB + '.lock')
 
     def forward_single(self, idx, mean=None):
         '''Will forward one single idx-image from the source set and saves the
