@@ -134,6 +134,8 @@ class SingleImageLayer(caffe.Layer):
         self.images = params['images']
         self.slicefile = params['slicefile']
         self.splitfile = params['splitfile']
+        self.slices = self.load_slices(self.splitfile, self.slicefile)
+        n = len(self.slices)
         if isinstance(params['mean'], str):
             self.mean = np.load(params['mean'])
         else:
@@ -144,11 +146,16 @@ class SingleImageLayer(caffe.Layer):
             'data/tmp/pascpart/patches/aeroplane_stern/img_augmented/neg/')
         self.batch_size = params.get('batch_size', 20)
         self.patch_size = params.get('patch_size', (224, 224))
-        self.ppI = params.get('ppI', 12)
+        self.ppI = params.get('ppI', None)
 
-        self.slices = self.load_slices(self.splitfile, self.slicefile)
+        if self.ppI is None:
+            if n >= 100:
+                self.ppI = 2
+            elif n >= 50:
+                self.ppI = 4
+            else:
+                self.ppI = 15
 
-        n = len(self.slices)
         self.samples = np.zeros((n * self.ppI * 2, 3,
                                  self.patch_size[0], self.patch_size[1]))
         for it, (path, bb) in enumerate(self.slices.items()):
