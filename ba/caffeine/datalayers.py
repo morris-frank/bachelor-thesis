@@ -3,13 +3,18 @@
     fcn.berkeleyvision.org
 '''
 import caffe
+from itertools import count
 from glob import glob
 import numpy as np
 import os.path
 from PIL import Image
 import random
-from scipy.misc import imread
-from scipy.misc import imresize
+from scipy.misc import (
+    imread,
+    imsave
+    )
+import skimage.transform as tf
+import time
 import yaml
 
 
@@ -137,23 +142,24 @@ class SingleImageLayer(caffe.Layer):
             'data/tmp/pascpart/patches/aeroplane_stern/img_augmented/neg/')
         self.batch_size = params.get('batch_size', 18)
         self.patch_size = params.get('patch_size', (224, 224))
-        self.ppI = params.get('ppI', 20)
+        self.ppI = params.get('ppI', 6)
 
         n = len(self.slices)
         self.samples = np.zeros((n * self.ppI * 2,
                                  self.patch_size[0], self.patch_size[1], 3))
-        for it, (path, bb) in zip(range(n), self.slices.items()):
+        for it, (path, bb) in enumerate(self.slices.items()):
             im = self.imread('{}{}.{}'.format(self.images, path, self.ext))
-            self.samples[it:it + self.ppI, ...] = self.generate_samples(im, bb)
+            subslice = slice(it * self.ppI, (it + 1) * self.ppI)
+            self.samples[subslice, ...] = self.generate_samples(im, bb)
         self.labels = np.append(np.ones(n * self.ppI),
                                 np.zeros(n * self.ppI))
-
         negs = glob(self.negatives + '/*png')
         negs = random.sample(negs, n * self.ppI)
         for it, neg in zip(range(1, len(negs) + 1), negs):
             im = self.imread(neg)
-            im = imresize(im, (self.patch_size[0], self.patch_size[1], 3))
-            im = im.astype(np.float32)
+            im /= 255
+            im = tf.resize(im, (self.patch_size[0], self.patch_size[1], 3))
+            im *= 255
             im -= self.mean
             self.samples[-it, ...] = im
 
@@ -181,30 +187,30 @@ class SingleImageLayer(caffe.Layer):
         return (bb[0].stop - bb[0].start,
                 bb[1].stop - bb[1].start)
 
-    def generate_samples(self, im, bb, shiftfactor=0.1, count=None):
-        if count is None:
-            count = self.ppI
-        if count % 2 != 0:
-            print('Count in SingleImageLayer is not divisble by two')
-            return
+    def generate_samples(self, im, bb, shiftfactor=0.25, nsamples=None):
+        if nsamples is None:
+            nsamples = self.ppI
+        if nsamples % 2 != 0:
+            raise ValueError('Count in SingleImageLayer is not divisble by two')
         bbshape = self.bounding_box_shape(bb)
-        shift = (bbshape[0] * shiftfactor, bbshape[1] * shiftfactor)
+        padded_im = np.pad(im, ((bbshape[0], bbshape[0]),
+                                (bbshape[1], bbshape[1]), (0, 0),),
+                           mode='reflect')
 
-        xsamples = (shift[0] * (2 * np.random.random(count) - 1)).astype(np.int8)
-        ysamples = (shift[1] * (2 * np.random.random(count) - 1)).astype(np.int8)
+        rands = (2 * np.random.random((2, nsamples)) - 1) * shiftfactor + 1
+        xsamples = (bbshape[0] * rands[0]).astype(np.int)
+        ysamples = (bbshape[1] * rands[1]).astype(np.int)
 
-        samples = np.zeros((count, self.patch_size[0], self.patch_size[1], 3))
-        for it, xsample, ysample in zip(range(len(xsamples)), xsamples, ysamples):
-            xstart = max(bb[0].start + xsample, 0)
-            xstop = min(bb[0].stop + xsample, im.shape[0])
-            ystart = max(bb[1].start + ysample, 0)
-            ystop = min(bb[1].stop + ysample, im.shape[1])
-            patch = im[xstart:xstop, ystart:ystop]
-            if patch.shape[:-1] != self.patch_size:
-                patch = imresize(patch, (self.patch_size[0],
-                                         self.patch_size[1], 3)).astype(np.float32)
-                patch -= self.mean
-            samples[it, ...] = patch
+        samples = np.zeros((nsamples, self.patch_size[0], self.patch_size[1], 3))
+        for it, xsample, ysample in zip(count(), xsamples, ysamples):
+            _x = [bb[0].start, bb[0].stop] + xsample
+            _y = [bb[1].start, bb[1].stop] + ysample
+            patch = np.copy(padded_im[_x[0]:_x[1], _y[0]:_y[1], :])
+            patch /= 255
+            sized_patch = tf.resize(patch, (self.patch_size[0], self.patch_size[1], 3))
+            sized_patch *= 255
+            sized_patch -= self.mean
+            samples[it, ...] = sized_patch
         return samples
 
     def reshape(self, bottom, top):
@@ -225,5 +231,4 @@ class SingleImageLayer(caffe.Layer):
         im = imread(path)
         im = np.array(im, dtype=np.float32)
         im = im[:, :, ::-1]
-        # im -= self.mean
         return im

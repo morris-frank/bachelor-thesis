@@ -386,6 +386,7 @@ class FCNPartRunner(NetRunner):
             self.dir + 'solver.prototxt',
             self.solver_weights,
             ','.join(str(x) for x in self.gpu),
+            # self.dir + logf))
             self.dir + logf), shell=True)
         if return_code >= 0:
             self.notifier._send_telegram_photo(self.notifier.lossgraph(logf), logf)
