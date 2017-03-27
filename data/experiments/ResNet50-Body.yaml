@@ -14,7 +14,7 @@ test_images: ''
 test_interval: 100
 test: 'data/tmp/pascpart/aeroplane_body.txt'
 train_sizes: [1, 10, 50, 100, 150, 250]
-train: 'data/single_body.txt'
+train: 'data/tmp/pascpart/aeroplane_body.txt'
 val: 'data/tmp/pascpart/patches/aeroplane_stern/img_augmented_lmdb_test.txt'
 weight_decay: 0.0005
 weights: 'data/models/resnet/ResNet-50-model.caffemodel'

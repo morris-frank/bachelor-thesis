@@ -2,6 +2,7 @@
     Based on code from Evan Shelhamer
     fcn.berkeleyvision.org
 '''
+import ba.utils
 import caffe
 from itertools import count
 from glob import glob
@@ -131,7 +132,8 @@ class SingleImageLayer(caffe.Layer):
         from keras.preprocessing.image import ImageDataGenerator
         params = eval(self.param_str)
         self.images = params['images']
-        self.slices = params['slices']
+        self.slicefile = params['slicefile']
+        self.splitfile = params['splitfile']
         if isinstance(params['mean'], str):
             self.mean = np.load(params['mean'])
         else:
@@ -140,16 +142,18 @@ class SingleImageLayer(caffe.Layer):
         self.negatives = params.get(
             'negatives',
             'data/tmp/pascpart/patches/aeroplane_stern/img_augmented/neg/')
-        self.batch_size = params.get('batch_size', 18)
+        self.batch_size = params.get('batch_size', 20)
         self.patch_size = params.get('patch_size', (224, 224))
-        self.ppI = params.get('ppI', 6)
+        self.ppI = params.get('ppI', 12)
+
+        self.slices = self.load_slices(self.splitfile, self.slicefile)
 
         n = len(self.slices)
-        self.samples = np.zeros((n * self.ppI * 2,
-                                 self.patch_size[0], self.patch_size[1], 3))
+        self.samples = np.zeros((n * self.ppI * 2, 3,
+                                 self.patch_size[0], self.patch_size[1]))
         for it, (path, bb) in enumerate(self.slices.items()):
             im = self.imread('{}{}.{}'.format(self.images, path, self.ext))
-            subslice = slice(it * self.ppI, (it + 1) * self.ppI)
+            subslice = slice(it, n * self.ppI, n)
             self.samples[subslice, ...] = self.generate_samples(im, bb)
         self.labels = np.append(np.ones(n * self.ppI),
                                 np.zeros(n * self.ppI))
@@ -161,7 +165,7 @@ class SingleImageLayer(caffe.Layer):
             im = tf.resize(im, (self.patch_size[0], self.patch_size[1], 3))
             im *= 255
             im -= self.mean
-            self.samples[-it, ...] = im
+            self.samples[-it, ...] = im.transpose((2, 0, 1))
 
         # two tops: data and label
         if len(top) != 2:
@@ -170,18 +174,25 @@ class SingleImageLayer(caffe.Layer):
         if len(bottom) != 0:
             raise Exception("Do not define a bottom.")
 
-        self.generator = ImageDataGenerator(
+        self.flow = ImageDataGenerator(
             rotation_range=15,
             shear_range=0.2,
             zoom_range=0.2,
             width_shift_range=0.05,
             height_shift_range=0.05,
-            horizontal_flip=True
-            )
+            horizontal_flip=True,
+            data_format='channels_first'
+            ).flow(self.samples, self.labels, batch_size=self.batch_size)
 
         top[0].reshape(
             self.batch_size, 3, self.patch_size[0], self.patch_size[1])
         top[1].reshape(self.batch_size, 1)
+
+    def load_slices(self, splitfile, slicefile):
+        with open(splitfile, 'r') as f:
+            imlist = [l[:-1] for l in f.readlines() if l.strip()]
+        slicelist = ba.utils.load_YAML(slicefile)
+        return {im: slicelist[im] for im in imlist}
 
     def bounding_box_shape(self, bb):
         return (bb[0].stop - bb[0].start,
@@ -201,7 +212,7 @@ class SingleImageLayer(caffe.Layer):
         xsamples = (bbshape[0] * rands[0]).astype(np.int)
         ysamples = (bbshape[1] * rands[1]).astype(np.int)
 
-        samples = np.zeros((nsamples, self.patch_size[0], self.patch_size[1], 3))
+        samples = np.zeros((nsamples, 3, self.patch_size[0], self.patch_size[1]))
         for it, xsample, ysample in zip(count(), xsamples, ysamples):
             _x = [bb[0].start, bb[0].stop] + xsample
             _y = [bb[1].start, bb[1].stop] + ysample
@@ -210,7 +221,7 @@ class SingleImageLayer(caffe.Layer):
             sized_patch = tf.resize(patch, (self.patch_size[0], self.patch_size[1], 3))
             sized_patch *= 255
             sized_patch -= self.mean
-            samples[it, ...] = sized_patch
+            samples[it, ...] = sized_patch.transpose((2, 0, 1))
         return samples
 
     def reshape(self, bottom, top):
@@ -218,11 +229,21 @@ class SingleImageLayer(caffe.Layer):
 
     def forward(self, bottom, top):
         # assign output
-        x, y = next(self.generator.flow(
-            self.samples, self.labels, batch_size=self.batch_size))
-        x = x.transpose((0, 3, 1, 2))
-        top[0].data[...] = x
-        top[1].data[...] = y[..., np.newaxis]
+        x, y = next(self.flow)
+        filled = x.shape[0]
+        top[0].data[:filled, ...] = x
+        top[1].data[:filled, ...] = y[..., np.newaxis]
+        while filled < self.batch_size:
+            x, y = next(self.flow)
+            filling = x.shape[0]
+            if filling + filled >= self.batch_size:
+                rem = self.batch_size - filled
+                top[0].data[filled:, ...] = x[:rem, ...]
+                top[1].data[filled:, ...] = y[:rem, np.newaxis]
+            else:
+                top[0].data[filled:filled + filling, ...] = x[...]
+                top[1].data[filled:filled + filling, ...] = x[..., np.newaxis]
+            filled += filling
 
     def backward(self, top, propagate_down, bottom):
         pass

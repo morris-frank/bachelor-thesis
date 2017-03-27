@@ -359,20 +359,19 @@ class FCNPartRunner(NetRunner):
             split (str): The split to prepare for.
         '''
         # Create build and snapshot direcotry:
-        if 'train' in split:
-            ba.utils.touch(self.snapshots)
-            self.trainset.target = self.dir + 'train.txt'
-            self.trainset.write()
-            self.write('train')
-            self.write_solver()
-        if 'train' in split or 'test' in split:
-            self.valset.target = self.dir + 'test.txt'
-            self.valset.write()
-            self.write('val')
-        if 'deploy' in split:
-            ba.utils.touch(self.heatmaps)
-            ba.utils.touch(self.heatmaps[:-1] + '_overlays/')
-            self.write('deploy')
+        ba.utils.touch(self.snapshots)
+        self.trainset.target = self.dir + 'train.txt'
+        self.trainset.write()
+        self.write('train')
+        self.write_solver()
+
+        self.valset.target = self.dir + 'test.txt'
+        self.valset.write()
+        self.write('val')
+
+        ba.utils.touch(self.heatmaps)
+        ba.utils.touch(self.heatmaps[:-1] + '_overlays/')
+        self.write('deploy')
 
     def train(self):
         '''Trains the network'''

@@ -58,12 +58,6 @@ class Experiment(ba.utils.NotifierClass):
         if isinstance(self.sysargs.bs, list):
             self.sysargs.bs = self.sysargs.bs[0]
 
-    def load_slices(self):
-        with open(self.conf['train']) as f:
-            imlist = [l[:-1] for l in f.readlines() if l.strip()]
-        slicelist = ba.utils.load_YAML(self.conf['slicefile'])
-        return {im: slicelist[im] for im in imlist}
-
     def load_conf(self):
         '''Open a YAML Configuration file and make a Bunch from it'''
         defaults = ba.utils.load_YAML('data/experiments/defaults.yaml')
@@ -100,9 +94,6 @@ class Experiment(ba.utils.NotifierClass):
                     self.conf[step]))
                 sys.exit(1)
 
-        if self.sysargs.train and 'slicefile' in self.conf:
-            self.conf['slices'] = self.load_slices()
-
         if 'train_sizes' in self.conf:
             if not isinstance(self.conf['train_sizes'], list):
                 print('train_sizes shall be a list of integers.')
@@ -136,8 +127,8 @@ class Experiment(ba.utils.NotifierClass):
                 self.cnn._solver_attr[attr] = self.conf[attr]
 
         # Extra attributes for the network generator
-        attrs = ['slices', 'batch_size', 'patch_size', 'ppI',
-                 'images', 'negatives']
+        attrs = ['batch_size', 'patch_size', 'ppI',
+                 'images', 'negatives', 'slicefile']
         for attr in attrs:
             if attr in self.conf:
                 self.cnn.generator_attr[attr] = self.conf[attr]
