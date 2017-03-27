@@ -21,7 +21,7 @@ class NotifierClass(object):
 
     def _new_notifer_thread(self, target, args):
         self.notifier_threads.append(
-            threading.Thread(target=target, args=args))
+            threading.Thread(target=target, args=args, daemon=True))
         self.notifier_threads[-1].start()
 
     def LOGNotifiy(self, logfile):
@@ -33,7 +33,8 @@ class NotifierClass(object):
         from telenotify import Notifier
         if self.notifier is None:
             self.notifier = Notifier(configfile=notifier_config)
-            self._new_notifer_thread(self.notifier._start,
+            self.notifier.register_re(Notifier.CAFFE_TRAIN_LOSS)
+            self._new_notifer_thread(self.notifier.tail,
                                      (logfile, ))
 
     def notify(self, message='', matrix=None):
