@@ -183,8 +183,8 @@ class Experiment(ba.utils.NotifierClass):
             return False
         for w in weights:
             bn = os.path.basename(w)
-            if '500' not in bn:
-                continue
+            # if '500' not in bn:
+            #     continue
             if not ba.utils.query_boolean('You want to test for {}?'.format(bn),
                                           default='yes', defaulting=self.sysargs.default):
                 continue

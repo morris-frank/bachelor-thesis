@@ -411,8 +411,8 @@ class FCNPartRunner(NetRunner):
             _soltestset = list(self.testset.set - trainset.set)
             while(os.path.isfile(self.resultDB + '.lock')):
                 time.sleep(1)
-            db = ba.utils.load_YAML(self.resultDB)
             ba.utils.touch(self.resultDB + '.lock')
+            db = ba.utils.load_YAML(self.resultDB)
             if db is None:
                 db = {}
             if self.name not in db:
