@@ -154,7 +154,7 @@ class SingleImageLayer(caffe.Layer):
             elif n >= 50:
                 self.ppI = 4
             else:
-                self.ppI = 15
+                self.ppI = 16
 
         self.samples = np.zeros((n * self.ppI * 2, 3,
                                  self.patch_size[0], self.patch_size[1]))

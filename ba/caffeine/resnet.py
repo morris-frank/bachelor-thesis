@@ -272,24 +272,13 @@ class ResNet_FCN(ResNet):
     def data(self):
         '''Adds the data layer'''
         pylayer = 'PosPatchDataLayer'
-        if self.params['split'] == 'train':
+        if self.params['split'] == 'train' or self.params['split'] == 'val':
             self.n.data, self.n.label = L.Python(
                 module='ba.caffeine.datalayers',
                 layer=pylayer,
                 ntop=2,
                 param_str=str(self.params)
                 )
-        elif self.params['split'] == 'val':
-            bs = self.params.get('batch_size', 18)
-            self.n.data, self.n.label = L.Data(
-                batch_size=bs,
-                source=self.params['lmdb'],
-                backend=P.Data.LMDB,
-                ntop=2, transform_param=dict(
-                    crop_size=224,
-                    mirror=True,
-                    mean_file="data/models/resnet/ResNet_mean.binaryproto"
-                    ))
         else:
             self.n.data = L.Input(shape=[dict(dim=[1, 3, 500, 500])])
 
