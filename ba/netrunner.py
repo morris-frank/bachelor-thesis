@@ -1,5 +1,4 @@
 from ba import caffeine
-import ba.eval
 from ba.set import SetList
 import ba.utils
 import caffe
@@ -398,6 +397,7 @@ class FCNPartRunner(NetRunner):
             slicefile (str, optional): The path for the seg.yaml, if given
                 will perform SelecSearch and BB errors..
         '''
+        import ba.eval
         self.prepare('deploy')
         self.forward_test()
         scoreboxf = self.results[:-1] + '.scores.yaml'

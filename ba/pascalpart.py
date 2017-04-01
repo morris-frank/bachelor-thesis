@@ -26,8 +26,11 @@ class PascalPartSet(object):
         '''
         self.name = name
         self.source = root
+        self.sourcelist = None
         self.classes = classes
+        self.classlist = None
         self.parts = parts
+        self.partslist = None
         if dolists:
             self.generate_lists()
 
@@ -41,7 +44,10 @@ class PascalPartSet(object):
             self.__parts = parts
         else:
             self.__parts = [parts]
-        self.tag = '_'.join(self.classes + self.parts)
+        partstr = self.__parts
+        if partstr[0] is None:
+            partstr = ['']
+        self.tag = '_'.join(self.classes + partstr)
 
     @property
     def classes(self):
@@ -80,25 +86,26 @@ class PascalPartSet(object):
 
     def write(self):
         '''Writes the generated lists to disk'''
-        for l in [self.sourcelist, self.classlist, self.partslist]:
-            l.rm_pre_suffix(self.source, self.extension)
-            l.write()
-            l.add_pre_suffix(self.source, self.extension)
+        for name in ['source', 'class', 'parts']:
+            self.__dict__[name + 'list'].rm_pre_suffix(self.source,
+                                                       self.extension)
+            self.__dict__[name + 'list'].write()
+            self.__dict__[name + 'list'].add_pre_suffix(self.source,
+                                                        self.extension)
 
     def generate_lists(self):
         '''Generates the *.txt lists for this set.'''
         f = {
             'source': self.build + self.name + '.txt',
-            'classes': self.build + '_'.join(self.classes) + '.txt',
+            'class': self.build + '_'.join(self.classes) + '.txt',
             'parts': self.build + self.tag + '.txt'
             }
         overwrite = {}
-        for _list, name in [(self.sourcelist, 'source'),
-                          (self.classlist, 'classes'),
-                          (self.partslist, 'parts')]:
+        for name in ['source', 'class', 'parts']:
             overwrite[name] = utils.query_overwrite(f[name], default='no')
-            _list = SetList(f[name])
-            _list.add_pre_suffix(self.source, self.extension)
+            self.__dict__[name + 'list'] = SetList(f[name])
+            self.__dict__[name + 'list'].add_pre_suffix(self.source,
+                                                        self.extension)
 
         if not sum(overwrite.values()):
             return True
@@ -108,10 +115,10 @@ class PascalPartSet(object):
             self.sourcelist.load_directory(self.source)
             self.sourcelist.add_pre_suffix(self.source, self.extension)
 
-        if overwrite['classes'] or overwrite['parts']:
+        if overwrite['class'] or overwrite['parts']:
             self.classlist.list = []
             self.partslist.list = []
-            print('Generating List {} and {}'.format(f['classes'], f['parts']))
+            print('Generating List {} and {}'.format(f['class'], f['parts']))
             for row in tqdm(self.sourcelist):
                 item = PascalPart(row)
                 if item.classname in self.classes or len(self.classes) < 1:
@@ -120,14 +127,11 @@ class PascalPartSet(object):
                         self.partslist.list.append(row)
         self.write()
 
-    def segmentations(self, augment=0):
-        '''Saves the segmentations for selected classes or parts.
-
-        Args:
-            augment (int, optional): How many augmentations per image
-        '''
+    def segmentations(self):
+        '''Saves the segmentations for selected classes or parts.'''
         d = {
-            'classes': '{}segmentations/{}/'.format(self.build, '_'.join(self.classes)),
+            'classes': '{}segmentations/{}/'.format(self.build,
+                                                    '_'.join(self.classes)),
             'parts': '{}segmentations/{}/'.format(self.build, self.tag)
             }
         overwrite = {
@@ -137,7 +141,7 @@ class PascalPartSet(object):
         if not sum(overwrite.values()):
             return True
 
-        print('Generating and extracting the segmentations...')
+        print('Generating and extracting the segmentations for ' + self.tag)
         for item in tqdm(self.classlist):
             idx = os.path.splitext(os.path.basename(item))[0]
             item = PascalPart(item)
@@ -175,7 +179,8 @@ class PascalPartSet(object):
             patchSegDB = {}
             patchDBPath = d['patch_seg'][:-1] + '.yaml'
 
-            print('Generating and extracting the segmentation bounding boxes.')
+            print('''Generating and extracting the segmentation bounding
+                  boxes for ''' + self.tag)
             for item in tqdm(self.classlist):
                 idx = os.path.splitext(os.path.basename(item))[0]
                 item = PascalPart(item)
@@ -370,6 +375,7 @@ class PascalPart(object):
             self.union = next(iter(self.parts.values())) * 0
             for part in self.parts:
                 self.union += self.parts[part]
+            self.union = self.union.astype(bool)
 
     def _singularize(self, img):
         '''Produces the cut part and bounding box slice for a single connected

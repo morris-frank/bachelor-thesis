@@ -7,8 +7,11 @@ DSSSOURCE = 'data/datasets/pascalparts/Annotations_Part/'
 
 def main(args):
     e = Experiment(argv=args)
-    if e.sysargs.data:
-        e.generate_data(DATASET, DSSSOURCE)
+    if e.sysargs.data_classes or e.sysargs.data_parts:
+        e.generate_data(
+            DATASET, DSSSOURCE,
+            classes=e.sysargs.data_classes,
+            parts=e.sysargs.data_parts)
     if e.sysargs.prepare:
         e.prepare()
     if e.sysargs.tofcn:

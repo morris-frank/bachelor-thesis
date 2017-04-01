@@ -31,7 +31,8 @@ class Experiment(ba.utils.NotifierClass):
         self.argv = argv
         self.cnn = None
         self.parse_arguments()
-        self.load_conf()
+        if self.sysargs.conf is not None:
+            self.load_conf()
 
     def exit(self):
         if self.cnn is not None:
@@ -40,18 +41,20 @@ class Experiment(ba.utils.NotifierClass):
     def parse_arguments(self):
         '''Parse the arguments for an experiment script'''
         parser = argparse.ArgumentParser(description='Runs a experiment')
-        parser.add_argument('conf', type=str, nargs=1,
-                            help='The YAML conf file')
-        parser.add_argument('--data', action='store_true')
+        parser.add_argument('--data_classes', type=str, nargs='+', metavar='class')
+        parser.add_argument('--data_parts', type=str, nargs='+', metavar='part')
         parser.add_argument('--default', action='store_true')
         parser.add_argument('--prepare', action='store_true')
         parser.add_argument('--test', action='store_true')
         parser.add_argument('--tofcn', action='store_true')
         parser.add_argument('--train', action='store_true')
         parser.add_argument('--bs', type=int, nargs=1, default=0,
+                            metavar='count',
                             help='The batch size for training.')
         parser.add_argument('--gpu', type=int, nargs='+', default=0,
-                            help='The GPU to use.')
+                            help='The GPU to use.', metavar='id')
+        parser.add_argument('conf', type=str, nargs='?',
+                            help='The YAML conf file')
         self.sysargs = parser.parse_args(args=self.argv)
         if isinstance(self.sysargs.conf, list):
             self.sysargs.conf = self.sysargs.conf[0]
@@ -104,6 +107,7 @@ class Experiment(ba.utils.NotifierClass):
 
     def prepare_network(self):
         '''Prepares a NetRunner from the given configuration.'''
+        assert(self.sysargs.conf is not None)
         if self.conf['sliding_window']:
             runner = ba.netrunner.SlidingFCNPartRunner
         else:
@@ -142,24 +146,28 @@ class Experiment(ba.utils.NotifierClass):
 
         self.cnn.gpu = self.sysargs.gpu
 
-    def generate_data(self, name, source):
+    def generate_data(self, name, source, classes=None, parts=None):
         '''Generates the training data for that experiment'''
-        ppset = ba.PascalPartSet(name, source, ['lwing', 'rwing'], 'aeroplane')
-        ppset.segmentations(augment=2)
-        if self.conf['sliding_window']:
-            ppset.bounding_boxes('data/datasets/voc2010/JPEGImages/',
-                                 negatives=2, augment=2)
+        ppset = ba.PascalPartSet(name, source, classes=classes, parts=parts)
+        ppset.segmentations()
+        ppset.bounding_boxes('data/datasets/voc2010/JPEGImages/',
+                             negatives=2, augment=2)
 
     def prepare(self):
+        assert(self.sysargs.conf is not None)
         self._multi_or_single_scale_exec(self._prepare)
 
     def test(self):
+        assert(self.sysargs.conf is not None)
+
         self._multi_or_single_scale_exec(self._test)
 
     def train(self):
+        assert(self.sysargs.conf is not None)
         self._multi_or_single_scale_exec(self._train)
 
     def convert_to_FCN(self):
+        assert(self.sysargs.conf is not None)
         self._multi_or_single_scale_exec(self._convert_to_FCN)
 
     def _prepare(self):
