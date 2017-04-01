@@ -352,12 +352,8 @@ class FCNPartRunner(NetRunner):
         s = SolverSpec(self.dir, self._solver_attr)
         s.write()
 
-    def prepare(self, split='train_test_deploy'):
-        '''Prepares the enviroment for phases.
-
-        Args:
-            split (str): The split to prepare for.
-        '''
+    def prepare(self):
+        '''Prepares the enviroment for phases.'''
         # Create build and snapshot direcotry:
         ba.utils.touch(self.snapshots)
         self.trainset.target = self.dir + 'train.txt'
@@ -375,7 +371,7 @@ class FCNPartRunner(NetRunner):
 
     def train(self):
         '''Trains the network'''
-        self.prepare('train')
+        self.prepare()
         logf = '{}_{}_train.log'.format(
             datetime.datetime.now().strftime('%y_%m_%d_'), self.name)
         ba.utils.touch(self.dir + logf, clear=True)
@@ -398,7 +394,7 @@ class FCNPartRunner(NetRunner):
                 will perform SelecSearch and BB errors..
         '''
         import ba.eval
-        self.prepare('deploy')
+        self.prepare()
         self.forward_test()
         scoreboxf = self.results[:-1] + '.scores.yaml'
         weightname = os.path.splitext(os.path.basename(self.net_weights))[0]
@@ -477,7 +473,7 @@ class FCNPartRunner(NetRunner):
         '''
         if setlist is None:
             return self.forward_test()
-        self.prepare('deploy')
+        self.prepare()
         self.create_net(self.dir + 'deploy.prototxt',
                        self.net_weights,
                        self.gpu[0])
