@@ -134,9 +134,12 @@ class SingleImageLayer(caffe.Layer):
         self.slicefile = params['slicefile']
         self.splitfile = params['splitfile']
         if not isinstance(self.slicefile, list):
-            self.slicefile = list(self.slicefile)
-        self.slices = [self.load_slices(self.splitfile, slicefile)
-                       for slicefile in self.slicefile]
+            self.slicefile = [self.slicefile]
+        self.slices = []
+        for slicefile in self.slicefile:
+            add_slices = self.load_slices(self.splitfile, slicefile)
+            if add_slices != {}:
+                self.slices.append(add_slices)
         n = sum([len(slices) for slices in self.slices])
         if isinstance(params['mean'], str):
             self.mean = np.load(params['mean'])
@@ -204,7 +207,7 @@ class SingleImageLayer(caffe.Layer):
         with open(splitfile, 'r') as f:
             imlist = [l[:-1] for l in f.readlines() if l.strip()]
         slicelist = ba.utils.load_YAML(slicefile)
-        return {im: slicelist[im] for im in imlist}
+        return {im: slicelist[im] for im in imlist if im in slicelist}
 
     def bounding_box_shape(self, bb):
         return (bb[0].stop - bb[0].start,
