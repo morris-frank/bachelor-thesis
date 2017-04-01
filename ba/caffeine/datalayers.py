@@ -127,15 +127,17 @@ class PosPatchDataLayer(SegDataLayer):
 class SingleImageLayer(caffe.Layer):
     '''
     '''
-
     def setup(self, bottom, top):
         from keras.preprocessing.image import ImageDataGenerator
         params = eval(self.param_str)
         self.images = params['images']
         self.slicefile = params['slicefile']
         self.splitfile = params['splitfile']
-        self.slices = self.load_slices(self.splitfile, self.slicefile)
-        n = len(self.slices)
+        if not isinstance(self.slicefile, list):
+            self.slicefile = list(self.slicefile)
+        self.slices = [self.load_slices(self.splitfile, slicefile)
+                       for slicefile in self.slicefile]
+        n = sum([len(slices) for slices in self.slices])
         if isinstance(params['mean'], str):
             self.mean = np.load(params['mean'])
         else:
@@ -158,10 +160,13 @@ class SingleImageLayer(caffe.Layer):
 
         self.samples = np.zeros((n * self.ppI * 2, 3,
                                  self.patch_size[0], self.patch_size[1]))
-        for it, (path, bb) in enumerate(self.slices.items()):
-            im = self.imread('{}{}.{}'.format(self.images, path, self.ext))
-            subslice = slice(it, n * self.ppI, n)
-            self.samples[subslice, ...] = self.generate_samples(im, bb)
+        it = 0
+        for slices in self.slices:
+            for path, bb in slices.items():
+                im = self.imread('{}{}.{}'.format(self.images, path, self.ext))
+                subslice = slice(it, n * self.ppI, n)
+                self.samples[subslice, ...] = self.generate_samples(im, bb)
+                it += 1
         self.labels = np.append(np.ones(n * self.ppI),
                                 np.zeros(n * self.ppI))
         negs = glob(self.negatives + '/*png')
