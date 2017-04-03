@@ -4,11 +4,13 @@ import ba.utils
 import copy
 from enum import Enum
 from glob import glob
+import multiprocessing as mp
 import os
 import random
 import re
 import shutil
 import sys
+import time
 
 
 class RunMode(Enum):
@@ -30,6 +32,7 @@ class Experiment(ba.utils.NotifierClass):
         super().__init__(**kwargs)
         self.argv = argv
         self.cnn = None
+        self.thread_semaphore = None
         self.parse_arguments()
         if self.sysargs.conf is not None:
             self.load_conf()
@@ -51,6 +54,9 @@ class Experiment(ba.utils.NotifierClass):
         parser.add_argument('--bs', type=int, nargs=1, default=0,
                             metavar='count',
                             help='The batch size for training.')
+        parser.add_argument('--threads', type=int, nargs=1, default=1,
+                            metavar='count',
+                            help='The count threads for execution.')
         parser.add_argument('--gpu', type=int, nargs='+', default=0,
                             help='The GPU to use.', metavar='id')
         parser.add_argument('conf', type=str, nargs='?',
@@ -60,6 +66,9 @@ class Experiment(ba.utils.NotifierClass):
             self.sysargs.conf = self.sysargs.conf[0]
         if isinstance(self.sysargs.bs, list):
             self.sysargs.bs = self.sysargs.bs[0]
+        if self.sysargs.threads != 0:
+            self.thread_semaphore = mp.BoundedSemaphore(
+                value=self.sysargs.threads)
 
     def load_conf(self):
         '''Open a YAML Configuration file and make a Bunch from it'''
@@ -91,10 +100,9 @@ class Experiment(ba.utils.NotifierClass):
             elif isinstance(self.conf[step], bool) and self.conf[step] is True:
                 self.conf[step] = 'data/models/{}/{}.txt'.format(
                     self.conf['tag'], step)
-                print(self.conf[step])
             else:
-                print('{} is not pointing to a file or True.'.format(
-                    self.conf[step]))
+                print('''Stepfile for {} ({}) is not pointing to a
+                      file or True.'''.format(step, self.conf[step]))
                 sys.exit(1)
 
         if 'train_sizes' in self.conf:
@@ -116,7 +124,7 @@ class Experiment(ba.utils.NotifierClass):
                           trainset=self.conf['train'],
                           valset=self.conf['val'],
                           testset=self.conf['test'],
-                          solver_weights=self.conf['weights'],
+                          solver_weights=self.conf.get('weights', ''),
                           net_generator=self.conf['net'],
                           images=self.conf['images'],
                           labels=self.conf['labels'],
@@ -172,7 +180,7 @@ class Experiment(ba.utils.NotifierClass):
 
     def _prepare(self):
         print('Preparing all phases for {}.'.format(self.conf['tag']))
-        old_weights = self.conf['weights']
+        old_weights = self.conf.get('weights', '')
         self.conf['weights'] = ''
         self.prepare_network()
         self.cnn.prepare()
@@ -191,8 +199,8 @@ class Experiment(ba.utils.NotifierClass):
             return False
         for w in weights:
             bn = os.path.basename(w)
-            # if '500' not in bn:
-            #     continue
+            if 'iter_500' not in bn:
+                continue
             if not ba.utils.query_boolean('You want to test for {}?'.format(bn),
                                           default='yes', defaulting=self.sysargs.default):
                 continue
@@ -206,6 +214,7 @@ class Experiment(ba.utils.NotifierClass):
             else:
                 self.cnn.test()
             self.cnn.clear()
+            return True
 
     def _train(self):
         '''Trains the given experiment'''
@@ -224,7 +233,7 @@ class Experiment(ba.utils.NotifierClass):
         new_dir = 'data/models/{}/'.format(new_tag)
         for f in ['train.txt', 'test.txt']:
             if os.path.isfile(old_dir + f):
-                shutil.copy2(old_dir + f, new_dir)
+                shutil.copy(src=old_dir + f, dst=new_dir)
         new_snap_dir = ba.utils.touch('{}snapshots/'.format(new_dir))
         weights = glob('{}*caffemodel'.format(old_dir + 'snapshots/'))
         if len(weights) < 1:
@@ -251,6 +260,10 @@ class Experiment(ba.utils.NotifierClass):
         else:
             fptr()
 
+    def _thread_exec(self, fptr):
+        with self.thread_semaphore:
+            fptr()
+
     def _multi_scale_exec(self, fptr, set_sizes):
         from ba import SetList
         old_train_conf = self.conf['train']
@@ -259,16 +272,20 @@ class Experiment(ba.utils.NotifierClass):
         bname = self.conf['tag']
         for set_size in set_sizes:
             self.conf['tag'] = '{}_{}samples'.format(bname, set_size)
-            if not ba.utils.query_boolean('You want to run {} for {}?'.format(fptr.__name__, set_size),
-                                          default='yes', defaulting=self.sysargs.default):
+            if not ba.utils.query_boolean('''You want to run {} for {}?'''.format(fptr.__name__, set_size), default='yes', defaulting=self.sysargs.default):
                 continue
             if set_size == 0 or set_size > len(hyper_set.list):
                 self.conf['train'].list = hyper_set.list
             else:
-                self.conf['train'].list = random.sample(hyper_set.list, set_size)
+                self.conf['train'].list = random.sample(hyper_set.list,
+                                                        set_size)
                 # self.cnn.testset.set = self.cnn.testset.set - self.cnn.trainset.set
-            return_code = fptr()
-            if return_code is not None and return_code < 0:
-                break
+            if self.sysargs.threads == 1:
+                return_code = fptr()
+                if return_code is not None and return_code < 0:
+                    break
+            else:
+                mp.Process(target=self._thread_exec, args=(fptr,))
+
         self.conf['tag'] = bname
         self.conf['train'] = old_train_conf
