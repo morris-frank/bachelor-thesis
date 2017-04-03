@@ -148,7 +148,7 @@ class SingleImageLayer(caffe.Layer):
         self.ext = params.get('extension', 'jpg')
         self.negatives = params.get(
             'negatives',
-            'data/tmp/pascpart/patches/aeroplane_stern/img_augmented/neg/')
+            'data/tmp/var_neg/')
         self.batch_size = params.get('batch_size', 20)
         self.patch_size = params.get('patch_size', (224, 224))
         self.ppI = params.get('ppI', None)
