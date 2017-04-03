@@ -173,7 +173,10 @@ def scoreToRegion(heatmap, image):
     Returns:
         The maximum bounding box (x_start, y_start, x_end, y_end)
     '''
+    # try:
     regions = _selective_search(image, True)
+    # except ValueError:
+    #     import ipdb; ipdb.set_trace()
 
     # Add all found regions to the start and end lists:
     starts = []

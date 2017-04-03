@@ -455,6 +455,8 @@ class FCNPartRunner(NetRunner):
         bn = os.path.basename(os.path.splitext(idx)[0])
         bn_hm = self.heatmaps + bn
         bn_ov = self.heatmaps[:-1] + '_overlays/' + bn
+        # if os.path.isfile(bn_hm + '.png'):
+        #     return False
         self.forward(data)
         score = self.net.blobs[self.net.outputs[0]].data[0][1, ...]
         imsave(bn_hm + '.png', score)
@@ -483,6 +485,7 @@ class FCNPartRunner(NetRunner):
         weightname = os.path.splitext(os.path.basename(self.net_weights))[0]
         print('Forwarding all in {}'.format(setlist))
         for i, idx in enumerate(tqdm(setlist)):
+            # self.forward_single(idx, mean=mean)
             scoreboxes.update(self.forward_single(idx, mean=mean))
             if i % 10 == 0:
                 with open(scoreboxf, 'w') as f:

@@ -9,6 +9,7 @@ import os
 import random
 import re
 import shutil
+import signal
 import sys
 import time
 
@@ -32,7 +33,6 @@ class Experiment(ba.utils.NotifierClass):
         super().__init__(**kwargs)
         self.argv = argv
         self.cnn = None
-        self.thread_semaphore = None
         self.parse_arguments()
         if self.sysargs.conf is not None:
             self.load_conf()
@@ -40,6 +40,9 @@ class Experiment(ba.utils.NotifierClass):
     def exit(self):
         if self.cnn is not None:
             self.cnn.clear()
+
+    def init_worker(self):
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
 
     def parse_arguments(self):
         '''Parse the arguments for an experiment script'''
@@ -62,13 +65,10 @@ class Experiment(ba.utils.NotifierClass):
         parser.add_argument('conf', type=str, nargs='?',
                             help='The YAML conf file')
         self.sysargs = parser.parse_args(args=self.argv)
-        if isinstance(self.sysargs.conf, list):
-            self.sysargs.conf = self.sysargs.conf[0]
-        if isinstance(self.sysargs.bs, list):
-            self.sysargs.bs = self.sysargs.bs[0]
-        if self.sysargs.threads != 0:
-            self.thread_semaphore = mp.BoundedSemaphore(
-                value=self.sysargs.threads)
+        for item in ['conf', 'bs', 'threads']:
+            if isinstance(self.sysargs.__dict__[item], list):
+                self.sysargs.__dict__[item] = self.sysargs.__dict__[item][0]
+        self.threaded = self.sysargs.threads > 1
 
     def load_conf(self):
         '''Open a YAML Configuration file and make a Bunch from it'''
@@ -151,7 +151,6 @@ class Experiment(ba.utils.NotifierClass):
             if switch in self.conf:
                 self.cnn.generator_switches[switch] = self.conf.get(switch,
                                                                     False)
-
         self.cnn.gpu = self.sysargs.gpu
 
     def generate_data(self, name, source, classes=None, parts=None):
@@ -167,7 +166,6 @@ class Experiment(ba.utils.NotifierClass):
 
     def test(self):
         assert(self.sysargs.conf is not None)
-
         self._multi_or_single_scale_exec(self._test)
 
     def train(self):
@@ -204,11 +202,12 @@ class Experiment(ba.utils.NotifierClass):
             if not ba.utils.query_boolean('You want to test for {}?'.format(bn),
                                           default='yes', defaulting=self.sysargs.default):
                 continue
-            print('TESTING ' + bn)
+            print('TESTING {} for {}'.format(bn, self.conf['tag']))
             self.prepare_network()
             self.cnn.net_weights = w
             if self.conf['test_images'] != '':
                 self.cnn.images = self.conf['test_images']
+            time.sleep(10)
             if 'slicefile' in self.conf:
                 self.cnn.test(self.conf['slicefile'])
             else:
@@ -260,9 +259,9 @@ class Experiment(ba.utils.NotifierClass):
         else:
             fptr()
 
-    def _thread_exec(self, fptr):
-        with self.thread_semaphore:
-            fptr()
+    def _thread_exec(self, fname, sema):
+        with sema:
+            self.__getattribute__(fname)()
 
     def _multi_scale_exec(self, fptr, set_sizes):
         from ba import SetList
@@ -270,22 +269,41 @@ class Experiment(ba.utils.NotifierClass):
         hyper_set = SetList(self.conf['train'])
         self.conf['train'] = copy.deepcopy(hyper_set)
         bname = self.conf['tag']
-        for set_size in set_sizes:
-            self.conf['tag'] = '{}_{}samples'.format(bname, set_size)
-            if not ba.utils.query_boolean('''You want to run {} for {}?'''.format(fptr.__name__, set_size), default='yes', defaulting=self.sysargs.default):
-                continue
-            if set_size == 0 or set_size > len(hyper_set.list):
-                self.conf['train'].list = hyper_set.list
-            else:
-                self.conf['train'].list = random.sample(hyper_set.list,
-                                                        set_size)
-                # self.cnn.testset.set = self.cnn.testset.set - self.cnn.trainset.set
-            if self.sysargs.threads == 1:
-                return_code = fptr()
-                if return_code is not None and return_code < 0:
-                    break
-            else:
-                mp.Process(target=self._thread_exec, args=(fptr,))
-
+        fname = fptr.__name__
+        if self.threaded:
+            worker_pool = mp.Pool(self.sysargs.threads, self.init_worker)
+            threads = []
+            sema = mp.BoundedSemaphore(value=self.sysargs.threads)
+        try:
+            for set_size in set_sizes:
+                self.conf['tag'] = '{}_{}samples'.format(bname, set_size)
+                if not ba.utils.query_boolean('''You want to run {} for {}?'''.format(fptr.__name__, set_size), default='yes', defaulting=self.sysargs.default):
+                    continue
+                if set_size == 0 or set_size > len(hyper_set.list):
+                    self.conf['train'].list = hyper_set.list
+                else:
+                    self.conf['train'].list = random.sample(hyper_set.list,
+                                                            set_size)
+                    # self.cnn.testset.set = self.cnn.testset.set - self.cnn.trainset.set
+                if self.threaded:
+                    orig_net = self.conf['net']
+                    self.conf['net'] = ''
+                    worker = copy.deepcopy(self)
+                    worker.conf['net'] = orig_net
+                    self.conf['net'] = orig_net
+                    threads.append(mp.Process(target=worker._thread_exec,
+                                              args=(fname, sema,)))
+                    threads[-1].start()
+                else:
+                    return_code = fptr()
+                    if return_code is not None and return_code < 0:
+                        break
+        except KeyboardInterrupt:
+            print('\n\n_multi_scale_exec for {} was interrupted'.format(
+                fptr.__name__))
+            if self.threaded:
+                for thread in threads:
+                    thread.terminate()
+                    thread.join()
         self.conf['tag'] = bname
         self.conf['train'] = old_train_conf
