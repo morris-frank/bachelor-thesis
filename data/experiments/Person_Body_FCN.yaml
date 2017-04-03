@@ -1,0 +1,12 @@
+desc: 'FCN from ResNet-50 refined on whole human bodies'
+images: 'data/datasets/voc2010/JPEGImages/'
+labels: 'data/tmp/pascpart/patches/person/seg.yaml'
+mean: 'data/models/resnet/ResNet_mean.npy'
+net: ba.caffeine.resnet.ResNet_FCN(nconv3=4, nconv4=6).write
+slicefile: 'data/tmp/pascpart/patches/person/seg.yaml'
+test_interval: 100
+test: 'data/tmp/pascpart/person.txt'
+tofcn: True
+train: True
+train_sizes: [1, 10, 25, 50, 100, 500, 1000]
+val: True

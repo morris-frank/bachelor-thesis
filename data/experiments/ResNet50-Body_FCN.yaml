@@ -2,7 +2,6 @@ base_lr: 10e-6
 desc: 'FCN generated from trained Singularly trained ReseNet50'
 images: 'data/datasets/voc2010/JPEGImages/'
 labels: 'data/tmp/pascpart/patches/aeroplane_body/seg.yaml'
-lr_policy: 'step'
 mean: 'data/models/resnet/ResNet_mean.npy'
 net: ba.caffeine.resnet.ResNet_FCN(nconv3=4, nconv4=6).write
 slicefile: 'data/tmp/pascpart/patches/aeroplane_body/seg.yaml'

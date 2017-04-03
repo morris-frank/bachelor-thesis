@@ -1,0 +1,12 @@
+desc: 'FCN from ResNet-50 refined on human legs'
+images: 'data/datasets/voc2010/JPEGImages/'
+mean: 'data/models/resnet/ResNet_mean.npy'
+net: ba.caffeine.resnet.ResNet_FCN(nconv3=4, nconv4=6).write
+slicefile: ['data/tmp/pascpart/patches/person_lfoot_llleg_luleg/seg.yaml',
+    'data/tmp/pascpart/patches/person_rfoot_rlleg_ruleg/seg.yaml']
+test_interval: 100
+test: 'data/tmp/pascpart/person_leg.txt'
+tofcn: True
+train_sizes: [1, 10, 25, 50, 100, 500, 1000]
+train: 'data/tmp/pascpart/person_leg.txt'
+val: True

@@ -13,7 +13,8 @@ stepsize: 500
 test_images: ''
 test_interval: 100
 test: 'data/tmp/pascpart/person_head.txt'
-train_sizes: [1, 10, 25, 50, 100, 500, 1000]
+# train_sizes: [1, 10, 25, 50, 100, 500, 1000]
+train_sizes: [500, 1000]
 train: 'data/tmp/pascpart/person_head.txt'
 val: 'data/tmp/pascpart/patches/person_head/img_augmented_lmdb_test.txt'
 weight_decay: 0.0005
