@@ -464,7 +464,10 @@ class FCNPartRunner(NetRunner):
         score = skimage.img_as_float(score)
         ba.utils.apply_overlay(im, score, bn_ov + '.png')
         region, rscore = ba.eval.scoreToRegion(score, im)
-        return {bn: {'region': list(region), 'score': float(rscore)}}
+        if region is False and rscore is False:
+            return False
+        else:
+            return {bn: {'region': list(region), 'score': float(rscore)}}
 
     def forward_list(self, setlist=None):
         '''Will forward a whole setlist through the network. Will default to the
@@ -485,8 +488,9 @@ class FCNPartRunner(NetRunner):
         weightname = os.path.splitext(os.path.basename(self.net_weights))[0]
         print('Forwarding all in {}'.format(setlist))
         for i, idx in enumerate(tqdm(setlist)):
-            # self.forward_single(idx, mean=mean)
-            scoreboxes.update(self.forward_single(idx, mean=mean))
+            res =  self.forward_single(idx, mean=mean)
+            if res != False:
+                scoreboxes.update(res)
             if i % 10 == 0:
                 with open(scoreboxf, 'w') as f:
                     yaml.dump(scoreboxes, f)
