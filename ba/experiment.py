@@ -54,9 +54,9 @@ class Experiment(ba.utils.NotifierClass):
         parser.add_argument('--test', action='store_true')
         parser.add_argument('--tofcn', action='store_true')
         parser.add_argument('--train', action='store_true')
-        parser.add_argument('--bs', type=int, nargs=1, default=0,
+        parser.add_argument('--bs', type=int, nargs=1, default=1,
                             metavar='count',
-                            help='The batch size for training.')
+                            help='The batch size for training or testing.')
         parser.add_argument('--threads', type=int, nargs=1, default=1,
                             metavar='count',
                             help='The count threads for execution.')
@@ -130,6 +130,12 @@ class Experiment(ba.utils.NotifierClass):
                           labels=self.conf['labels'],
                           mean=self.conf['mean']
                           )
+
+        # Extra attributes for the cnn
+        attrs = ['batch_size']
+        for attr in attrs:
+            if attr in self.conf:
+                self.cnn.__dict__[attr] = self.conf[attr]
 
         # Extra atrributes for the solver
         attrs = ['lr_policy', 'stepsize', 'weight_decay', 'base_lr',

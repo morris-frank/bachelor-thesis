@@ -1,3 +1,4 @@
+from itertools import zip_longest
 from glob import glob
 import matplotlib as mpl
 mpl.use('Agg')
@@ -117,18 +118,20 @@ def apply_overlay(image, overlay, path, label='', fig=None):
         plt.close(_fig)
 
 
-def apply_rect(image, rects, path, colors='black', labels='', fig=None):
+def apply_rect(image, rects, path=None, colors='black', labels='', fig=None):
     '''Overlay rectangle onto image and save to path
     (full path with extension!)
 
     Args:
         image (image): The image to use as 'background'.
         rects (tuple, list[tuple]): (xmin, ymin, xmax, ymax)
-        path (str): The full path to save the result to.
+        path (str, optional): The full path to save the result to.
         color (str, list[str], optional): The color for the rectangles
         labels (str, list[str], optional): The for the rectangles
         fig (plt.figure, optional): An optional figure to work on
     '''
+    if path is None and fig is None:
+        raise RuntimeError
     if fig is None:
         _fig = _prepareImagePlot(image)
     else:
@@ -256,7 +259,19 @@ def prevalent_extension(path):
     return max(set(exts), key=exts.count)
 
 
-def sliding_window(image, stride, kernel_size):
+def sliding_slice(shape, stride, kernel_size):
+    if stride is None:
+        stride = kernel_size
+    if isinstance(kernel_size, int):
+        kernel_size = (kernel_size, kernel_size)
+    if isinstance(stride, int):
+        stride = (stride, stride)
+    for x1 in range(0, shape[0], stride[0]):
+        for x2 in range(0, shape[1], stride[1]):
+            yield (x1, x2)
+
+
+def sliding_window(image, stride=None, kernel_size=(10, 10)):
     '''Slides a quadratic window over an image.
 
     Args:
@@ -264,9 +279,14 @@ def sliding_window(image, stride, kernel_size):
         stride (int): The step size for the sliding window
         kernel_size (int): Width of the window
     '''
-    for y in range(0, image.shape[0], stride):
-        for x in range(0, image.shape[1], stride):
-            yield (x, y, image[y:y + kernel_size, x:x + kernel_size])
+    if stride is None:
+        stride = kernel_size
+    if isinstance(kernel_size, int):
+        kernel_size = (kernel_size, kernel_size)
+    if isinstance(stride, int):
+        stride = (stride, stride)
+    for x1, x2 in sliding_slice(image.shape, stride, kernel_size):
+        yield (x1, x2, image[x1:x1 + kernel_size[0], x2:x2 + kernel_size[1]])
 
 
 def slice_overlap(x1, x2, w):
@@ -315,3 +335,8 @@ def load_YAML(path):
             print('Config {} not loadable.'.format(path))
             sys.exit(1)
     return content
+
+
+def grouper(iterable, n, fillvalue=None):
+    args = [iter(iterable)] * n
+    return zip_longest(*args, fillvalue=fillvalue)

@@ -1,7 +1,7 @@
 desc: 'FCN from ResNet-50 refined on whole human bodies'
-images: 'data/datasets/voc2010/JPEGImages/'
+images: 'data/tmp/mean_substracted_voc/'
 labels: 'data/tmp/pascpart/patches/person/seg.yaml'
-mean: 'data/models/resnet/ResNet_mean.npy'
+mean: False
 net: ba.caffeine.resnet.ResNet_FCN(nconv3=4, nconv4=6).write
 slicefile: 'data/tmp/pascpart/patches/person/seg.yaml'
 test_interval: 100

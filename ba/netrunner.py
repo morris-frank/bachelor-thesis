@@ -1,13 +1,15 @@
 from ba import caffeine
 from ba.set import SetList
 import ba.utils
+from ba.utils import grouper
 import caffe
 import copy
 import datetime
+from itertools import count
 import numpy as np
 import os
 from os.path import normpath
-from PIL import Image
+import random
 import re
 from scipy.misc import imread
 from scipy.misc import imresize
@@ -81,6 +83,7 @@ class NetRunner(ba.utils.NotifierClass):
         self.name = name
         self._solver_attr = {}
         defaults = {
+            'batch_size': 1,
             'dir': './',
             'generator_switches': {},
             'generator_attr': {},
@@ -174,7 +177,7 @@ class NetRunner(ba.utils.NotifierClass):
         self.solver = caffe.SGDSolver(solverpath)
         self.solver.net.copy_from(weights)
 
-    def load_img(self, path, mean):
+    def load_img(self, path, mean=False):
         '''Loads an image and prepares it for caffe.
 
         Args:
@@ -184,17 +187,19 @@ class NetRunner(ba.utils.NotifierClass):
         Returns:
             A tuple made of the input data and the image
         '''
-        # im = Image.open(path)
-        # Seems faster in my opinion:
-        im = imread(path)
-        data = np.array(im, dtype=np.float32)
-        data = data[:, :, ::-1]
-        if not isinstance(mean, bool) or mean:
-            if mean.shape == (224, 224, 3):
-                mean = imresize(mean, data.shape)
-            data -= np.array(mean)
-        data = data.transpose((2, 0, 1))
-        return (data, im)
+        if path[-3:] == 'npy':
+            data = np.load(path)
+            return (data, False)
+        else:
+            im = imread(path)
+            data = np.array(im, dtype=np.float32)
+            data = data[:, :, ::-1]
+            if not isinstance(mean, bool) or mean:
+                if mean.shape == (224, 224, 3):
+                    mean = imresize(mean, data.shape)
+                data -= np.array(mean)
+            data = data.transpose((2, 0, 1))
+            return (data, im)
 
     def forward(self, data):
         '''Forwards a loaded image through the network.
@@ -205,7 +210,10 @@ class NetRunner(ba.utils.NotifierClass):
         Returns:
             The results from the score layer
         '''
-        self.net.blobs['data'].reshape(1, *data.shape)
+        if data.ndim == 3:
+            self.net.blobs['data'].reshape(1, *data.shape)
+        else:
+            self.net.blobs['data'].reshape(*data.shape)
         self.net.blobs['data'].data[...] = data
 
         # run net and take argmax for prediction
@@ -278,7 +286,6 @@ class FCNPartRunner(NetRunner):
         '''
         super().__init__(name=name, **kwargs)
         self.name = name
-        self.images = 'data/datasets/voc2010/JPEGImages/'
 
     @property
     def name(self):
@@ -438,12 +445,48 @@ class FCNPartRunner(NetRunner):
                 yaml.dump(db, f)
             ba.utils.rm(self.resultDB + '.lock')
 
-    def forward_single(self, idx, mean=None):
-        '''Will forward one single idx-image from the source set and saves the
+    def forward_batch(self, path_batch, mean=None):
+        bs = len(path_batch)
+        datas = []
+        max_h = 0
+        max_w = 0
+        for path in path_batch:
+            if path:
+                data, im = self.load_img(path, mean=mean)
+                if data.shape[1] > max_h:
+                    max_h = data.shape[1]
+                if data.shape[2] > max_w:
+                    max_w = data.shape[2]
+                datas.append(data)
+        self.net.blobs['data'].reshape(len(datas), 3, max_h, max_w)
+        for i, data in enumerate(datas):
+            self.net.blobs['data'].data[i, :, 0:data.shape[1], 0:data.shape[2]] = data
+        self.net.forward()
+        scores = self.net.blobs[self.net.outputs[0]].data[:, 1, ...]
+        scoreboxes = {}
+        for path, score, data in zip(path_batch, scores, datas):
+            bn = os.path.basename(os.path.splitext(path)[0])
+            regions, rscores = self._postprocess_single_output(bn, score,
+                                                             data.shape[1:])
+            scoreboxes[bn] = {'region': regions, 'score': rscores}
+        return scoreboxes
+
+    def _postprocess_single_output(self, bn, score, imshape):
+        bn_hm = self.heatmaps + bn
+        bn_ov = self.heatmaps[:-1] + '_overlays/' + bn
+        imsave(bn_hm + '.png', score)
+        score = imresize(score, imshape)
+        score = skimage.img_as_float(score)
+        #ba.utils.apply_overlay(im, score, bn_ov + '.png')
+        regions, rscores = ba.eval.scoreToRegion(score, imshape)
+        return regions, rscores
+
+    def forward_single(self, path, mean=None):
+        '''Will forward one single path-image from the source set and saves the
         scoring heatmaps and heatmaps to disk.
 
         Args:
-            idx (str): The index (basename) of the image to forward
+            path (str): The path of the image to forward
             mean (tuple, optional): The mean
 
         Return:
@@ -451,33 +494,27 @@ class FCNPartRunner(NetRunner):
         '''
         if mean is None:
             mean, meanpath = self.get_mean()
-        data, im = self.load_img(idx, mean=mean)
-        bn = os.path.basename(os.path.splitext(idx)[0])
-        bn_hm = self.heatmaps + bn
-        bn_ov = self.heatmaps[:-1] + '_overlays/' + bn
-        # if os.path.isfile(bn_hm + '.png'):
-        #     return False
+        data, im = self.load_img(path, mean=mean)
         self.forward(data)
         score = self.net.blobs[self.net.outputs[0]].data[0][1, ...]
-        imsave(bn_hm + '.png', score)
-        score = imresize(score, im.shape[:-1])
-        score = skimage.img_as_float(score)
-        ba.utils.apply_overlay(im, score, bn_ov + '.png')
-        region, rscore = ba.eval.scoreToRegion(score, im)
-        if region is False and rscore is False:
-            return False
-        else:
-            return {bn: {'region': list(region), 'score': float(rscore)}}
+        bn = os.path.basename(os.path.splitext(path)[0])
+        regions, rscores = self._postprocess_single_output(bn, score,
+                                                         data.shape[1:])
+        return {bn: {'region': regions, 'score': rscores}}
 
-    def forward_list(self, setlist=None):
+    def forward_list(self, setlist):
         '''Will forward a whole setlist through the network. Will default to the
         validation set.
 
         Args:
-            setlist (SetList, optional): The set to put forward
+            setlist (SetList): The set to put forward
         '''
-        if setlist is None:
-            return self.forward_test()
+        def save_scoreboxes(scoreboxf, scoreboxes):
+            for boxdict in scoreboxes.values():
+                boxdict['region'] = boxdict['region'].tolist()
+                boxdict['score'] = boxdict['score'].tolist()
+            with open(scoreboxf, 'w') as f:
+                yaml.dump(scoreboxes, f)
         self.prepare()
         self.create_net(self.dir + 'deploy.prototxt',
                        self.net_weights,
@@ -486,14 +523,18 @@ class FCNPartRunner(NetRunner):
         scoreboxes = {}
         scoreboxf = self.results[:-1] + '.scores.yaml'
         weightname = os.path.splitext(os.path.basename(self.net_weights))[0]
-        print('Forwarding all in {}'.format(setlist))
-        for i, idx in enumerate(tqdm(setlist)):
-            res =  self.forward_single(idx, mean=mean)
+        if self.batch_size > 1:
+            forward = lambda x: self.forward_batch(x, mean=mean)
+        else:
+            forward = lambda x: self.forward_single(x[0], mean=mean)
+
+        print('Forwarding for {} at {} list {}'.format(
+            self.name, weightname, setlist.source))
+        for idx in grouper(tqdm(setlist), self.batch_size, None):
+            res = forward(idx)
             if res != False:
                 scoreboxes.update(res)
-            if i % 10 == 0:
-                with open(scoreboxf, 'w') as f:
-                    yaml.dump(scoreboxes, f)
+        save_scoreboxes(scoreboxf, scoreboxes)
         self.notify('Forwarded {} for weights {} of {}'.format(setlist.source,
                                                                weightname,
                                                                self.name))
@@ -509,6 +550,7 @@ class FCNPartRunner(NetRunner):
         '''Will forward the whole validation set through the network.'''
         imgext = '.' + ba.utils.prevalent_extension(self.images)
         self.testset.add_pre_suffix(self.images, imgext)
+        random.shuffle(self.testset.list)
         self.forward_list(setlist=self.testset)
         self.testset.rm_pre_suffix(self.images, imgext)
 
@@ -584,10 +626,10 @@ class SlidingFCNPartRunner(FCNPartRunner):
             pad = int(ks)
             padded_data = np.pad(data, ((pad, pad), (pad, pad), (0, 0)), mode='reflect')
             padded_hm = np.zeros(padded_data.shape[:-1])
-            for (x, y, window) in ba.utils.sliding_window(padded_data, self.stride,
+            for (x1, x2, window) in ba.utils.sliding_window(padded_data, self.stride,
                                                        ks):
                 score = self.forward_window(window)
-                padded_hm[y:y + ks, x:x + ks] += score
+                padded_hm[x1:x1 + ks, x2:x2 + ks] += score
             hm += padded_hm[pad:-pad, pad:-pad]
 
         imsave(bn_hm + '.png', hm)
