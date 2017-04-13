@@ -1,14 +1,11 @@
-# For the pure python implementation:
-from ba.selectivesearch import selective_search as selective_search_py
 import ba.utils
 import copy
 from matplotlib import pyplot as plt
 import numpy as np
 import skimage.transform
+import sklearn.metrics
 from scipy.ndimage import distance_transform_cdt
 from scipy.misc import imread, imresize
-# For the cpython implementation:
-from selective_search import selective_search as selective_search_cpy
 import sys
 from tqdm import tqdm
 import yaml
@@ -24,6 +21,40 @@ def extract_mean_evals(itemlist, evalf):
     meanDistErr = float(np.mean([i['disterr'] for i in evals.values()]))
     meanScalErr = float(np.mean([i['scalingerr'] for i in evals.values()]))
     return meanIOU, meanDistErr, meanScalErr, len(evals)
+
+
+def evalDect(predf, gtf, images, heatmaps=None):
+    preds = ba.utils.load_YAML(predf)
+    gts = ba.utils.load_YAML(gtf)
+    outputfile = '.'.join(predf.split('.')[:-2] + ['evals', 'yaml'])
+    outputdir = ba.utils.touch('.'.join(predf.split('.')[:-2]) + '/evals/')
+    results = {}
+    ext_img = ba.utils.prevalent_extension(images)
+    if heatmaps is not None:
+        ext_hm = ba.utils.prevalent_extension(heatmaps)
+    print('Evaluating {}'.format(predf))
+    hitted_labels = []
+    pred_labels = []
+    for idx, pred in tqdm(preds.items()):
+        rects = pred['region']
+        scores = pred['score']
+        im = imread('{}{}.{}'.format(images, idx, ext_img))
+        if heatmaps is not None:
+            hm = imread('{}{}.{}'.format(heatmaps, idx, ext_hm))
+            hm = imresize(hm, im.shape[:-1])
+        imout = outputdir + idx + '.png'
+        # Get the ground truth:
+        gtslice = gts[idx]
+        gtrect = (gtslice[0].start, gtslice[1].start,
+                  gtslice[0].stop, gtslice[1].stop)
+        # Evaluate it:
+        hitted_labels.extend([int(intersectOverLeft(rect, gtrect) >= 0.7)
+                              for rect in rects])
+        pred_labels.extend(scores)
+    return hitted_labels, pred_labels
+    precision, recall, thresholds = sklearn.metrics.precision_recall_curve(
+        hitted_labels, pred_labels, pos_label=1)
+    return precision, recall, thresholds
 
 
 def evalYAML(predf, gtf, images, heatmaps=None):
@@ -100,6 +131,14 @@ def rectDistance(a, b):
     return np.linalg.norm(aCenter - bCenter)
 
 
+def intersectOverLeft(a, b):
+    area = intersectArea(a, b)
+    if area == 0:
+        return area
+    aArea = (a[2] - a[0]) * (a[3] - a[1])
+    return area / aArea
+
+
 def intersectOverUnion(a, b):
     '''Calculates the intersect over Union of two rectangles.
 
@@ -133,46 +172,6 @@ def intersectArea(a, b):
         return dx * dy
     else:
         return 0.0
-
-
-def _selective_search(image, CPY=True):
-    '''Selective search meta function.
-
-    Args:
-        image (ndarray): The image
-        CPY (bool, optional): What version to use
-
-    Returns:
-        the Regions
-    '''
-    if CPY:
-        # cpython implementation
-        mshape = max(image.shape)
-        ks = [int(mshape/i) for i in [10, 7, 5, 3]]
-        regions = selective_search_cpy(image, ks=ks, n_jobs=-10)
-    else:
-        # pure python implementation
-        regions = []
-        labels, regions_ = selective_search_py(
-            image, scale=500, sigma=0.9, min_size=200)
-        for region in regions_:
-            y1, x1, y2, x2 = region['rect']
-            regions.append((region['size'], (x1, y1, x2, y2)))
-
-    # Add all found regions to the start and end lists:
-    starts = []
-    ends = []
-    minsize = int(heatmap.size * 0.01)
-    for size, (x1, y1, x2, y2) in regions:
-        if x2 < x1:
-            x2,x1 = x1,x2
-        if y2 < y1:
-            y2,y1 = y1,y2
-        if (x2 - x1) * (y2 - y1) > minsize:
-            starts.append((x1, y1))
-            ends.append((x2, y2))
-
-    return starts, ends
 
 
 def _generic_box(shape):
