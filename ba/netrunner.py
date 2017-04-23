@@ -407,6 +407,8 @@ class FCNPartRunner(NetRunner):
         weightname = os.path.splitext(os.path.basename(self.net_weights))[0]
         iteration = weightname.split('_')[-1]
         if slicefile is not None:
+            ba.eval.evalDect(scoreboxf, slicefile)
+            return True
             ofile = ba.eval.evalYAML(
                 scoreboxf, slicefile, self.images, self.heatmaps)
             # ofile = '.'.join(scoreboxf.split('.')[:-2] + ['evals', 'yaml'])
@@ -446,19 +448,22 @@ class FCNPartRunner(NetRunner):
             ba.utils.rm(self.resultDB + '.lock')
 
     def forward_batch(self, path_batch, mean=None):
-        bs = len(path_batch)
         datas = []
-        max_h = 0
-        max_w = 0
+        max_h = 500
+        max_w = 500
         for path in path_batch:
-            if path:
-                data, im = self.load_img(path, mean=mean)
-                if data.shape[1] > max_h:
-                    max_h = data.shape[1]
-                if data.shape[2] > max_w:
-                    max_w = data.shape[2]
-                datas.append(data)
-        self.net.blobs['data'].reshape(len(datas), 3, max_h, max_w)
+            if path is None:
+                continue
+            data, im = self.load_img(path, mean=mean)
+            # ADAPTIVE VERSION
+            # if data.shape[1] > max_h:
+            #     max_h = data.shape[1]
+            # if data.shape[2] > max_w:
+            #     max_w = data.shape[2]
+            datas.append(data)
+
+        bs = len(datas)
+        self.net.blobs['data'].reshape(bs, 3, max_h, max_w)
         for i, data in enumerate(datas):
             self.net.blobs['data'].data[i, :, 0:data.shape[1], 0:data.shape[2]] = data
         self.net.forward()
@@ -467,7 +472,7 @@ class FCNPartRunner(NetRunner):
         for path, score, data in zip(path_batch, scores, datas):
             bn = os.path.basename(os.path.splitext(path)[0])
             regions, rscores = self._postprocess_single_output(bn, score,
-                                                             data.shape[1:])
+                                                               data.shape[1:])
             scoreboxes[bn] = {'region': regions, 'score': rscores}
         return scoreboxes
 
@@ -477,7 +482,7 @@ class FCNPartRunner(NetRunner):
         imsave(bn_hm + '.png', score)
         score = imresize(score, imshape)
         score = skimage.img_as_float(score)
-        #ba.utils.apply_overlay(im, score, bn_ov + '.png')
+        # ba.utils.apply_overlay(im, score, bn_ov + '.png')
         regions, rscores = ba.eval.scoreToRegion(score, imshape)
         return regions, rscores
 

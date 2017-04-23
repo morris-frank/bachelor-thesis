@@ -213,7 +213,7 @@ class ResNet(object):
                     mean_file="data/models/resnet/ResNet_mean.binaryproto"
                     ))
         else:
-            self.n.data = L.Input(shape=[dict(dim=[1, 3, 224, 224])])
+            self.n.data = L.Input(shape=[dict(dim=[1, 3, 500, 500])])
 
     def base_net(self):
         '''Adds the main part of residual blocks. Everything between the data
@@ -336,4 +336,4 @@ class ResNet_Single(ResNet):
                     mean_file="data/models/resnet/ResNet_mean.binaryproto"
                     ))
         else:
-            self.n.data = L.Input(shape=[dict(dim=[1, 3, 224, 224])])
+            self.n.data = L.Input(shape=[dict(dim=[1, 3, 500, 500])])

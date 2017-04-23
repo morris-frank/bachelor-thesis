@@ -13,6 +13,12 @@ import yaml
 sys.path.append('../telenotify')
 notifier_config = '../telenotify/config.yaml'
 
+def static_vars(**kwargs):
+    def decorate(func):
+        for k in kwargs:
+            setattr(func, k, kwargs[k])
+        return func
+    return decorate
 
 class NotifierClass(object):
     '''A class containing an notifer'''

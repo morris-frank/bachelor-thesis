@@ -1,4 +1,5 @@
 import ba.utils
+from ba.utils import static_vars
 import copy
 from matplotlib import pyplot as plt
 import numpy as np
@@ -23,26 +24,18 @@ def extract_mean_evals(itemlist, evalf):
     return meanIOU, meanDistErr, meanScalErr, len(evals)
 
 
-def evalDect(predf, gtf, images, heatmaps=None):
+def evalDect(predf, gtf):
     preds = ba.utils.load_YAML(predf)
     gts = ba.utils.load_YAML(gtf)
-    outputfile = '.'.join(predf.split('.')[:-2] + ['evals', 'yaml'])
+    outputfile = '.'.join(predf.split('.')[:-2] + ['prec_rec', 'png'])
     outputdir = ba.utils.touch('.'.join(predf.split('.')[:-2]) + '/evals/')
     results = {}
-    ext_img = ba.utils.prevalent_extension(images)
-    if heatmaps is not None:
-        ext_hm = ba.utils.prevalent_extension(heatmaps)
-    print('Evaluating {}'.format(predf))
+    print('Evaluating detection {}'.format(predf))
     hitted_labels = []
     pred_labels = []
     for idx, pred in tqdm(preds.items()):
         rects = pred['region']
         scores = pred['score']
-        im = imread('{}{}.{}'.format(images, idx, ext_img))
-        if heatmaps is not None:
-            hm = imread('{}{}.{}'.format(heatmaps, idx, ext_hm))
-            hm = imresize(hm, im.shape[:-1])
-        imout = outputdir + idx + '.png'
         # Get the ground truth:
         gtslice = gts[idx]
         gtrect = (gtslice[0].start, gtslice[1].start,
@@ -51,9 +44,13 @@ def evalDect(predf, gtf, images, heatmaps=None):
         hitted_labels.extend([int(intersectOverLeft(rect, gtrect) >= 0.7)
                               for rect in rects])
         pred_labels.extend(scores)
-    return hitted_labels, pred_labels
     precision, recall, thresholds = sklearn.metrics.precision_recall_curve(
         hitted_labels, pred_labels, pos_label=1)
+
+    fig, ax = plt.subplots(nrows=1, ncols=1)
+    ax.plot(recall, precision)
+    fig.savefig(outputfile)
+    plt.close(fig)
     return precision, recall, thresholds
 
 
@@ -174,6 +171,7 @@ def intersectArea(a, b):
         return 0.0
 
 
+@static_vars(boxsets={})
 def _generic_box(shape):
     '''Returns a generic grid of boxes for an image. A little bit like done
     on YOLO
@@ -189,6 +187,8 @@ def _generic_box(shape):
         for x1, x2 in ba.utils.sliding_slice(shape, steps, (height, width)):
             yield ((x1, x2), (x1 + height, x2 + width))
 
+    if shape in _generic_box.boxsets:
+        return _generic_box.boxsets[shape]
     h, w = shape
     areas = []
     starts = []
@@ -214,7 +214,10 @@ def _generic_box(shape):
                 areas.append(_area)
             starts.append((x1, y1))
             ends.append((x2, y2))
-    return np.array(starts), np.array(ends), np.array(areas)
+    _generic_box.boxsets[shape] = (np.array(starts),
+                                   np.array(ends),
+                                   np.array(areas))
+    return _generic_box.boxsets[shape]
 
 
 def nms(starts, ends, overlapThresh=0.2):
@@ -270,14 +273,16 @@ def scoreToRegion(hm, imshape):
     starts, ends, areas = _generic_box(imshape)
 
     hm_sum = float(np.sum(hm))
-    if hm_sum > 0:
-        hm /= hm_sum
+    # if hm_sum > 0:
+    #     hm /= hm_sum
 
     # Add distance base negative penalty:
-    thres = 0.1 / hm_sum
+    thres = 0.01 # / hm_sum
     negative_hm = distance_transform_cdt(hm < thres).astype(float)
-    negative_hm /= np.sum(negative_hm)
-    hm -= negative_hm
+    negative_hm_sum = np.sum(negative_hm)
+    if negative_hm_sum > 0:
+        negative_hm /= negative_hm_sum
+        hm -= negative_hm
 
     for i in range(hm.ndim):
         hm = hm.cumsum(axis=i)
@@ -289,7 +294,6 @@ def scoreToRegion(hm, imshape):
 
     bbscores = np.divide(bbscores, areas)
     thres = 1e-5 * 2
-
 
     picks = bbscores > thres
     if any(picks):
