@@ -1,8 +1,6 @@
 from ba.set import SetList
 from ba import utils
 import copy
-from functools import partial
-from glob import glob
 import numpy as np
 import os.path
 import scipy.io as sio
@@ -10,6 +8,7 @@ from scipy.misc import imread
 from scipy.misc import imsave
 import scipy.ndimage
 from tqdm import tqdm
+
 
 class PascalPartSet(object):
     _builddir = 'data/tmp/'
@@ -207,13 +206,15 @@ class PascalPartSet(object):
                     w = [bb[0].stop - x1[0], bb[1].stop - x1[1]]
                     subim = [im.shape[0] - w[0], im.shape[1] - w[1]]
                     checkidx = 0
-                    while checkidx < 30 and utils.slice_overlap(x1, x2, w) > 0.3:
+                    overlap = utils.slice_overlap(x1, x2, w)
+                    while checkidx < 30 and overlap > 0.3:
                         checkidx += 1
                         x2 = (np.random.random(2) * subim).astype(int)
                     if checkidx >= 30:
                         continue
                     negpatch = im[x2[0]:x2[0] + w[0], x2[1]:x2[1] + w[1]]
-                    imsave(d['patch_neg'] + '{}_{}.png'.format(idx, i), negpatch)
+                    imsave(d['patch_neg'] + '{}_{}.png'.format(idx, i),
+                           negpatch)
 
             with open(classDBPath, 'w') as f:
                 yaml.dump(classSegDB, f)
@@ -221,8 +222,9 @@ class PascalPartSet(object):
                 yaml.dump(patchSegDB, f)
 
         if utils.query_overwrite(pbdir + 'img_augmented/', default='yes'):
-            self.augment_single(pbdir + 'img/pos/', len(self.classlist) * augment)
-            self.augment_single(pbdir + 'img/neg/', len(self.classlist) * augment)
+            naugment = len(self.classlist) * augment
+            self.augment_single(pbdir + 'img/pos/', naugment)
+            self.augment_single(pbdir + 'img/neg/', naugment)
             self.generate_LMDB(pbdir + 'img_augmented/')
 
     def generate_LMDB(self, path):
@@ -251,8 +253,12 @@ class PascalPartSet(object):
         testlist.target = target['test'] + '.txt'
         trainlist.write()
         testlist.write()
-        os.system('convert_imageset --resize_height={} --resize_height={} --shuffle "/" "{}" "{}" '.format(wh, wh, trainlist.target, target['train']))
-        os.system('convert_imageset --resize_height={} --resize_height={} --shuffle "/" "{}" "{}" '.format(wh, wh, testlist.target, target['test']))
+        cmdstr = 'convert_imageset --resize_height=' + wh
+        cmdstr += ' --resize_height=' + wh + ' --shuffle "/"'
+        os.system('{} "{}" "{}" '.format(cmdstr, trainlist.target,
+                                         target['train']))
+        os.system('{} "{}" "{}" '.format(cmdstr, testlist.target,
+                                         target['test']))
 
     def augment_single(self, imdir, n):
         '''Generates augmentet images

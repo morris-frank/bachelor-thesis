@@ -4,7 +4,6 @@
 '''
 from caffe import layers as L
 from caffe import params as P
-import warnings
 import math
 
 
@@ -25,13 +24,13 @@ def upsample(bottom, factor, nout, name=None):
     if name is not None:
         return L.Deconvolution(bottom, name=name, convolution_param=dict(
             kernel_size=ks, stride=factor, num_output=nout, pad=pad,
-            weight_filler=dict(type='bilinear'), bias_term=False),
-                               param=dict(lr_mult=0, decay_mult=0))
+            weight_filler=dict(type='bilinear'),
+            bias_term=False), param=dict(lr_mult=0, decay_mult=0))
     else:
         return L.Deconvolution(bottom, convolution_param=dict(
             kernel_size=ks, stride=factor, num_output=nout, pad=pad,
-            weight_filler=dict(type='bilinear'), bias_term=False),
-                               param=dict(lr_mult=0, decay_mult=0))
+            weight_filler=dict(type='bilinear'),
+            bias_term=False), param=dict(lr_mult=0, decay_mult=0))
 
 
 def fc(bottom, nout=4096, std=0.01, lrmult=0):
@@ -52,8 +51,8 @@ def fc(bottom, nout=4096, std=0.01, lrmult=0):
                             weight_filler=dict(type='gaussian', std=std),
                             bias_filler=dict(type='constant', value=0),
                             num_output=nout),
-                        param=[dict(lr_mult=1*lrmult, decay_mult=1),
-                               dict(lr_mult=2*lrmult, decay_mult=0)])
+                        param=[dict(lr_mult=1 * lrmult, decay_mult=1),
+                               dict(lr_mult=2 * lrmult, decay_mult=0)])
     return fc, L.ReLU(fc, in_place=True)
 
 
@@ -73,14 +72,14 @@ def conv_relu(bottom, nout, ks=3, stride=1, pad=1, lrmult=False, name=None):
     '''
     if name is not None:
         conv = L.Convolution(bottom, kernel_size=ks, stride=stride,
-            num_output=nout, pad=pad, name=name,
-            param=[dict(lr_mult=1*lrmult, decay_mult=1),
-                   dict(lr_mult=2*lrmult, decay_mult=0)])
+                             num_output=nout, pad=pad, name=name,
+                             param=[dict(lr_mult=1 * lrmult, decay_mult=1),
+                                    dict(lr_mult=2 * lrmult, decay_mult=0)])
     else:
         conv = L.Convolution(bottom, kernel_size=ks, stride=stride,
-            num_output=nout, pad=pad,
-            param=[dict(lr_mult=1*lrmult, decay_mult=1),
-                   dict(lr_mult=2*lrmult, decay_mult=0)])
+                             num_output=nout, pad=pad,
+                             param=[dict(lr_mult=1 * lrmult, decay_mult=1),
+                                    dict(lr_mult=2 * lrmult, decay_mult=0)])
     return conv, L.ReLU(conv, in_place=True)
 
 

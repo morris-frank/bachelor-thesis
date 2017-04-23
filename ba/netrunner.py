@@ -1,11 +1,9 @@
-from ba import caffeine
 from ba.set import SetList
 import ba.utils
 from ba.utils import grouper
 import caffe
 import copy
 import datetime
-from itertools import count
 import numpy as np
 import os
 from os.path import normpath
@@ -16,7 +14,6 @@ from scipy.misc import imresize
 from scipy.misc import imsave
 import skimage
 import subprocess
-import sys
 import time
 from tqdm import tqdm
 import yaml
@@ -54,8 +51,9 @@ class SolverSpec(ba.utils.Bunch):
         '''Writes this SolverSpec to the disc at the path set at self.target.
 
         '''
+        specvals = sorted(self.__dict__.items(), key=lambda x: x[0])
         with open(normpath(self._dir + '/solver.prototxt'), 'w') as f:
-            for key, value in sorted(self.__dict__.items(), key=lambda x: x[0]):
+            for key, value in specvals:
                 if not key.startswith('_'):
                     if isinstance(value, str):
                         if re.match('[0-9]+e[+-]?[0-9]+', value) is not None:
@@ -385,12 +383,13 @@ class FCNPartRunner(NetRunner):
         self.LOGNotifiy(self.dir + logf)
         return_code = subprocess.call(
             'caffe train -solver {} -weights {} -gpu {} 2>&1 | tee {}'.format(
-            self.dir + 'solver.prototxt',
-            self.solver_weights,
-            ','.join(str(x) for x in self.gpu),
-            self.dir + logf), shell=True)
+                self.dir + 'solver.prototxt',
+                self.solver_weights,
+                ','.join(str(x) for x in self.gpu),
+                self.dir + logf), shell=True)
         if return_code >= 0:
-            self.notifier._send_telegram_photo(self.notifier.lossgraph(logf), logf)
+            self.notifier._send_telegram_photo(self.notifier.lossgraph(logf),
+                                               logf)
         return return_code
 
     def test(self, slicefile=None):
@@ -465,7 +464,8 @@ class FCNPartRunner(NetRunner):
         bs = len(datas)
         self.net.blobs['data'].reshape(bs, 3, max_h, max_w)
         for i, data in enumerate(datas):
-            self.net.blobs['data'].data[i, :, 0:data.shape[1], 0:data.shape[2]] = data
+            shape = data.shape[1:]
+            self.net.blobs['data'].data[i, :, 0:shape[0], 0:shape[1]] = data
         self.net.forward()
         scores = self.net.blobs[self.net.outputs[0]].data[:, 1, ...]
         scoreboxes = {}
@@ -478,7 +478,7 @@ class FCNPartRunner(NetRunner):
 
     def _postprocess_single_output(self, bn, score, imshape):
         bn_hm = self.heatmaps + bn
-        bn_ov = self.heatmaps[:-1] + '_overlays/' + bn
+        # bn_ov = self.heatmaps[:-1] + '_overlays/' + bn
         imsave(bn_hm + '.png', score)
         score = imresize(score, imshape)
         score = skimage.img_as_float(score)
@@ -504,7 +504,7 @@ class FCNPartRunner(NetRunner):
         score = self.net.blobs[self.net.outputs[0]].data[0][1, ...]
         bn = os.path.basename(os.path.splitext(path)[0])
         regions, rscores = self._postprocess_single_output(bn, score,
-                                                         data.shape[1:])
+                                                           data.shape[1:])
         return {bn: {'region': regions, 'score': rscores}}
 
     def forward_list(self, setlist):
@@ -522,22 +522,29 @@ class FCNPartRunner(NetRunner):
                 yaml.dump(scoreboxes, f)
         self.prepare()
         self.create_net(self.dir + 'deploy.prototxt',
-                       self.net_weights,
-                       self.gpu[0])
+                        self.net_weights,
+                        self.gpu[0])
         mean, meanpath = self.get_mean()
         scoreboxes = {}
         scoreboxf = self.results[:-1] + '.scores.yaml'
         weightname = os.path.splitext(os.path.basename(self.net_weights))[0]
+
+        def forward_batch(x):
+            return self.forward_batch(x, mean=mean)
+
+        def forward_single(x):
+            return self.forward_single(x[0], mean=mean)
+
         if self.batch_size > 1:
-            forward = lambda x: self.forward_batch(x, mean=mean)
+            forward = forward_batch
         else:
-            forward = lambda x: self.forward_single(x[0], mean=mean)
+            forward = forward_single
 
         print('Forwarding for {} at {} list {}'.format(
             self.name, weightname, setlist.source))
         for idx in grouper(tqdm(setlist), self.batch_size, None):
             res = forward(idx)
-            if res != False:
+            if res is not False:
                 scoreboxes.update(res)
         save_scoreboxes(scoreboxf, scoreboxes)
         self.notify('Forwarded {} for weights {} of {}'.format(setlist.source,
@@ -629,10 +636,11 @@ class SlidingFCNPartRunner(FCNPartRunner):
         bn_ov = self.heatmaps[:-1] + '_overlays/' + bn
         for ks in [50, 100, 250]:
             pad = int(ks)
-            padded_data = np.pad(data, ((pad, pad), (pad, pad), (0, 0)), mode='reflect')
+            padded_data = np.pad(data, ((pad, pad), (pad, pad), (0, 0)),
+                                 mode='reflect')
             padded_hm = np.zeros(padded_data.shape[:-1])
-            for (x1, x2, window) in ba.utils.sliding_window(padded_data, self.stride,
-                                                       ks):
+            for (x1, x2, window) in ba.utils.sliding_window(padded_data,
+                                                            self.stride, ks):
                 score = self.forward_window(window)
                 padded_hm[x1:x1 + ks, x2:x2 + ks] += score
             hm += padded_hm[pad:-pad, pad:-pad]

@@ -105,18 +105,18 @@ class SetList(object):
         Returns:
             The mean pixel. As BGR!
         '''
-        self.mean = [[],[],[]]
+        self.mean = [[], [], []]
         print('Calculating mean pixel...')
         for row in tqdm(self):
             im = imread(row)
-            self.mean[0].append(np.mean(im[...,0]))
-            self.mean[1].append(np.mean(im[...,1]))
-            self.mean[2].append(np.mean(im[...,2]))
+            self.mean[0].append(np.mean(im[..., 0]))
+            self.mean[1].append(np.mean(im[..., 1]))
+            self.mean[2].append(np.mean(im[..., 2]))
         self.mean = np.mean(self.mean, axis=1)
         if self.mean.shape == (3,):
             return self.mean
         else:
-            return self.mean[:,:,::-1]
+            return self.mean[:, :, ::-1]
 
     def each(self, callback):
         '''Applies a callable to every element of the list

@@ -3,11 +3,10 @@ from ba.utils import static_vars
 import copy
 from matplotlib import pyplot as plt
 import numpy as np
-import skimage.transform
+import skimage.transform as tf
 import sklearn.metrics
 from scipy.ndimage import distance_transform_cdt
-from scipy.misc import imread, imresize
-import sys
+from scipy.misc import imread
 from tqdm import tqdm
 import yaml
 
@@ -28,8 +27,6 @@ def evalDect(predf, gtf):
     preds = ba.utils.load_YAML(predf)
     gts = ba.utils.load_YAML(gtf)
     outputfile = '.'.join(predf.split('.')[:-2] + ['prec_rec', 'png'])
-    outputdir = ba.utils.touch('.'.join(predf.split('.')[:-2]) + '/evals/')
-    results = {}
     print('Evaluating detection {}'.format(predf))
     hitted_labels = []
     pred_labels = []
@@ -79,7 +76,7 @@ def evalYAML(predf, gtf, images, heatmaps=None):
         im = imread('{}{}.{}'.format(images, idx, ext_img))
         if heatmaps is not None:
             hm = imread('{}{}.{}'.format(heatmaps, idx, ext_hm))
-            hm = imresize(hm, im.shape[:-1])
+            hm = tf.resize(hm, im.shape[:-1])
         imout = outputdir + idx + '.png'
         # Get the ground truth:
         gtslice = gts[idx]
@@ -225,10 +222,10 @@ def nms(starts, ends, overlapThresh=0.2):
     ends = np.array(ends).astype(float)
 
     # grab the coordinates of the bounding boxes
-    x1 = starts[:,0]
-    y1 = starts[:,1]
-    x2 = ends[:,0]
-    y2 = ends[:,1]
+    x1 = starts[:, 0]
+    y1 = starts[:, 1]
+    x2 = ends[:, 0]
+    y2 = ends[:, 1]
 
     area = (x2 - x1 + 1) * (y2 - y1 + 1)
     idxs = np.argsort(y2)
@@ -249,11 +246,11 @@ def nms(starts, ends, overlapThresh=0.2):
 
         overlap = (w * h) / area[idxs[:last]]
 
-        idxs = np.delete(idxs, np.concatenate(([last],
-            np.where(overlap > overlapThresh)[0])))
+        idxs = np.delete(idxs, np.concatenate(
+            ([last], np.where(overlap > overlapThresh)[0])))
 
     return pick
-    # return np.concatenate((starts[pick].astype(int), ends[pick].astype(int)), axis=1)
+
 
 def scoreToRegion(hm, imshape):
     '''Reudces a heatmap to a bounding box by searching through regions of the
@@ -272,12 +269,12 @@ def scoreToRegion(hm, imshape):
     #     return False, False
     starts, ends, areas = _generic_box(imshape)
 
-    hm_sum = float(np.sum(hm))
+    # hm_sum = float(np.sum(hm))
     # if hm_sum > 0:
     #     hm /= hm_sum
 
     # Add distance base negative penalty:
-    thres = 0.01 # / hm_sum
+    thres = 0.01  # / hm_sum
     negative_hm = distance_transform_cdt(hm < thres).astype(float)
     negative_hm_sum = np.sum(negative_hm)
     if negative_hm_sum > 0:
@@ -286,10 +283,10 @@ def scoreToRegion(hm, imshape):
 
     for i in range(hm.ndim):
         hm = hm.cumsum(axis=i)
-    bbscore = lambda s, e: hm[s[0],
-                              s[1]] + hm[e[0],
-                                         e[1]] - hm[s[0],
-                                                    e[1]] - hm[e[0], s[1]]
+
+    def bbscore(s, e):
+        return hm[s[0], s[1]] + hm[e[0],
+                                   e[1]] - hm[s[0], e[1]] - hm[e[0], s[1]]
     bbscores = np.array([bbscore(s, e) for s, e in zip(starts, ends)])
 
     bbscores = np.divide(bbscores, areas)

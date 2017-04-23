@@ -1,9 +1,7 @@
 from itertools import zip_longest
 from glob import glob
-import matplotlib as mpl
-mpl.use('Agg')
 import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
+import matplotlib.patches as mpatches
 import os.path
 import sys
 import threading
@@ -13,12 +11,14 @@ import yaml
 sys.path.append('../telenotify')
 notifier_config = '../telenotify/config.yaml'
 
+
 def static_vars(**kwargs):
     def decorate(func):
         for k in kwargs:
             setattr(func, k, kwargs[k])
         return func
     return decorate
+
 
 class NotifierClass(object):
     '''A class containing an notifer'''
@@ -92,13 +92,14 @@ def _prepareImagePlot(image):
     '''
     xS = 3
     yS = xS / image.shape[1] * image.shape[0]
-    fig = plt.figure(frameon=False, figsize=(xS,yS), dpi=image.shape[1]/xS)
+    fig = plt.figure(frameon=False, figsize=(xS, yS), dpi=image.shape[1] / xS)
     plt.axis('off')
-    ax = plt.Axes(fig, [0.,0.,1.,1.])
+    ax = plt.Axes(fig, [0., 0., 1., 1.])
     ax.set_axis_off()
     fig.add_axes(ax)
     plt.imshow(image, interpolation='none')
     return fig
+
 
 def apply_overlay(image, overlay, path, label='', fig=None):
     '''Overlay overlay onto image and add label as text
@@ -156,8 +157,9 @@ def apply_rect(image, rects, path=None, colors='black', labels='', fig=None):
         height = rect[2] - rect[0]
         width = rect[3] - rect[1]
         ca = plt.gca()
-        ca.add_patch(Rectangle((rect[1], rect[0]), width, height, fill=None,
-                               alpha=1, ec=color, label=label))
+        ca.add_patch(mpatches.Rectangle((rect[1], rect[0]), width, height,
+                                        fill=None, alpha=1, ec=color,
+                                        label=label))
         if label != '':
             bbox_props = dict(boxstyle='square', fc='w', ec='w')
             ca.text(rect[3] - 3, rect[0] + 5, label, ha='right', va='top',
@@ -307,7 +309,9 @@ def slice_overlap(x1, x2, w):
     '''
     x1_2 = [x1[0] + w[0], x1[1] + w[1]]
     x2_2 = [x2[0] + w[0], x2[1] + w[1]]
-    SI = max(0, min(x1_2[0], x2_2[0]) - max(x1[0], x2[0])) * max(0, min(x1_2[1], x2_2[1]) - max(x1[1], x2[1]))
+    SI = max(0, min(x1_2[0], x2_2[0]) -
+             max(x1[0], x2[0])) * max(0, min(x1_2[1], x2_2[1]) -
+                                      max(x1[1], x2[1]))
     S = 2 * w[0] * w[1] - SI
     return SI / S
 

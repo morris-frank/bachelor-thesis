@@ -2,8 +2,7 @@ import caffe
 from caffe import layers as L
 from caffe import params as P
 from caffe.coord_map import crop
-from ba.caffeine.utils import *
-from os.path import dirname
+import ba.caffeine.utils as bL
 
 
 class VGG16(object):
@@ -15,37 +14,41 @@ class VGG16(object):
 
     def base_net(self):
         # the base net
-        self.n.conv1_1, self.n.relu1_1 = conv_relu(self.n.data, 64, pad=100,
-                                                   lrmult=0)
-        self.n.conv1_2, self.n.relu1_2 = conv_relu(self.n.relu1_1, 64,
-                                                   lrmult=0)
-        self.n.pool1 = max_pool(self.n.relu1_2)
+        self.n.conv1_1, self.n.relu1_1 = bL.conv_relu(self.n.data, 64, pad=100,
+                                                      lrmult=0)
+        self.n.conv1_2, self.n.relu1_2 = bL.conv_relu(self.n.relu1_1, 64,
+                                                      lrmult=0)
+        self.n.pool1 = bL.max_pool(self.n.relu1_2)
 
-        self.n.conv2_1, self.n.relu2_1 = conv_relu(self.n.pool1, 128, lrmult=0)
-        self.n.conv2_2, self.n.relu2_2 = conv_relu(self.n.relu2_1, 128,
-                                                   lrmult=0)
-        self.n.pool2 = max_pool(self.n.relu2_2)
+        self.n.conv2_1, self.n.relu2_1 = bL.conv_relu(self.n.pool1, 128,
+                                                      lrmult=0)
+        self.n.conv2_2, self.n.relu2_2 = bL.conv_relu(self.n.relu2_1, 128,
+                                                      lrmult=0)
+        self.n.pool2 = bL.max_pool(self.n.relu2_2)
 
-        self.n.conv3_1, self.n.relu3_1 = conv_relu(self.n.pool2, 256, lrmult=0)
-        self.n.conv3_2, self.n.relu3_2 = conv_relu(self.n.relu3_1, 256,
-                                                   lrmult=0)
-        self.n.conv3_3, self.n.relu3_3 = conv_relu(self.n.relu3_2, 256,
-                                                   lrmult=0)
-        self.n.pool3 = max_pool(self.n.relu3_3)
+        self.n.conv3_1, self.n.relu3_1 = bL.conv_relu(self.n.pool2, 256,
+                                                      lrmult=0)
+        self.n.conv3_2, self.n.relu3_2 = bL.conv_relu(self.n.relu3_1, 256,
+                                                      lrmult=0)
+        self.n.conv3_3, self.n.relu3_3 = bL.conv_relu(self.n.relu3_2, 256,
+                                                      lrmult=0)
+        self.n.pool3 = bL.max_pool(self.n.relu3_3)
 
-        self.n.conv4_1, self.n.relu4_1 = conv_relu(self.n.pool3, 512, lrmult=0)
-        self.n.conv4_2, self.n.relu4_2 = conv_relu(self.n.relu4_1, 512,
-                                                   lrmult=0)
-        self.n.conv4_3, self.n.relu4_3 = conv_relu(self.n.relu4_2, 512,
-                                                   lrmult=0)
-        self.n.pool4 = max_pool(self.n.relu4_3)
+        self.n.conv4_1, self.n.relu4_1 = bL.conv_relu(self.n.pool3, 512,
+                                                      lrmult=0)
+        self.n.conv4_2, self.n.relu4_2 = bL.conv_relu(self.n.relu4_1, 512,
+                                                      lrmult=0)
+        self.n.conv4_3, self.n.relu4_3 = bL.conv_relu(self.n.relu4_2, 512,
+                                                      lrmult=0)
+        self.n.pool4 = bL.max_pool(self.n.relu4_3)
 
-        self.n.conv5_1, self.n.relu5_1 = conv_relu(self.n.pool4, 512, lrmult=0)
-        self.n.conv5_2, self.n.relu5_2 = conv_relu(self.n.relu5_1, 512,
-                                                   lrmult=0)
-        self.n.conv5_3, self.n.relu5_3 = conv_relu(self.n.relu5_2, 512,
-                                                   lrmult=0)
-        self.n.pool5 = max_pool(self.n.relu5_3)
+        self.n.conv5_1, self.n.relu5_1 = bL.conv_relu(self.n.pool4, 512,
+                                                      lrmult=0)
+        self.n.conv5_2, self.n.relu5_2 = bL.conv_relu(self.n.relu5_1, 512,
+                                                      lrmult=0)
+        self.n.conv5_3, self.n.relu5_3 = bL.conv_relu(self.n.relu5_2, 512,
+                                                      lrmult=0)
+        self.n.pool5 = bL.max_pool(self.n.relu5_3)
 
     def data(self):
         if self.params['split'] == 'train' or self.params['split'] == 'val':
@@ -59,11 +62,11 @@ class VGG16(object):
 
     def tail(self):
         # fully conv
-        fc6, self.n.relu6 = fc(self.n.pool5, std=0.05, lrmult=1)
+        fc6, self.n.relu6 = bL.fc(self.n.pool5, std=0.05, lrmult=1)
         self.n.drop6 = L.Dropout(self.n.relu6, dropout_ratio=0.5,
                                  in_place=True)
 
-        fc7, self.n.relu7 = fc(self.n.drop6, std=0.05, lrmult=1)
+        fc7, self.n.relu7 = bL.fc(self.n.drop6, std=0.05, lrmult=1)
         self.n.drop7 = L.Dropout(self.n.relu7, dropout_ratio=0.5,
                                  in_place=True)
 
@@ -74,8 +77,8 @@ class VGG16(object):
             self.n.fc6 = fc6
             self.n.fc7 = fc7
 
-        self.n.fc8_, _ = fc(self.n.drop7, nout=self.nclasses, std=0.01,
-                            lrmult=10)
+        self.n.fc8_, _ = bL.fc(self.n.drop7, nout=self.nclasses, std=0.01,
+                               lrmult=10)
         # self.n.prob = L.Softmax(self.n.fc8_)
 
         if 'deploy' != self.params['split']:
@@ -104,7 +107,7 @@ class VGG16(object):
 
 
 class VGG16_Single(VGG16):
-    def __init__(self, nclasses =2):
+    def __init__(self, nclasses=2):
         super().__init__(nclasses=nclasses)
 
     def data(self):
@@ -144,12 +147,12 @@ class FCN32s(VGG16):
         else:
             na = ''
         # fully conv
-        self.n['fc6' + na], self.n.relu6 = conv_relu(
+        self.n['fc6' + na], self.n.relu6 = bL.conv_relu(
             self.n.pool5, 4096, ks=7, pad=0, lrmult=0)
         self.n.drop6 = L.Dropout(
             self.n.relu6, dropout_ratio=0.5, in_place=True)
 
-        self.n['fc7' + na], self.n.relu7 = conv_relu(
+        self.n['fc7' + na], self.n.relu7 = bL.conv_relu(
             self.n.drop6, 4096, ks=1, pad=0, lrmult=0)
         self.n.drop7 = L.Dropout(self.n.relu7, dropout_ratio=0.5,
                                  in_place=True)
@@ -163,8 +166,8 @@ class FCN32s(VGG16):
             na = ''
         else:
             na = '_'
-        self.n['upscore' + na] = upsample(self.n.score_fr_, factor=32,
-                                          nout=self.nclasses)
+        self.n['upscore' + na] = bL.upsample(self.n.score_fr_, factor=32,
+                                             nout=self.nclasses)
 
         self.n.score = crop(self.n['upscore' + na], self.n.data)
 
@@ -203,13 +206,13 @@ class FCN8s(FCN32s):
         else:
             na = ''
         # fully conv
-        self.n['fc6' + na], self.n.relu6 = conv_relu(self.n.pool5, 4096, ks=7,
-                                                     pad=0, lrmult=0)
+        self.n['fc6' + na], self.n.relu6 = bL.conv_relu(self.n.pool5, 4096,
+                                                        ks=7, pad=0, lrmult=0)
         self.n.drop6 = L.Dropout(self.n.relu6, dropout_ratio=0.5,
                                  in_place=True)
 
-        self.n['fc7' + na], self.n.relu7 = conv_relu(self.n.drop6, 4096, ks=1,
-                                                     pad=0, lrmult=0)
+        self.n['fc7' + na], self.n.relu7 = bL.conv_relu(self.n.drop6, 4096,
+                                                        ks=1, pad=0, lrmult=0)
         self.n.drop7 = L.Dropout(self.n.relu7, dropout_ratio=0.5,
                                  in_place=True)
 

@@ -1,19 +1,24 @@
 from __future__ import division
-import caffe
 import numpy as np
 
 
 def convertToFCN(new_net, old_net, new_params, old_params, path):
-    fc_params = {pr: (old_net.params[pr][0].data, old_net.params[pr][1].data) for pr in old_params}
+    fc_params = {pr: (old_net.params[pr][0].data,
+                      old_net.params[pr][1].data) for pr in old_params}
     for fc in old_params:
-        print('{} weights are {} dimensional and biases are {} dimensional'.format(fc, fc_params[fc][0].shape, fc_params[fc][1].shape))
+        print('''{} weights are {} dimensional and
+              biases are {} dimensional'''.format(fc, fc_params[fc][0].shape,
+                                                  fc_params[fc][1].shape))
 
-    conv_params = {pr: (new_net.params[pr][0].data, new_net.params[pr][1].data) for pr in new_params}
+    conv_params = {pr: (new_net.params[pr][0].data,
+                        new_net.params[pr][1].data) for pr in new_params}
     for conv in new_params:
-        print('{} weights are {} dimensional and biases are {} dimensional'.format(conv, conv_params[conv][0].shape, conv_params[conv][1].shape))
+        print('''{} weights are {} dimensional and biases are {}
+              dimensional'''.format(conv, conv_params[conv][0].shape,
+                                    conv_params[conv][1].shape))
 
     for pr, pr_conv in zip(old_params, new_params):
-        conv_params[pr_conv][0].flat = fc_params[pr][0].flat  # flat unrolls the arrays
+        conv_params[pr_conv][0].flat = fc_params[pr][0].flat
         conv_params[pr_conv][1][...] = fc_params[pr][1]
 
     new_net.save(path)
@@ -41,8 +46,10 @@ def transplant(new_net, net, suffix=''):
             if i > (len(new_net.params[p_new]) - 1):
                 print('dropping', p, i)
                 break
-            if net.params[p][i].data.shape != new_net.params[p_new][i].data.shape:
-                print('coercing', p, i, 'from', net.params[p][i].data.shape, 'to', new_net.params[p_new][i].data.shape)
+            old_shape = net.params[p][i].data.shape
+            new_shape = new_net.params[p_new][i].data.shape
+            if old_shape != new_shape:
+                print('coercing', p, i, 'from', old_shape, 'to', new_shape)
             else:
                 print('copying', p, ' -> ', p_new, i)
             new_net.params[p_new][i].data.flat = net.params[p][i].data.flat
@@ -69,7 +76,8 @@ def interp(net, layers):
     for l in layers:
         m, k, h, w = net.params[l][0].data.shape
         if m != k and k != 1:
-            print('input + output channels need to be the same or |output| == 1')
+            print('''input + output channels need to
+                  be the same or |output| == 1''')
             raise
         if h != w:
             print('filters need to be square')
@@ -84,5 +92,6 @@ def expand_score(new_net, new_layer, net, layer):
     score layer with k classes s.t. the first k' are the old classes.
     '''
     old_cl = net.params[layer][0].num
-    new_net.params[new_layer][0].data[:old_cl][...] = net.params[layer][0].data
-    new_net.params[new_layer][1].data[0,0,0,:old_cl][...] = net.params[layer][1].data
+    new_params = new_net.params[new_layer]
+    new_params[0].data[:old_cl][...] = net.params[layer][0].data
+    new_params[1].data[0, 0, 0, :old_cl][...] = net.params[layer][1].data

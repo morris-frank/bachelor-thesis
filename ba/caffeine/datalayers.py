@@ -7,15 +7,10 @@ import caffe
 from itertools import count
 from glob import glob
 import numpy as np
-import os.path
 from PIL import Image
 import random
-from scipy.misc import (
-    imread,
-    imsave
-    )
+from scipy.misc import imread
 import skimage.transform as tf
-import time
 import yaml
 
 
@@ -53,7 +48,7 @@ class SegDataLayer(caffe.Layer):
         # randomization: seed and pick
         if self.random:
             random.seed(self.seed)
-            self.idx = random.randint(0, len(self.indices)-1)
+            self.idx = random.randint(0, len(self.indices) - 1)
 
     def reshape(self, bottom, top):
         # load image + label image pair
@@ -103,7 +98,7 @@ class SegDataLayer(caffe.Layer):
         The leading singleton dimension is required by the loss.
         '''
         label = imread('{}/{}.png'.format(self.labels, idx))
-        label = (label/255).astype(np.uint8)
+        label = (label / 255).astype(np.uint8)
         label = label[np.newaxis, ...]
         return label
 
@@ -217,7 +212,7 @@ class SingleImageLayer(caffe.Layer):
         if nsamples is None:
             nsamples = self.ppI
         if nsamples % 2 != 0:
-            raise ValueError('Count in SingleImageLayer is not divisble by two')
+            raise ValueError('Count in SingleImageLayer is not divisble by 2.')
         bbshape = self.bounding_box_shape(bb)
         padded_im = np.pad(im, ((bbshape[0], bbshape[0]),
                                 (bbshape[1], bbshape[1]), (0, 0),),
@@ -227,13 +222,15 @@ class SingleImageLayer(caffe.Layer):
         xsamples = (bbshape[0] * rands[0]).astype(np.int)
         ysamples = (bbshape[1] * rands[1]).astype(np.int)
 
-        samples = np.zeros((nsamples, 3, self.patch_size[0], self.patch_size[1]))
+        samples = np.zeros((nsamples, 3,
+                            self.patch_size[0], self.patch_size[1]))
         for it, xsample, ysample in zip(count(), xsamples, ysamples):
             _x = [bb[0].start, bb[0].stop] + xsample
             _y = [bb[1].start, bb[1].stop] + ysample
             patch = np.copy(padded_im[_x[0]:_x[1], _y[0]:_y[1], :])
             patch /= 255
-            sized_patch = tf.resize(patch, (self.patch_size[0], self.patch_size[1], 3))
+            sized_patch = tf.resize(patch, (self.patch_size[0],
+                                            self.patch_size[1], 3))
             sized_patch *= 255
             sized_patch -= self.mean
             samples[it, ...] = sized_patch.transpose((2, 0, 1))

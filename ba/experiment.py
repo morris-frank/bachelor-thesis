@@ -47,8 +47,10 @@ class Experiment(ba.utils.NotifierClass):
     def parse_arguments(self):
         '''Parse the arguments for an experiment script'''
         parser = argparse.ArgumentParser(description='Runs a experiment')
-        parser.add_argument('--data_classes', type=str, nargs='+', metavar='class')
-        parser.add_argument('--data_parts', type=str, nargs='+', metavar='part')
+        parser.add_argument('--data_classes', type=str, nargs='+',
+                            metavar='class')
+        parser.add_argument('--data_parts', type=str, nargs='+',
+                            metavar='part')
         parser.add_argument('--default', action='store_true')
         parser.add_argument('--prepare', action='store_true')
         parser.add_argument('--test', action='store_true')
@@ -203,8 +205,9 @@ class Experiment(ba.utils.NotifierClass):
             return False
         for w in weights:
             bn = os.path.basename(w)
-            if not ba.utils.query_boolean('You want to test for {}?'.format(bn),
-                                          default='yes', defaulting=self.sysargs.default):
+            question = 'You want to test {}?'.format(bn)
+            if not ba.utils.query_boolean(question, default='yes',
+                                          defaulting=self.sysargs.default):
                 continue
             print('TESTING {} for {}'.format(bn, self.conf['tag']))
             self.prepare_network()
@@ -231,7 +234,7 @@ class Experiment(ba.utils.NotifierClass):
         old_tag = self.conf['tag']
         if new_tag is None:
             mgroups = re.match('(.*_)([0-9]+samples)', old_tag).groups()
-            new_tag =  '{}FCN_{}'.format(mgroups[0], mgroups[1])
+            new_tag = '{}FCN_{}'.format(mgroups[0], mgroups[1])
         old_dir = 'data/models/{}/'.format(old_tag)
         new_dir = 'data/models/{}/'.format(new_tag)
         for f in ['train.txt', 'test.txt']:
@@ -245,9 +248,9 @@ class Experiment(ba.utils.NotifierClass):
         for w in weights:
             bn = os.path.basename(w)
             new_weights = new_snap_dir + 'classifier_' + bn
-            if not ba.utils.query_boolean('You want to convert {}?'.format(w),
-                                       default='yes',
-                                       defaulting=self.sysargs.default):
+            question = 'You want to convert {}?'.format(w)
+            if not ba.utils.query_boolean(question, default='yes',
+                                          defaulting=self.sysargs.default):
                 continue
             print('CONVERTING ' + bn)
             old_net = caffe.Net(old_dir + 'deploy.prototxt', w, caffe.TEST)
@@ -275,20 +278,22 @@ class Experiment(ba.utils.NotifierClass):
         bname = self.conf['tag']
         fname = fptr.__name__
         if self.threaded:
-            worker_pool = mp.Pool(self.sysargs.threads, self.init_worker)
+            # worker_pool = mp.Pool(self.sysargs.threads, self.init_worker)
             threads = []
             sema = mp.BoundedSemaphore(value=self.sysargs.threads)
         try:
             for set_size in set_sizes:
                 self.conf['tag'] = '{}_{}samples'.format(bname, set_size)
-                if not ba.utils.query_boolean('''You want to run {} for {}?'''.format(fptr.__name__, set_size), default='yes', defaulting=self.sysargs.default):
+                question = 'You want to run {} for {}?'.format(fptr.__name__,
+                                                               set_size)
+                if not ba.utils.query_boolean(question, default='yes',
+                                              defaulting=self.sysargs.default):
                     continue
                 if set_size == 0 or set_size > len(hyper_set.list):
                     self.conf['train'].list = hyper_set.list
                 else:
                     self.conf['train'].list = random.sample(hyper_set.list,
                                                             set_size)
-                    # self.cnn.testset.set = self.cnn.testset.set - self.cnn.trainset.set
                 if self.threaded:
                     orig_net = self.conf['net']
                     self.conf['net'] = ''

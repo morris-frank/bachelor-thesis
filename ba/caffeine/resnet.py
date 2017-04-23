@@ -1,8 +1,6 @@
-from ba.caffeine.utils import *
 import caffe
 from caffe import layers as L
 from caffe import params as P
-from caffe.coord_map import crop
 
 
 class ResNet(object):
@@ -231,7 +229,7 @@ class ResNet(object):
         res2c = self.ResBlock('pool1', 3, '2', 64, ds=False)
         res3d = self.ResBlock(res2c, self.nconv3, '3', 128, alephnaming=an)
         res4f = self.ResBlock(res3d, self.nconv4, '4', 256, alephnaming=an)
-        res5c = self.ResBlock(res4f, 3, '5', 512, train=False)
+        self.ResBlock(res4f, 3, '5', 512, train=False)
 
     def tail(self):
         '''Adds the last layers after the residual blocks. 1 Pooling, 1 FC
@@ -281,7 +279,6 @@ class ResNet_FCN(ResNet):
                 )
         else:
             self.n.data = L.Input(shape=[dict(dim=[1, 3, 500, 500])])
-
 
     def tail(self):
         '''Adds the last layers after the residual blocks. 1 Conv and
