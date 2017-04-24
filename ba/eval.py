@@ -12,6 +12,15 @@ import yaml
 
 
 def extract_mean_evals(itemlist, evalf):
+    '''Extracting the mean evaluations for a set of results.
+
+    Args:
+        itemlist (list): A list of datum indices
+        evalf (str): The path to the YAML file containing hte results.
+
+    Returns:
+        meanIOU, meanDistErr, meanScalErr, len(evals)
+    '''
     evals = ba.utils.load_YAML(evalf)
     _evals = copy.deepcopy(evals)
     for e in _evals:
@@ -24,6 +33,15 @@ def extract_mean_evals(itemlist, evalf):
 
 
 def evalDect(predf, gtf):
+    '''Evaluate detection for a result file.
+
+    Args:
+        predf (str): The path to the YAML file conataining the predictions
+        gtf (str): The path to the YAML file conataining the ground truth
+
+    Returns:
+        precision, recall, thresholds
+    '''
     preds = ba.utils.load_YAML(predf)
     gts = ba.utils.load_YAML(gtf)
     outputfile = '.'.join(predf.split('.')[:-2] + ['prec_rec', 'png'])
@@ -169,12 +187,15 @@ def intersectArea(a, b):
 
 
 @static_vars(boxsets={})
-def _generic_box(shape):
+def _generic_box(shape, scales=None, cache=True):
     '''Returns a generic grid of boxes for an image. A little bit like done
     on YOLO
 
     Args:
         shape (ndarray): The shape of the image
+        scales (tupel, optional): The scales as dividents of the img size to
+            generate boxes for
+        cache (bool, optional): Whether to use the cache
 
     Returns:
         a list of regions
@@ -184,17 +205,20 @@ def _generic_box(shape):
         for x1, x2 in ba.utils.sliding_slice(shape, steps, (height, width)):
             yield ((x1, x2), (x1 + height, x2 + width))
 
-    if shape in _generic_box.boxsets:
+    if scales is None:
+        scales = (2, 7, 15,)
+
+    if cache and shape in _generic_box.boxsets:
         return _generic_box.boxsets[shape]
     h, w = shape
     areas = []
     starts = []
     ends = []
-    for scale in (2, 7, 15,):
+    for scale in scales:
         _h = int(h / scale)
         _w = int(w / scale)
         _area = _h * _w
-        for (x1, y1), (x2, y2) in generic_regions(shape, _w, _h):
+        for (x1, y1), (x2, y2) in generic_regions(shape, _w, _h, 0.5):
             rec = False
             if x2 >= h:
                 rec = True
@@ -217,7 +241,20 @@ def _generic_box(shape):
     return _generic_box.boxsets[shape]
 
 
-def nms(starts, ends, overlapThresh=0.2):
+def nms(starts, ends, thresh=0.5):
+    '''Non maximum suppression.
+    See Discriminatively Trained Deformable Part Models, Release 5
+        http://www.rossgirshick.info/latent/
+
+    Args:
+        starts (iterable of 2-tuples): The coordinates of the left-top points
+        ends (iterable of 2-tuples): The coordinates of the right-bottom points
+        thresh (float, optional): The threshold to remove regions.
+
+    Returns:
+        The indices of picked boxes.
+    '''
+
     starts = np.array(starts).astype(float)
     ends = np.array(ends).astype(float)
 
@@ -247,7 +284,7 @@ def nms(starts, ends, overlapThresh=0.2):
         overlap = (w * h) / area[idxs[:last]]
 
         idxs = np.delete(idxs, np.concatenate(
-            ([last], np.where(overlap > overlapThresh)[0])))
+            ([last], np.where(overlap > thresh)[0])))
 
     return pick
 
@@ -267,7 +304,8 @@ def scoreToRegion(hm, imshape):
     #     starts, ends = _selective_search(image, True)
     # except ValueError:
     #     return False, False
-    starts, ends, areas = _generic_box(imshape)
+    scales = (2, 5, 7,)
+    starts, ends, areas = _generic_box(imshape, scales=scales)
 
     # hm_sum = float(np.sum(hm))
     # if hm_sum > 0:

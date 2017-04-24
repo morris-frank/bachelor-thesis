@@ -13,6 +13,11 @@ notifier_config = '../telenotify/config.yaml'
 
 
 def static_vars(**kwargs):
+    '''A decorator with which it is possible to give functions static
+    variables. Use:
+        @static_vars(static_var=None)
+        def function(arg1, arg2):
+    '''
     def decorate(func):
         for k in kwargs:
             setattr(func, k, kwargs[k])
@@ -101,17 +106,19 @@ def _prepareImagePlot(image):
     return fig
 
 
-def apply_overlay(image, overlay, path, label='', fig=None):
+def apply_overlay(image, overlay, path=None, label='', fig=None):
     '''Overlay overlay onto image and add label as text
     and save to path (full path with extension!)
 
     Args:
         image (image): The image to use as 'background'.
         overlay (image): The image to overly over the image.
-        path (str): The path to save the result to.
+        path (str, optional): The path to save the result to.
         label (str, optional): A label for the heatmap.
         fig (plt.figure, optional): An optional figure to work on
     '''
+    if path is None and fig is None:
+        raise RuntimeError
     if fig is None:
         _fig = _prepareImagePlot(image)
     else:
@@ -123,6 +130,7 @@ def apply_overlay(image, overlay, path, label='', fig=None):
     if fig is None:
         _fig.savefig(path, pad_inches=0, dpi=_fig.dpi)
         plt.close(_fig)
+    return _fig
 
 
 def apply_rect(image, rects, path=None, colors='black', labels='', fig=None):
@@ -167,6 +175,7 @@ def apply_rect(image, rects, path=None, colors='black', labels='', fig=None):
     if fig is None:
         _fig.savefig(path, pad_inches=0, dpi=_fig.dpi)
         plt.close(_fig)
+    return _fig
 
 
 def query_boolean(question, default='yes', defaulting=False):
@@ -348,5 +357,16 @@ def load_YAML(path):
 
 
 def grouper(iterable, n, fillvalue=None):
+    '''Slices an iterable into groups.
+
+    Args:
+        iterable (iterable): The iterable to group
+        n (int): The size of the groups
+        fillvalue (value, optional): With what to fill the possible unfilled
+            last group
+
+    Returns:
+        The iterator over the groups
+    '''
     args = [iter(iterable)] * n
     return zip_longest(*args, fillvalue=fillvalue)
