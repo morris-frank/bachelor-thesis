@@ -66,12 +66,6 @@ def evalDect(predf, gtf):
                   {'precision': precision.tolist(),
                    'recall': recall.tolist(),
                    'thresholds': thresholds.tolist()})
-
-    # fig, ax = ba.plt.newfig()
-    # ax.plot(recall, precision)
-    # plt.xlabel('recall')
-    # plt.xlabel('precision')
-    # ba.plt.savefig(outputfile)
     return precision, recall, thresholds
 
 
