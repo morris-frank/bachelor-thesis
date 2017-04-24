@@ -11,6 +11,7 @@ ipython-genutils==0.1.0
 ipython==5.1.0
 keras>2.0
 matplotlib==2.0.0
+msgpack-python==0.4.8
 numpy==1.12.0
 pep8==1.5.7
 Pillow==4.0.0

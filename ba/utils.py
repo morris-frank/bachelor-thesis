@@ -158,7 +158,7 @@ def load(path):
     '''
     extension = os.path.splitext(path)[1].lower()
     if extension == '.mp':
-        with open(touch(path), 'r') as f:
+        with open(touch(path), 'rb') as f:
             try:
                 content = msgpack.load(f)
             except Exception as e:
@@ -189,7 +189,7 @@ def save(path, content):
         extension = '.mp'
     path = bpath + extension
     if extension == '.mp':
-        with open(path, 'w') as f:
+        with open(path, 'wb') as f:
             msgpack.dump(content, f)
     elif extension == '.yaml':
         with open(path, 'w') as f:
