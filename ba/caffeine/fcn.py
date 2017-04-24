@@ -2,7 +2,7 @@ import caffe
 from caffe import layers as L
 from caffe import params as P
 from caffe.coord_map import crop
-import ba.caffeine.utils as bL
+from ba.caffeine import utils as bL
 
 
 class VGG16(object):

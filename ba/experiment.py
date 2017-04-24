@@ -74,8 +74,8 @@ class Experiment(ba.utils.NotifierClass):
 
     def load_conf(self):
         '''Open a YAML Configuration file and make a Bunch from it'''
-        defaults = ba.utils.load_YAML('data/experiments/defaults.yaml')
-        self.conf = ba.utils.load_YAML(self.sysargs.conf)
+        defaults = ba.utils.load('data/experiments/defaults.yaml')
+        self.conf = ba.utils.load(self.sysargs.conf)
         if 'tag' not in self.conf:
             self.conf['tag'] = os.path.basename(
                 os.path.splitext(self.sysargs.conf)[0])

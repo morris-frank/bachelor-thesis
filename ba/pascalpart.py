@@ -1,5 +1,5 @@
 from ba.set import SetList
-from ba import utils
+import ba.utils
 import copy
 import numpy as np
 import os.path
@@ -71,7 +71,7 @@ class PascalPartSet(object):
             raise OSError('source attribute must be path to a dir')
         else:
             self.__source = source
-            self.extension = '.' + utils.prevalent_extension(source)
+            self.extension = '.' + ba.utils.prevalent_extension(source)
 
     @property
     def name(self):
@@ -81,7 +81,7 @@ class PascalPartSet(object):
     def name(self, name):
         self.__name = str(name)
         self.build = self._builddir + '/' + self.__name + '/'
-        utils.touch(self.build)
+        ba.utils.touch(self.build)
 
     def write(self):
         '''Writes the generated lists to disk'''
@@ -101,7 +101,7 @@ class PascalPartSet(object):
             }
         overwrite = {}
         for name in ['source', 'class', 'parts']:
-            overwrite[name] = utils.query_overwrite(f[name], default='no')
+            overwrite[name] = ba.utils.query_overwrite(f[name], default='no')
             self.__dict__[name + 'list'] = SetList(f[name])
             self.__dict__[name + 'list'].add_pre_suffix(self.source,
                                                         self.extension)
@@ -134,8 +134,8 @@ class PascalPartSet(object):
             'parts': '{}segmentations/{}/'.format(self.build, self.tag)
             }
         overwrite = {
-            'classes': utils.query_overwrite(d['classes'], default='no'),
-            'parts': utils.query_overwrite(d['parts'], default='no')
+            'classes': ba.utils.query_overwrite(d['classes'], default='no'),
+            'parts': ba.utils.query_overwrite(d['parts'], default='no')
             }
         if not sum(overwrite.values()):
             return True
@@ -160,23 +160,22 @@ class PascalPartSet(object):
             negatives (int, optional): How many negative samples to generate
             augment (int, optional): How many augmentations per image
         '''
-        import yaml
         cbdir = '{}patches/{}/'.format(self.build, '_'.join(self.classes))
         pbdir = '{}patches/{}/'.format(self.build, self.tag)
         d = {
-            'patch_pos': utils.touch(pbdir + 'img/pos/'),
-            'patch_neg': utils.touch(pbdir + 'img/neg/'),
-            'class_img': utils.touch(cbdir + 'img/'),
-            'patch_seg': utils.touch(pbdir + 'seg/'),
-            'class_seg': utils.touch(cbdir + 'seg/')
+            'patch_pos': ba.utils.touch(pbdir + 'img/pos/'),
+            'patch_neg': ba.utils.touch(pbdir + 'img/neg/'),
+            'class_img': ba.utils.touch(cbdir + 'img/'),
+            'patch_seg': ba.utils.touch(pbdir + 'seg/'),
+            'class_seg': ba.utils.touch(cbdir + 'seg/')
             }
-        if utils.query_overwrite(pbdir, default='yes'):
-            ext = utils.prevalent_extension(imgdir)
+        if ba.utils.query_overwrite(pbdir, default='yes'):
+            ext = ba.utils.prevalent_extension(imgdir)
 
-            classSegDB = {}
-            classDBPath = d['class_seg'][:-1] + '.yaml'
-            patchSegDB = {}
-            patchDBPath = d['patch_seg'][:-1] + '.yaml'
+            class_db = {}
+            class_db_path = d['class_seg'][:-1] + '.yaml'
+            patch_db = {}
+            patch_db_path = d['patch_seg'][:-1] + '.yaml'
 
             print('''Generating and extracting the segmentation bounding
                   boxes for ''' + self.tag)
@@ -189,7 +188,7 @@ class PascalPartSet(object):
                 # Save Class patches
                 item.target = d['class_seg'] + idx
                 bb = item.bounding_box(mode='class')
-                classSegDB[idx] = bb
+                class_db[idx] = bb
                 imsave(d['class_img'] + idx + '.png', im[bb])
 
                 # Save positive patch
@@ -197,7 +196,7 @@ class PascalPartSet(object):
                 bb = item.bounding_box(mode='parts')
                 if bb is None:
                     continue
-                patchSegDB[idx] = bb
+                patch_db[idx] = bb
                 imsave(d['patch_pos'] + idx + '.png', im[bb])
 
                 # Save neagtive patches
@@ -206,7 +205,7 @@ class PascalPartSet(object):
                     w = [bb[0].stop - x1[0], bb[1].stop - x1[1]]
                     subim = [im.shape[0] - w[0], im.shape[1] - w[1]]
                     checkidx = 0
-                    overlap = utils.slice_overlap(x1, x2, w)
+                    overlap = ba.utils.slice_overlap(x1, x2, w)
                     while checkidx < 30 and overlap > 0.3:
                         checkidx += 1
                         x2 = (np.random.random(2) * subim).astype(int)
@@ -216,12 +215,10 @@ class PascalPartSet(object):
                     imsave(d['patch_neg'] + '{}_{}.png'.format(idx, i),
                            negpatch)
 
-            with open(classDBPath, 'w') as f:
-                yaml.dump(classSegDB, f)
-            with open(patchDBPath, 'w') as f:
-                yaml.dump(patchSegDB, f)
+            ba.utils.save(class_db_path, class_db)
+            ba.utils.save(patch_db_path, patch_db)
 
-        if utils.query_overwrite(pbdir + 'img_augmented/', default='yes'):
+        if ba.utils.query_overwrite(pbdir + 'img_augmented/', default='yes'):
             naugment = len(self.classlist) * augment
             self.augment_single(pbdir + 'img/pos/', naugment)
             self.augment_single(pbdir + 'img/neg/', naugment)
@@ -238,8 +235,8 @@ class PascalPartSet(object):
         absp = os.path.abspath(path)
         target = {'train': absp + '_lmdb_train', 'test': absp + '_lmdb_test'}
         for d in target.values():
-            utils.rm(d)
-            utils.rm(d + '.txt')
+            ba.utils.rm(d)
+            ba.utils.rm(d + '.txt')
         wh = 224
         trainlist = SetList(absp + '/pos/')
         trainlist.add_pre_suffix(absp + '/pos/', '.png 1')
@@ -279,7 +276,7 @@ class PascalPartSet(object):
         par_imdir = '/'.join(os.path.normpath(imdir).split('/')[:-1])
         bn_imdir = os.path.normpath(imdir).split('/')[-1]
         save_imdir = os.path.normpath(par_imdir) + '_augmented'
-        utils.rm(save_imdir + '/' + bn_imdir)
+        ba.utils.rm(save_imdir + '/' + bn_imdir)
         os.makedirs(save_imdir + '/' + bn_imdir)
         img_generator = augmenter.flow_from_directory(
             directory=par_imdir,

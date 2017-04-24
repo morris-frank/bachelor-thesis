@@ -16,7 +16,6 @@ import skimage
 import subprocess
 import time
 from tqdm import tqdm
-import yaml
 
 
 class SolverSpec(ba.utils.Bunch):
@@ -416,7 +415,7 @@ class FCNPartRunner(NetRunner):
             while(os.path.isfile(self.resultDB + '.lock')):
                 time.sleep(1)
             ba.utils.touch(self.resultDB + '.lock')
-            db = ba.utils.load_YAML(self.resultDB)
+            db = ba.utils.load(self.resultDB)
             if db is None:
                 db = {}
             if self.name not in db:
@@ -442,8 +441,7 @@ class FCNPartRunner(NetRunner):
                          ['MeanDistErr', t_dist],
                          ['MeanScalErr', t_scal]]
                 db[self.name][str(iteration + '_train')] = t_mat
-            with open(self.resultDB, 'w') as f:
-                yaml.dump(db, f)
+            ba.utils.save(self.resultDB, db)
             ba.utils.rm(self.resultDB + '.lock')
 
     def forward_batch(self, path_batch, mean=None):
@@ -482,7 +480,7 @@ class FCNPartRunner(NetRunner):
         imsave(bn_hm + '.png', score)
         score = imresize(score, imshape)
         score = skimage.img_as_float(score)
-        # ba.utils.apply_overlay(im, score, bn_ov + '.png')
+        # ba.plt.apply_overlay(im, score, bn_ov + '.png')
         regions, rscores = ba.eval.scoreToRegion(score, imshape)
         return regions, rscores
 
@@ -514,19 +512,18 @@ class FCNPartRunner(NetRunner):
         Args:
             setlist (SetList): The set to put forward
         '''
-        def save_scoreboxes(scoreboxf, scoreboxes):
+        def save_scoreboxes(path_score, scoreboxes):
             for boxdict in scoreboxes.values():
                 boxdict['region'] = boxdict['region'].tolist()
                 boxdict['score'] = boxdict['score'].tolist()
-            with open(scoreboxf, 'w') as f:
-                yaml.dump(scoreboxes, f)
+            ba.utils.save(path_score, scoreboxes)
         self.prepare()
         self.create_net(self.dir + 'deploy.prototxt',
                         self.net_weights,
                         self.gpu[0])
         mean, meanpath = self.get_mean()
         scoreboxes = {}
-        scoreboxf = self.results[:-1] + '.scores.yaml'
+        path_score = self.results[:-1] + '.scores.yaml'
         weightname = os.path.splitext(os.path.basename(self.net_weights))[0]
 
         def forward_batch(x):
@@ -546,7 +543,7 @@ class FCNPartRunner(NetRunner):
             res = forward(idx)
             if res is not False:
                 scoreboxes.update(res)
-        save_scoreboxes(scoreboxf, scoreboxes)
+        save_scoreboxes(path_score, scoreboxes)
         self.notify('Forwarded {} for weights {} of {}'.format(setlist.source,
                                                                weightname,
                                                                self.name))

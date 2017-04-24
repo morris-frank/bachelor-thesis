@@ -201,7 +201,7 @@ class SingleImageLayer(caffe.Layer):
     def load_slices(self, splitfile, slicefile):
         with open(splitfile, 'r') as f:
             imlist = [l[:-1] for l in f.readlines() if l.strip()]
-        slicelist = ba.utils.load_YAML(slicefile)
+        slicelist = ba.utils.load(slicefile)
         return {im: slicelist[im] for im in imlist if im in slicelist}
 
     def bounding_box_shape(self, bb):
