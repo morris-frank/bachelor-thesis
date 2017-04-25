@@ -221,8 +221,9 @@ class PascalPartSet(object):
                         patch_bb_list.append(bb)
                         imsave(patch_target + '_' + str(it) + '.png', im[bb])
 
-                self._generate_negatives(d['patch_neg'] + idx, im,
-                                         patch_bb_list, negatives)
+                if len(patch_bb_list) > 0:
+                    self._generate_negatives(d['patch_neg'] + idx, im,
+                                             patch_bb_list, negatives)
 
             ba.utils.save(class_db_path, class_db)
             ba.utils.save(patch_db_path, patch_db)
