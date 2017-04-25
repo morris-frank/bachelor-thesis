@@ -286,8 +286,9 @@ class PascalPartSet(object):
         testlist.target = target['test'] + '.txt'
         trainlist.write()
         testlist.write()
-        cmdstr = 'convert_imageset --resize_height=' + wh
-        cmdstr += ' --resize_height=' + wh + ' --shuffle "/"'
+        cmdstr = 'convert_imageset --resize_height={}'
+        cmdstr += '--resize_height={} --shuffle "/"'
+        cmdstr.format(wh, wh)
         os.system('{} "{}" "{}" '.format(cmdstr, trainlist.target,
                                          target['train']))
         os.system('{} "{}" "{}" '.format(cmdstr, testlist.target,
