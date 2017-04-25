@@ -144,11 +144,12 @@ class SingleImageLayer(caffe.Layer):
         if not isinstance(self.slicefile, list):
             self.slicefile = [self.slicefile]
         self.slices = []
+        n = 0
         for slicefile in self.slicefile:
-            add_slices = self.load_slices(self.splitfile, slicefile)
+            add_slices, n_slices = self.load_slices(self.splitfile, slicefile)
+            n += n_slices
             if add_slices != {}:
                 self.slices.append(add_slices)
-        n = sum([len(slices) for slices in self.slices])
 
         if self.ppI is None:
             if n >= 100:
@@ -162,11 +163,12 @@ class SingleImageLayer(caffe.Layer):
                                  self.patch_size[0], self.patch_size[1]))
         it = 0
         for slices in self.slices:
-            for path, bb in slices.items():
+            for path, bblist in slices.items():
                 im = self.imread('{}{}.{}'.format(self.images, path, self.ext))
-                subslice = slice(it, n * self.ppI, n)
-                self.samples[subslice, ...] = self.generate_samples(im, bb)
-                it += 1
+                for bb in bblist:
+                    subslice = slice(it, n * self.ppI, n)
+                    self.samples[subslice, ...] = self.generate_samples(im, bb)
+                    it += 1
         self.labels = np.append(np.ones(n * self.ppI),
                                 np.zeros(n * self.ppI))
         negs = glob(self.negatives + '/*png')
@@ -204,7 +206,9 @@ class SingleImageLayer(caffe.Layer):
         with open(splitfile, 'r') as f:
             imlist = [l[:-1] for l in f.readlines() if l.strip()]
         slicelist = ba.utils.load(slicefile)
-        return {im: slicelist[im] for im in imlist if im in slicelist}
+        slice_dict = {im: slicelist[im] for im in imlist if im in slicelist}
+        n_slices = sum([len(sl) for sl in slice_dict.values()])
+        return slice_dict, n_slices
 
     def bounding_box_shape(self, bb):
         return (bb[0].stop - bb[0].start,
