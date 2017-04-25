@@ -11,7 +11,7 @@ sns.set_style('whitegrid')
 pgf_with_latex = {
     "pgf.texsystem": "pdflatex",
     "pgf.rcfonts": False,
-    "text.usetex": True,
+    "text.usetex": False,
     "font.family": "serif",
     "font.serif": [],
     "font.sans-serif": [],
