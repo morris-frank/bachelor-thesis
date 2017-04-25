@@ -238,7 +238,8 @@ class PascalPartSet(object):
 
     def _generate_negatives(self, basepath, im, boxes, count):
         def overlaps(coords, shape):
-            return [ba.utils.slice_overlap(b, coords, shape) for b in boxes]
+            return [ba.utils.slice_overlap((b[0].start, b[1].start),
+                                           coords, shape) for b in boxes]
 
         # Save neagtive patches
         for i in range(count):
