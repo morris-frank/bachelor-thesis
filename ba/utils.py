@@ -270,6 +270,7 @@ def slice_overlap(x1, x2, w):
     Args:
         x1 (list or tuple): First 2d-Point for the first rectangle
         x2 (list or tuple): Second 2d-Point for the second rectangle
+        w (list or tuple): Width and height of the rectangles
 
     Returns:
         The overlap in a percentage range

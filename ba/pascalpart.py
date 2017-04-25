@@ -9,6 +9,7 @@ from scipy.misc import imsave
 import scipy.ndimage
 from tqdm import tqdm
 import collections
+import random
 
 
 class PascalPartSet(object):
@@ -169,21 +170,24 @@ class PascalPartSet(object):
             negatives (int, optional): How many negative samples to generate
             augment (int, optional): How many augmentations per image
         '''
-        cbdir = '{}patches/{}/'.format(self.build, '_'.join(self.classes))
-        pbdir = '{}patches/{}/'.format(self.build, self.tag)
+        class_patches_base_dir = '{}patches/{}/'.format(
+            self.build, '_'.join(self.classes))
+        part_patches_base_dir = '{}patches/{}/'.format(
+            self.build, self.tag)
+
         d = {
-            'patch_pos': ba.utils.touch(pbdir + 'img/pos/'),
-            'patch_neg': ba.utils.touch(pbdir + 'img/neg/'),
-            'class_img': ba.utils.touch(cbdir + 'img/'),
-            'patch_seg': ba.utils.touch(pbdir + 'seg/'),
-            'class_seg': ba.utils.touch(cbdir + 'seg/')
+            'patch_pos': ba.utils.touch(part_patches_base_dir + 'img/pos/'),
+            'patch_neg': ba.utils.touch(part_patches_base_dir + 'img/neg/'),
+            'patch_seg': ba.utils.touch(part_patches_base_dir + 'seg/'),
+            'class_img': ba.utils.touch(class_patches_base_dir + 'img/'),
+            'class_seg': ba.utils.touch(class_patches_base_dir + 'seg/')
             }
-        if ba.utils.query_overwrite(pbdir, default='yes'):
+        if ba.utils.query_overwrite(part_patches_base_dir, default='yes'):
             ext = ba.utils.prevalent_extension(imgdir)
 
             class_db = {}
-            class_db_path = d['class_seg'][:-1] + '.yaml'
             patch_db = {}
+            class_db_path = d['class_seg'][:-1] + '.yaml'
             patch_db_path = d['patch_seg'][:-1] + '.yaml'
 
             print('''Generating and extracting the segmentation bounding
@@ -197,52 +201,62 @@ class PascalPartSet(object):
 
                 # Save Class patches
                 item.target = d['class_seg'] + idx
-                bbs = item.bounding_box(mode='class')
-                class_db[idx] = []
-                for classname in self.classes:
-                    target = d['class_img'] + idx
-                    if multpl_classes:
-                        target += '_' + classname
-                    for it, bb in enumerate(bbs[classname]):
-                        class_db[idx].append(bb)
-                        imsave(target + '_' + str(it) + '.png', im[bb])
-
-                # Save positive patch
+                class_bound_boxes = item.bounding_box(mode='class')
                 item.target = d['patch_seg'] + idx
-                bbs = item.bounding_box(mode='parts')
+                part_bound_boxes = item.bounding_box(mode='parts')
+                class_db[idx] = []
                 patch_db[idx] = []
+                patch_bb_list = []
                 for classname in self.classes:
-                    target = d['patch_pos'] + idx
+                    class_target = d['class_img'] + idx
+                    patch_target = d['patch_pos'] + idx
                     if multpl_classes:
-                        target += '_' + classname
-                    for it, bb in enumerate(bbs[classname]):
+                        class_target += '_' + classname
+                        patch_target += '_' + classname
+                    for it, bb in enumerate(class_bound_boxes[classname]):
+                        class_db[idx].append(bb)
+                        imsave(class_target + '_' + str(it) + '.png', im[bb])
+                    for it, bb in enumerate(part_bound_boxes[classname]):
                         patch_db[idx].append(bb)
-                        imsave(target + '_' + str(it) + '.png', im[bb])
+                        patch_bb_list.append(bb)
+                        imsave(patch_target + '_' + str(it) + '.png', im[bb])
 
-                # Save neagtive patches
-                for i in range(0, negatives):
-                    x2 = x1 = [bb[0].start, bb[1].start]
-                    w = [bb[0].stop - x1[0], bb[1].stop - x1[1]]
-                    subim = [im.shape[0] - w[0], im.shape[1] - w[1]]
-                    checkidx = 0
-                    overlap = ba.utils.slice_overlap(x1, x2, w)
-                    while checkidx < 30 and overlap > 0.3:
-                        checkidx += 1
-                        x2 = (np.random.random(2) * subim).astype(int)
-                    if checkidx >= 30:
-                        continue
-                    negpatch = im[x2[0]:x2[0] + w[0], x2[1]:x2[1] + w[1]]
-                    imsave(d['patch_neg'] + '{}_{}.png'.format(idx, i),
-                           negpatch)
+                self._generate_negatives(d['patch_neg'] + idx, im,
+                                         patch_bb_list, negatives)
 
             ba.utils.save(class_db_path, class_db)
             ba.utils.save(patch_db_path, patch_db)
+            self.augment_and_lmdb(part_patches_base_dir, augment)
 
-        if ba.utils.query_overwrite(pbdir + 'img_augmented/', default='yes'):
+    def augment_and_lmdb(self, part_patches_base_dir, augment):
+        if ba.utils.query_overwrite(part_patches_base_dir + 'img_augmented/',
+                                    default='yes'):
             naugment = len(self.classlist) * augment
-            self.augment_single(pbdir + 'img/pos/', naugment)
-            self.augment_single(pbdir + 'img/neg/', naugment)
-            self.generate_LMDB(pbdir + 'img_augmented/')
+            self.augment_single(part_patches_base_dir + 'img/pos/', naugment)
+            self.augment_single(part_patches_base_dir + 'img/neg/', naugment)
+            self.generate_LMDB(part_patches_base_dir + 'img_augmented/')
+
+    def _generate_negatives(self, basepath, im, boxes, count):
+        def overlaps(coords, shape):
+            return [ba.utils.slice_overlap(b, coords, shape) for b in boxes]
+
+        # Save neagtive patches
+        for i in range(count):
+            box = random.choice(boxes)
+            neg_coords = (box[0].start, box[1].start)
+            shape = (box[0].stop - box[0].start,
+                     box[1].stop - box[1].start)
+            subim = [im.shape[0] - shape[0],
+                     im.shape[1] - shape[1]]
+            checkidx = 0
+            while checkidx < 30 and max(overlaps(neg_coords, shape)) > 0.3:
+                checkidx += 1
+                neg_coords = (np.random.random(2) * subim).astype(int)
+            if checkidx >= 30:
+                continue
+            negative_patch = im[neg_coords[0]:neg_coords[0] + shape[0],
+                                neg_coords[1]:neg_coords[1] + shape[1]]
+            imsave(basepath + '_{}.png'.format(i), negative_patch)
 
     def generate_LMDB(self, path):
         '''Generates the LMDB for the trainingset.
