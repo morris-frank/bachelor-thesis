@@ -1,6 +1,4 @@
-from ba import caffeine
 from ba import utils
-from ba import netrunner
 from ba.set import SetList
 from ba.pascalpart import PascalPart
 from ba.pascalpart import PascalPartSet
@@ -8,6 +6,7 @@ from ba.pascalpart import PascalPartSet
 import seaborn as sns
 import matplotlib as mpl
 sns.set_style('whitegrid')
+
 # mpl.use('pgf')
 pgf_with_latex = {
     "pgf.texsystem": "pdflatex",
