@@ -8,6 +8,7 @@ from scipy.misc import imread
 from scipy.misc import imsave
 import scipy.ndimage
 from tqdm import tqdm
+import collections
 
 
 class PascalPartSet(object):
@@ -43,10 +44,9 @@ class PascalPartSet(object):
             self.__parts = parts
         else:
             self.__parts = [parts]
-        partstr = self.__parts
-        if partstr[0] is None:
-            partstr = ['']
-        self.tag = '_'.join(self.classes + partstr)
+        if self.__parts[0] is None:
+            self.__parts = ['']
+        self.tag = '_'.join(self.classes + self.__parts)
 
     @property
     def classes(self):
@@ -120,10 +120,19 @@ class PascalPartSet(object):
             print('Generating List {} and {}'.format(f['class'], f['parts']))
             for row in tqdm(self.sourcelist):
                 item = PascalPart(row)
-                if item.classname in self.classes or len(self.classes) < 1:
+                if len(set(self.classes) &
+                       item.classnames) > 0 or len(self.classes) < 1:
                     self.classlist.list.append(row)
-                    if any(part in item.parts for part in self.parts):
-                        self.partslist.list.append(row)
+                    contains_any_parts = False
+                    for classname in self.classes:
+                        if contains_any_parts:
+                            break
+                        for parts_dict in item.parts[classname]:
+                            if len(set(self.parts) &
+                                   set(parts_dict.keys())) > 0:
+                                self.partslist.list.append(row)
+                                contains_any_parts = True
+                                break
         self.write()
 
     def segmentations(self):
@@ -144,8 +153,8 @@ class PascalPartSet(object):
         for item in tqdm(self.classlist):
             idx = os.path.splitext(os.path.basename(item))[0]
             item = PascalPart(item)
+            item.reduce(self.parts, self.classes)
             if overwrite['parts']:
-                item.reduce(self.parts)
                 item.target = d['parts'] + idx
                 item.save(mode='parts')
             if overwrite['classes']:
@@ -183,21 +192,32 @@ class PascalPartSet(object):
                 idx = os.path.splitext(os.path.basename(item))[0]
                 item = PascalPart(item)
                 im = imread(imgdir + idx + '.' + ext)
-                item.reduce(self.parts)
+                item.reduce(self.parts, self.classes)
+                multpl_classes = len(self.classes) > 1
 
                 # Save Class patches
                 item.target = d['class_seg'] + idx
-                bb = item.bounding_box(mode='class')
-                class_db[idx] = bb
-                imsave(d['class_img'] + idx + '.png', im[bb])
+                bbs = item.bounding_box(mode='class')
+                class_db[idx] = []
+                for classname in self.classes:
+                    target = d['class_img'] + idx
+                    if multpl_classes:
+                        target += '_' + classname
+                    for it, bb in enumerate(bbs[classname]):
+                        class_db[idx].append(bb)
+                        imsave(target + '_' + str(it) + '.png', im[bb])
 
                 # Save positive patch
                 item.target = d['patch_seg'] + idx
-                bb = item.bounding_box(mode='parts')
-                if bb is None:
-                    continue
-                patch_db[idx] = bb
-                imsave(d['patch_pos'] + idx + '.png', im[bb])
+                bbs = item.bounding_box(mode='parts')
+                patch_db[idx] = []
+                for classname in self.classes:
+                    target = d['patch_pos'] + idx
+                    if multpl_classes:
+                        target += '_' + classname
+                    for it, bb in enumerate(bbs[classname]):
+                        patch_db[idx].append(bb)
+                        imsave(target + '_' + str(it) + '.png', im[bb])
 
                 # Save neagtive patches
                 for i in range(0, negatives):
@@ -299,9 +319,13 @@ class PascalPart(object):
             source (str, optional): The path to mat file
         '''
         self.parts = {}
-        self.source = source
-        self.target = source
         self.itemsave = lambda path, im: imsave(path + '.png', im)
+        self.classnames = set()
+        self.segmentations = collections.defaultdict(list)
+        self.parts = collections.defaultdict(list)
+        self.unions = collections.defaultdict(list)
+        self.target = source
+        self.source = source
 
     @property
     def source(self):
@@ -316,28 +340,46 @@ class PascalPart(object):
         '''Loads the inouts from the mat file'''
         mat = sio.loadmat(self.source)
         try:
-            mat = mat['anno'][0][0][1][0][0]
+            mat = mat['anno'][0][0][1][0]
         except IndexError:
             print('PascalPart::load: given file is wrong, %s', self.source)
             return False
-        self.classname = mat[0][0]
-        self.segmentation = mat[2].astype('float')
-        if mat[3].size and mat[3][0].size:
-            for part in mat[3][0]:
-                self.parts[part[0][0]] = part[1].astype('float')
+        for submat in mat:
+            classname, segmentation, parts = self._load_object(submat)
+            self.classnames.add(classname)
+            self.parts[classname].append(parts)
+            self.segmentations[classname].append(segmentation)
         self.unionize()
 
+    def _load_object(self, submat):
+        classname = submat[0][0]
+        segmentation = submat[2].astype('float')
+        parts = {}
+        if submat[3].size and submat[3][0].size:
+            for part in submat[3][0]:
+                parts[part[0][0]] = part[1].astype('float')
+        return classname, segmentation, parts
+
     def save(self, mode='parts'):
-        '''Saves the segmentations binarly samesized to input
+        '''Saves the segmentations binarly same-sized to input
 
         Args:
-            mode (str, optional): Either doing the whole object or only the
-                                  parts
+            mode (str, optional): 'parts' or 'class'
         '''
         if mode == 'class':
-            self.itemsave(self.target, self.segmentation)
-        elif len(self.parts) > 0:
-            self.itemsave(self.target, self.union)
+            sources = self.segmentations
+        else:
+            sources = self.unions
+        target = self.target
+        for classname in self.classnames:
+            if len(self.classnames) > 1:
+                target = self.target + '_' + classname
+            if len(sources[classname]) == 0:
+                continue
+            sum_source = sources[classname][0] * 0
+            for source in sources[classname]:
+                sum_source += source
+            self.itemsave(target, sum_source.astype(bool))
 
     def bounding_box(self, mode='parts'):
         '''Saves the segmentations in their respective patches (bounding boxes)
@@ -349,36 +391,56 @@ class PascalPart(object):
         Returns:
             The bounding box slice for that patch
         '''
+        target = self.target
+        bbs = collections.defaultdict(list)
         if mode == 'class':
-            patch, bb = self._singularize(self.segmentation.astype(int))
-            self.itemsave(self.target, patch)
-            return bb
-        elif len(self.parts) > 0:
-            patch, bb = self._singularize(self.union.astype(int))
-            self.itemsave(self.target, patch)
-            return bb
+            sources = self.segmentations
+        else:
+            sources = self.unions
+        for classname in self.classnames:
+            if len(self.classnames) > 1:
+                target = self.target + '_' + classname
+            if len(sources[classname]) > 0:
+                for it, source in enumerate(sources[classname]):
+                    patch, bb = self._singularize(source.astype(int))
+                    self.itemsave(target + '_' + str(it), patch)
+                    bbs[classname].append(bb)
+            return bbs
 
-    def reduce(self, parts=[]):
+    def reduce(self, keep_parts=[], keep_classes=None):
         '''Reduces the segmentations to the specified list of parts
 
         Args:
-            parts (list, optional): List of part names that shall be saved.
+            keep_parts (list, optional): List of part names that are keept.
+            keep_classes (list, optional): List of classes that are keept.
         '''
-        newparts = {}
-        if len(parts) > 0 and len(self.parts) > 0:
-            for part in parts:
-                if part in self.parts:
-                    newparts[part] = self.parts[part]
-        self.parts = newparts
+        keep_parts = set(keep_parts)
+        keep_classes = set(keep_classes)
+        if keep_classes is None:
+            keep_classes = set(self.classnames)
+        self.classnames &= keep_classes
+        new_parts = collections.defaultdict(list)
+        for classname in self.classnames:
+            for parts_dict in self.parts[classname]:
+                new_parts_dict = {}
+                for partname in set(parts_dict.keys()) & keep_parts:
+                    new_parts_dict[partname] = parts_dict[partname]
+                new_parts[classname].append(new_parts_dict)
+        self.parts = new_parts
         self.unionize()
 
     def unionize(self):
         '''Generate the sum of the parts or the union of segmentations.'''
-        if len(self.parts) > 0:
-            self.union = next(iter(self.parts.values())) * 0
-            for part in self.parts:
-                self.union += self.parts[part]
-            self.union = self.union.astype(bool)
+        self.unions = collections.defaultdict(list)
+        for classname in self.classnames:
+            for parts_dict in self.parts[classname]:
+                if len(parts_dict) == 0:
+                    continue
+                union = self.segmentations[classname][0] * 0
+                for part in parts_dict.values():
+                    union += part.astype(int)
+                union = union.astype(bool)
+                self.unions[classname].append(union)
 
     def _singularize(self, img):
         '''Produces the cut part and bounding box slice for a single connected

@@ -1,5 +1,5 @@
 import ba.utils
-from ba.utils import static_vars
+from functools import lru_cache as cache
 import ba.plt
 import copy
 from matplotlib import pyplot as plt
@@ -42,31 +42,37 @@ def evalDect(predf, gtf):
     Returns:
         precision, recall, thresholds
     '''
-    preds = ba.utils.load(predf)
-    gts = ba.utils.load(gtf)
+    def hits(rect, targets):
+        return any([intersectOverLeft(rect, target) >= 0.7 for
+                    target in targets])
+
+    predicted_slices = ba.utils.load(predf)
+    ground_truth_slices = ba.utils.load(gtf)
     outputfile = '.'.join(predf.split('.')[:-2] + ['prec_rec', 'mp'])
     print('Evaluating detection {}'.format(predf))
     hitted_labels = []
     pred_labels = []
-    for idx, pred in tqdm(preds.items()):
+    for idx, pred in tqdm(predicted_slices.items()):
         rects = pred['region']
         scores = pred['score']
-        # Get the ground truth:
-        gtslice = gts[idx]
-        gtrect = (gtslice[0].start, gtslice[1].start,
-                  gtslice[0].stop, gtslice[1].stop)
-        # Evaluate it:
-        hitted_labels.extend([int(intersectOverLeft(rect, gtrect) >= 0.7)
-                              for rect in rects])
-        pred_labels.extend(scores)
-    precision, recall, thresholds = sklearn.metrics.precision_recall_curve(
-        hitted_labels, pred_labels, pos_label=1)
 
+        # Get the ground truth:
+        ground_truth = ground_truth_slices[idx]
+        gt_rects = [(s[0].start, s[1].start,
+                     s[0].stop, s[1].stop) for s in ground_truth]
+
+        # Evaluate it:
+        hitted_labels.extend([int(hits(rect, gt_rects)) for rect in rects])
+        pred_labels.extend(scores)
+
+    pr, rc, th = sklearn.metrics.precision_recall_curve(hitted_labels,
+                                                        pred_labels,
+                                                        pos_label=1)
     ba.utils.save(outputfile,
-                  {'precision': precision.tolist(),
-                   'recall': recall.tolist(),
-                   'thresholds': thresholds.tolist()})
-    return precision, recall, thresholds
+                  {'precision': pr.tolist(),
+                   'recall': rc.tolist(),
+                   'thresholds': th.tolist()})
+    return pr, rc, th
 
 
 def evalYAML(predf, gtf, images, heatmaps=None):
@@ -185,8 +191,9 @@ def intersectArea(a, b):
         return 0.0
 
 
-@static_vars(boxsets={})
-def _generic_box(shape, scales=None, cache=True):
+# @static_vars(boxsets={})
+@cache(maxsize=32)
+def _generic_box(shape, scales=(2, 7, 15,), cache=True):
     '''Returns a generic grid of boxes for an image. A little bit like done
     on YOLO
 
@@ -204,11 +211,8 @@ def _generic_box(shape, scales=None, cache=True):
         for x1, x2 in ba.utils.sliding_slice(shape, steps, (height, width)):
             yield ((x1, x2), (x1 + height, x2 + width))
 
-    if scales is None:
-        scales = (2, 7, 15,)
-
-    if cache and shape in _generic_box.boxsets:
-        return _generic_box.boxsets[shape]
+    # if cache and shape in _generic_box.boxsets:
+    #     return _generic_box.boxsets[shape]
     h, w = shape
     areas = []
     starts = []
@@ -234,13 +238,14 @@ def _generic_box(shape, scales=None, cache=True):
                 areas.append(_area)
             starts.append((x1, y1))
             ends.append((x2, y2))
-    _generic_box.boxsets[shape] = (np.array(starts),
-                                   np.array(ends),
-                                   np.array(areas))
-    return _generic_box.boxsets[shape]
+    # _generic_box.boxsets[shape] = (np.array(starts),
+    #                                np.array(ends),
+    #                                np.array(areas))
+    # return _generic_box.boxsets[shape]
+    return (np.array(starts), np.array(ends), np.array(areas))
 
 
-def nms(starts, ends, thresh=0.5):
+def nms(starts, ends, scores, thresh=0.5):
     '''Non maximum suppression.
     See Discriminatively Trained Deformable Part Models, Release 5
         http://www.rossgirshick.info/latent/
@@ -248,6 +253,7 @@ def nms(starts, ends, thresh=0.5):
     Args:
         starts (iterable of 2-tuples): The coordinates of the left-top points
         ends (iterable of 2-tuples): The coordinates of the right-bottom points
+        scores (iterable): The scores of the boxes
         thresh (float, optional): The threshold to remove regions.
 
     Returns:
@@ -264,18 +270,18 @@ def nms(starts, ends, thresh=0.5):
     y2 = ends[:, 1]
 
     area = (x2 - x1 + 1) * (y2 - y1 + 1)
-    idxs = np.argsort(y2)
+    idxs = np.argsort(scores)
 
-    pick = []
+    picks = []
     while len(idxs) > 0:
         last = len(idxs) - 1
-        i = idxs[last]
-        pick.append(i)
+        highest_indice = idxs[last]
+        picks.append(highest_indice)
 
-        xx1 = np.maximum(x1[i], x1[idxs[:last]])
-        yy1 = np.maximum(y1[i], y1[idxs[:last]])
-        xx2 = np.minimum(x2[i], x2[idxs[:last]])
-        yy2 = np.minimum(y2[i], y2[idxs[:last]])
+        xx1 = np.maximum(x1[highest_indice], x1[idxs[:last]])
+        yy1 = np.maximum(y1[highest_indice], y1[idxs[:last]])
+        xx2 = np.minimum(x2[highest_indice], x2[idxs[:last]])
+        yy2 = np.minimum(y2[highest_indice], y2[idxs[:last]])
 
         w = np.maximum(0, xx2 - xx1 + 1)
         h = np.maximum(0, yy2 - yy1 + 1)
@@ -285,7 +291,7 @@ def nms(starts, ends, thresh=0.5):
         idxs = np.delete(idxs, np.concatenate(
             ([last], np.where(overlap > thresh)[0])))
 
-    return pick
+    return picks
 
 
 def scoreToRegion(hm, imshape):
@@ -322,14 +328,12 @@ def scoreToRegion(hm, imshape):
 
     # Get the score densities
     bbscores = np.divide(bbscores, areas)
-
     picks = bbscores > 0.2
     if any(picks):
         bbscores = bbscores[picks]
         starts = starts[picks]
         ends = ends[picks]
-
-        picks = nms(starts, ends)
+        picks = nms(starts, ends, bbscores)
         bbscores = bbscores[picks]
         starts = starts[picks]
         ends = ends[picks]

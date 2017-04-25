@@ -126,8 +126,21 @@ class SingleImageLayer(caffe.Layer):
         from keras.preprocessing.image import ImageDataGenerator
         params = eval(self.param_str)
         self.images = params['images']
+        self.ext = params.get('extension', 'jpg')
+        self.batch_size = params.get('batch_size', 20)
+        self.patch_size = params.get('patch_size', (224, 224))
+        self.ppI = params.get('ppI', None)
         self.slicefile = params['slicefile']
         self.splitfile = params['splitfile']
+        self.negatives = params.get(
+            'negatives',
+            'data/tmp/var_neg/')
+        if isinstance(params['mean'], str):
+            self.mean = np.load(params['mean'])
+        else:
+            self.mean = np.array(params['mean'])
+
+        # Load slices
         if not isinstance(self.slicefile, list):
             self.slicefile = [self.slicefile]
         self.slices = []
@@ -136,17 +149,6 @@ class SingleImageLayer(caffe.Layer):
             if add_slices != {}:
                 self.slices.append(add_slices)
         n = sum([len(slices) for slices in self.slices])
-        if isinstance(params['mean'], str):
-            self.mean = np.load(params['mean'])
-        else:
-            self.mean = np.array(params['mean'])
-        self.ext = params.get('extension', 'jpg')
-        self.negatives = params.get(
-            'negatives',
-            'data/tmp/var_neg/')
-        self.batch_size = params.get('batch_size', 20)
-        self.patch_size = params.get('patch_size', (224, 224))
-        self.ppI = params.get('ppI', None)
 
         if self.ppI is None:
             if n >= 100:
