@@ -14,7 +14,7 @@ from scipy.misc import imresize
 from scipy.misc import imsave
 import skimage
 import subprocess
-import time
+# import time
 from tqdm import tqdm
 
 
@@ -402,47 +402,46 @@ class FCNPartRunner(NetRunner):
         self.prepare()
         self.forward_test()
         scoreboxf = self.results[:-1] + '.scores.yaml'
-        weightname = os.path.splitext(os.path.basename(self.net_weights))[0]
-        iteration = weightname.split('_')[-1]
+        # weightname = os.path.splitext(os.path.basename(self.net_weights))[0]
+        # iteration = weightname.split('_')[-1]
         if slicefile is not None:
             ba.eval.evalDect(scoreboxf, slicefile)
-            return True
-            ofile = ba.eval.evalYAML(
-                scoreboxf, slicefile, self.images, self.heatmaps)
-            # ofile = '.'.join(scoreboxf.split('.')[:-2] + ['evals', 'yaml'])
-            trainset = ba.SetList(self.dir + 'train.txt')
-            _soltestset = list(self.testset.set - trainset.set)
-            while(os.path.isfile(self.resultDB + '.lock')):
-                time.sleep(1)
-            ba.utils.touch(self.resultDB + '.lock')
-            db = ba.utils.load(self.resultDB)
-            if db is None:
-                db = {}
-            if self.name not in db:
-                db[self.name] = {}
-            if trainset is not None and self.testset is not None:
-                v_iou, v_dist, v_scal, v_n = ba.eval.extract_mean_evals(
-                    _soltestset, ofile)
-                v_mat = [['Network', self.name],
-                         ['Weights', weightname],
-                         ['Datums', v_n],
-                         ['MeanIOU', v_iou],
-                         ['MeanDistErr', v_dist],
-                         ['MeanScalErr', v_scal]]
-                db[self.name][str(iteration + '_test')] = v_mat
-                self.notify(matrix=v_mat)
-            if trainset is not None and len(trainset.list) > 0:
-                t_iou, t_dist, t_scal, t_n = ba.eval.extract_mean_evals(
-                    trainset.list, ofile)
-                t_mat = [['Network', self.name],
-                         ['Weights', weightname],
-                         ['Datums', t_n],
-                         ['MeanIOU', t_iou],
-                         ['MeanDistErr', t_dist],
-                         ['MeanScalErr', t_scal]]
-                db[self.name][str(iteration + '_train')] = t_mat
-            ba.utils.save(self.resultDB, db)
-            ba.utils.rm(self.resultDB + '.lock')
+            # ofile = ba.eval.evalYAML(
+            #     scoreboxf, slicefile, self.images, self.heatmaps)
+            # # ofile = '.'.join(scoreboxf.split('.')[:-2] + ['evals', 'yaml'])
+            # trainset = ba.SetList(self.dir + 'train.txt')
+            # _soltestset = list(self.testset.set - trainset.set)
+            # while(os.path.isfile(self.resultDB + '.lock')):
+            #     time.sleep(1)
+            # ba.utils.touch(self.resultDB + '.lock')
+            # db = ba.utils.load(self.resultDB)
+            # if db is None:
+            #     db = {}
+            # if self.name not in db:
+            #     db[self.name] = {}
+            # if trainset is not None and self.testset is not None:
+            #     v_iou, v_dist, v_scal, v_n = ba.eval.extract_mean_evals(
+            #         _soltestset, ofile)
+            #     v_mat = [['Network', self.name],
+            #              ['Weights', weightname],
+            #              ['Datums', v_n],
+            #              ['MeanIOU', v_iou],
+            #              ['MeanDistErr', v_dist],
+            #              ['MeanScalErr', v_scal]]
+            #     db[self.name][str(iteration + '_test')] = v_mat
+            #     self.notify(matrix=v_mat)
+            # if trainset is not None and len(trainset.list) > 0:
+            #     t_iou, t_dist, t_scal, t_n = ba.eval.extract_mean_evals(
+            #         trainset.list, ofile)
+            #     t_mat = [['Network', self.name],
+            #              ['Weights', weightname],
+            #              ['Datums', t_n],
+            #              ['MeanIOU', t_iou],
+            #              ['MeanDistErr', t_dist],
+            #              ['MeanScalErr', t_scal]]
+            #     db[self.name][str(iteration + '_train')] = t_mat
+            # ba.utils.save(self.resultDB, db)
+            # ba.utils.rm(self.resultDB + '.lock')
 
     def forward_batch(self, path_batch, mean=None):
         datas = []
