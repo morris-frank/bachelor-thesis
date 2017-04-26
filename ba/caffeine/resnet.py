@@ -333,4 +333,4 @@ class ResNet_Single(ResNet):
                     mean_file="data/models/resnet/ResNet_mean.binaryproto"
                     ))
         else:
-            self.n.data = L.Input(shape=[dict(dim=[1, 3, 500, 500])])
+            self.n.data = L.Input(shape=[dict(dim=[1, 3, 224, 224])])

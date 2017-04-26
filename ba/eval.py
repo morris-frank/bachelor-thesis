@@ -100,7 +100,7 @@ def evalYAML(predf, gtf, images, heatmaps=None):
         im = imread('{}{}.{}'.format(images, idx, ext_img))
         if heatmaps is not None:
             hm = imread('{}{}.{}'.format(heatmaps, idx, ext_hm))
-            hm = tf.resize(hm, im.shape[:-1])
+            hm = tf.resize(hm, im.shape[:-1], mode='reflect')
         imout = outputdir + idx + '.png'
         # Get the ground truth:
         gtslice = gts[idx]
