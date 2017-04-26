@@ -233,7 +233,7 @@ class Experiment(ba.utils.NotifierClass):
         '''Converts the source weights to an FCN'''
         import caffe
         caffe.set_mode_cpu()
-        caffe.set_device(self.sysargs.gpu)
+        caffe.set_device(self.sysargs.gpu[0])
         old_tag = self.conf['tag']
         if new_tag is None:
             mgroups = re.match('(.*_)([0-9]+samples)', old_tag).groups()
