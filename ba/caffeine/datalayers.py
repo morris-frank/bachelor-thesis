@@ -176,7 +176,8 @@ class SingleImageLayer(caffe.Layer):
         for it, neg in zip(range(1, len(negs) + 1), negs):
             im = self.imread(neg)
             im /= 255
-            im = tf.resize(im, (self.patch_size[0], self.patch_size[1], 3))
+            im = tf.resize(im, (self.patch_size[0], self.patch_size[1], 3),
+                           mode='reflect')
             im *= 255
             im -= self.mean
             self.samples[-it, ...] = im.transpose((2, 0, 1))
