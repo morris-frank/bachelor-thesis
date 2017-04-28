@@ -1,6 +1,17 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import seaborn as sns
+
+
+def plt_hm(hm):
+    fig, ax = newfig(0.9)
+    plt.axis('off')
+    ax = plt.Axes(fig, [0., 0., 1., 1.])
+    ax.set_axis_off()
+    fig.add_axes(ax)
+    plt.imshow(hm, cmap=sns.cubehelix_palette(as_cmap=True))
+    return fig
 
 
 def figsize(scale):

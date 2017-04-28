@@ -12,10 +12,6 @@ pgf_with_latex = {
     "pgf.texsystem": "pdflatex",
     "pgf.rcfonts": False,
     "text.usetex": False,
-    "font.family": "serif",
-    "font.serif": [],
-    "font.sans-serif": [],
-    "font.monospace": [],
     "pgf.preamble": [
         r"\usepackage[utf8x]{inputenc}",
         r"\usepackage[T1]{fontenc}",
