@@ -399,7 +399,6 @@ class FCNPartRunner(NetRunner):
                 will perform SelecSearch and BB errors..
         '''
         import ba.eval
-        self.prepare()
         self.forward_test(**kwargs)
         scoreboxf = self.results[:-1] + '.scores.yaml'
         # weightname = os.path.splitext(os.path.basename(self.net_weights))[0]

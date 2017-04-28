@@ -13,7 +13,6 @@ import re
 import shutil
 import signal
 import sys
-import time
 
 
 class RunMode(Enum):
@@ -200,14 +199,28 @@ class Experiment(ba.utils.NotifierClass):
 
     def _conv_test(self):
         import caffe
-        caffe.set_mode_cpu()
+        caffe.set_mode_gpu()
         caffe.set_device(self.sysargs.gpu[0])
 
         def inline_convert_to_fcn():
-            self.dir + 'deploy.prototxt'
-            self.net_weights
-            self.cnn.net_weights = weights
-            self.cnn.net = caffe.Net(model, weights, caffe.TEST)
+            modeldef = 'data/models/{}/deploy.prototxt'.format(
+                self.conf['tag'])
+            orig_modeldef = modeldef.replace('FCN_', '')
+            fc_net = caffe.Net(orig_modeldef, self.cnn.net_weights, caffe.TEST)
+            self.cnn.net = caffe.Net(modeldef, caffe.TEST)
+
+            old_params = ['fc']
+            new_params = ['fc_conv']
+
+            # Transplant all the unchanged weights
+            for param_name in fc_net.params:
+                if any([param_name == param for param in old_params]):
+                    continue
+                self.cnn.net.params[param_name] = fc_net.params[param_name]
+
+            self.cnn.net = ba.caffeine.surgery.convert_to_FCN(
+                self.cnn.net, fc_net, new_params, old_params)
+
             return False
 
         self._meta_test(callback=inline_convert_to_fcn)
@@ -220,6 +233,8 @@ class Experiment(ba.utils.NotifierClass):
 
     def _meta_test(self, callback=(lambda: True)):
         snapdir = self.conf['snapshot_dir'].format(self.conf['tag'])
+        if self.sysargs.tofcn:
+            snapdir = snapdir.replace('FCN_', '')
         weights = glob('{}*caffemodel'.format(snapdir))
         if len(weights) < 1:
             print('No weights found for {}'.format(self.conf['tag']))
@@ -237,11 +252,10 @@ class Experiment(ba.utils.NotifierClass):
             self.cnn.net_weights = w
             if self.conf['test_images'] != '':
                 self.cnn.images = self.conf['test_images']
-            time.sleep(10)
+            reset_net = callback()
             if 'slicefile' in self.conf:
-                self.cnn.test(self.conf['slicefile'])
+                self.cnn.test(self.conf['slicefile'], reset_net=reset_net)
             else:
-                reset_net = callback()
                 self.cnn.test(reset_net=reset_net)
             self.cnn.clear()
             return True
@@ -287,8 +301,9 @@ class Experiment(ba.utils.NotifierClass):
                 new_model_dir + 'deploy.prototxt', w, caffe.TEST)
             old_params = ['fc']
             new_params = ['fc_conv']
-            ba.caffeine.surgery.convertToFCN(
+            converted_net = ba.caffeine.surgery.convert_to_FCN(
                 new_net, old_net, new_params, old_params, new_weights)
+            converted_net.save(new_weights)
 
     def _multi_or_single_scale_exec(self, fptr):
         if 'train_sizes' in self.conf:
