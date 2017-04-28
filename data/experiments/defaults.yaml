@@ -11,3 +11,4 @@ test_images: ''
 tofcn: False
 train: ''
 val: ''
+snapshot_dir: 'data/models/{}/snapshots/'

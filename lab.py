@@ -16,11 +16,15 @@ def main(args):
     if e.sysargs.prepare:
         e.prepare()
     if e.sysargs.tofcn:
-        e.convert_to_FCN()
-    if e.sysargs.train:
-        e.train()
-    if e.sysargs.test:
-        e.test()
+        if e.sysargs.test:
+            e.conv_test()
+        else:
+            e.convert_to_FCN()
+    else:
+        if e.sysargs.train:
+            e.train()
+        if e.sysargs.test:
+            e.test()
     e.exit()
 
 

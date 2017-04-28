@@ -391,7 +391,7 @@ class FCNPartRunner(NetRunner):
                                                logf)
         return return_code
 
-    def test(self, slicefile=None):
+    def test(self, slicefile=None, **kwargs):
         '''Will test the net.
 
         Args:
@@ -400,7 +400,7 @@ class FCNPartRunner(NetRunner):
         '''
         import ba.eval
         self.prepare()
-        self.forward_test()
+        self.forward_test(**kwargs)
         scoreboxf = self.results[:-1] + '.scores.yaml'
         # weightname = os.path.splitext(os.path.basename(self.net_weights))[0]
         # iteration = weightname.split('_')[-1]
@@ -504,7 +504,7 @@ class FCNPartRunner(NetRunner):
                                                            data.shape[1:])
         return {bn: {'region': regions, 'score': rscores}}
 
-    def forward_list(self, setlist):
+    def forward_list(self, setlist, reset_net=True):
         '''Will forward a whole setlist through the network. Will default to the
         validation set.
 
@@ -517,9 +517,10 @@ class FCNPartRunner(NetRunner):
                 boxdict['score'] = boxdict['score'].tolist()
             ba.utils.save(path_score, scoreboxes)
         self.prepare()
-        self.create_net(self.dir + 'deploy.prototxt',
-                        self.net_weights,
-                        self.gpu[0])
+        if reset_net:
+            self.create_net(self.dir + 'deploy.prototxt',
+                            self.net_weights,
+                            self.gpu[0])
         mean, meanpath = self.get_mean()
         scoreboxes = {}
         path_score = self.results[:-1] + '.scores.yaml'
@@ -547,19 +548,19 @@ class FCNPartRunner(NetRunner):
                                                                weightname,
                                                                self.name))
 
-    def forward_val(self):
+    def forward_val(self, **kwargs):
         '''Will forward the whole validation set through the network.'''
         imgext = '.' + ba.utils.prevalent_extension(self.images)
         self.valset.add_pre_suffix(self.images, imgext)
-        self.forward_list(setlist=self.valset)
+        self.forward_list(setlist=self.valset, **kwargs)
         self.valset.rm_pre_suffix(self.images, imgext)
 
-    def forward_test(self):
+    def forward_test(self, **kwargs):
         '''Will forward the whole validation set through the network.'''
         imgext = '.' + ba.utils.prevalent_extension(self.images)
         self.testset.add_pre_suffix(self.images, imgext)
         random.shuffle(self.testset.list)
-        self.forward_list(setlist=self.testset)
+        self.forward_list(setlist=self.testset, **kwargs)
         self.testset.rm_pre_suffix(self.images, imgext)
 
 

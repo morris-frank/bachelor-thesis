@@ -178,6 +178,10 @@ class Experiment(ba.utils.NotifierClass):
         assert(self.sysargs.conf is not None)
         self._multi_or_single_scale_exec(self._test)
 
+    def conv_test(self):
+        assert(self.sysargs.conf is not None)
+        self._multi_or_single_scale_exec(self._conv_test)
+
     def train(self):
         assert(self.sysargs.conf is not None)
         self._multi_or_single_scale_exec(self._train)
@@ -194,11 +198,28 @@ class Experiment(ba.utils.NotifierClass):
         self.cnn.prepare()
         self.conf['weights'] = old_weights
 
+    def _conv_test(self):
+        import caffe
+        caffe.set_mode_cpu()
+        caffe.set_device(self.sysargs.gpu[0])
+
+        def inline_convert_to_fcn():
+            self.dir + 'deploy.prototxt'
+            self.net_weights
+            self.cnn.net_weights = weights
+            self.cnn.net = caffe.Net(model, weights, caffe.TEST)
+            return False
+
+        self._meta_test(callback=inline_convert_to_fcn)
+
     def _test(self):
         '''Tests the given experiment, Normally depends on user input. If --default
         flag is set will test EVERY snapshot previously saved.
         '''
-        snapdir = 'data/models/{}/snapshots/'.format(self.conf['tag'])
+        self._meta_test()
+
+    def _meta_test(self, callback=(lambda: True)):
+        snapdir = self.conf['snapshot_dir'].format(self.conf['tag'])
         weights = glob('{}*caffemodel'.format(snapdir))
         if len(weights) < 1:
             print('No weights found for {}'.format(self.conf['tag']))
@@ -220,7 +241,8 @@ class Experiment(ba.utils.NotifierClass):
             if 'slicefile' in self.conf:
                 self.cnn.test(self.conf['slicefile'])
             else:
-                self.cnn.test()
+                reset_net = callback()
+                self.cnn.test(reset_net=reset_net)
             self.cnn.clear()
             return True
 
@@ -238,13 +260,16 @@ class Experiment(ba.utils.NotifierClass):
         if new_tag is None:
             mgroups = re.match('(.*_)([0-9]+samples)', old_tag).groups()
             new_tag = '{}FCN_{}'.format(mgroups[0], mgroups[1])
-        old_dir = 'data/models/{}/'.format(old_tag)
-        new_dir = 'data/models/{}/'.format(new_tag)
+        old_model_dir = 'data/models/{}/'.format(old_tag)
+        new_model_dir = 'data/models/{}/'.format(new_tag)
         for f in ['train.txt', 'test.txt']:
-            if os.path.isfile(old_dir + f):
-                shutil.copy(src=old_dir + f, dst=new_dir)
-        new_snap_dir = ba.utils.touch('{}snapshots/'.format(new_dir))
-        weights = glob('{}*caffemodel'.format(old_dir + 'snapshots/'))
+            if os.path.isfile(old_model_dir + f):
+                shutil.copy(src=old_model_dir + f, dst=new_model_dir)
+
+        old_snap_dir = self.conf['snapshot_dir'].format(old_tag)
+        new_snap_dir = ba.utils.touch(
+            self.conf['snapshot_dir'].format(new_tag))
+        weights = glob('{}*caffemodel'.format(old_snap_dir))
         if len(weights) < 1:
             print('No weights found for {}'.format(self.conf['tag']))
             return False
@@ -256,8 +281,10 @@ class Experiment(ba.utils.NotifierClass):
                                           defaulting=self.sysargs.default):
                 continue
             print('CONVERTING ' + bn)
-            old_net = caffe.Net(old_dir + 'deploy.prototxt', w, caffe.TEST)
-            new_net = caffe.Net(new_dir + 'deploy.prototxt', w, caffe.TEST)
+            old_net = caffe.Net(
+                old_model_dir + 'deploy.prototxt', w, caffe.TEST)
+            new_net = caffe.Net(
+                new_model_dir + 'deploy.prototxt', w, caffe.TEST)
             old_params = ['fc']
             new_params = ['fc_conv']
             ba.caffeine.surgery.convertToFCN(
