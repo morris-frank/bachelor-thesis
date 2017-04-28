@@ -284,6 +284,12 @@ def slice_overlap(x1, x2, w):
     return SI / S
 
 
+def slicetupel_to_rect(slicetupel):
+    xs = slicetupel[0]
+    ys = slicetupel[1]
+    return [xs.start, ys.start, xs.stop, ys.stop]
+
+
 def rm(path):
     '''Removes a path with rm and all its content, recusively.
     With great power comes great responsibility!
