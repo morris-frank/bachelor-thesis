@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import seaborn as sns
 
+SEQUENTIAL_CMAP = sns.cubehelix_palette(start=0.5, rot=0.2, as_cmap=True)
+
 
 def plt_hm(hm):
     fig, ax = newfig(0.9)
@@ -10,7 +12,7 @@ def plt_hm(hm):
     ax = plt.Axes(fig, [0., 0., 1., 1.])
     ax.set_axis_off()
     fig.add_axes(ax)
-    plt.imshow(hm, cmap=sns.cubehelix_palette(as_cmap=True))
+    plt.imshow(hm, cmap=SEQUENTIAL_CMAP)
     return fig
 
 
@@ -32,8 +34,8 @@ def newfig(width=0.9):
 
 
 def savefig(filename):
-    plt.savefig('{}.pgf'.format(filename))
-    plt.savefig('{}.pdf'.format(filename))
+    plt.gcf().savefig('{}.pgf'.format(filename), dpi=200)
+    plt.gcf().savefig('{}.pdf'.format(filename), dpi=200)
 
 
 def _prepareImagePlot(image):
