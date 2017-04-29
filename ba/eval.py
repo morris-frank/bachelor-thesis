@@ -309,11 +309,11 @@ def scoreToRegion(hm, imshape):
     starts, ends, areas = _generic_box(imshape, scales=scales)
 
     # Add distance base negative penalty:
+    # TODO: DOES DIS MAKE ANY DIFFERENCE??
     thres = 0.01
     negative_hm = distance_transform_cdt(hm < thres).astype(float)
-    negative_hm_sum = np.sum(negative_hm)
-    if negative_hm_sum > 0:
-        negative_hm /= negative_hm_sum
+    if negative_hm.any():
+        negative_hm /= negative_hm.max()
         hm -= negative_hm
 
     # Construct the integral image
