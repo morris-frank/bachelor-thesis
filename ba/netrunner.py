@@ -523,12 +523,17 @@ class FCNPartRunner(NetRunner):
         self.valset.rm_pre_suffix(self.images, imgext)
 
     def forward_test(self, **kwargs):
-        '''Will forward the whole validation set through the network.'''
+        '''Will forward the whole validation set through the network.
+
+        Returns:
+            the filename of the ****scores.yaml File
+        '''
         imgext = '.' + ba.utils.prevalent_extension(self.images)
         self.testset.add_pre_suffix(self.images, imgext)
         random.shuffle(self.testset.list)
-        self.forward_list(setlist=self.testset, **kwargs)
+        scores_path = self.forward_list(setlist=self.testset, **kwargs)
         self.testset.rm_pre_suffix(self.images, imgext)
+        return scores_path
 
 
 class SlidingFCNPartRunner(FCNPartRunner):
