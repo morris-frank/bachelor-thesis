@@ -14,7 +14,7 @@ from scipy.misc import imresize
 from scipy.misc import imsave
 import skimage
 import subprocess
-# import time
+import time
 from tqdm import tqdm
 
 
@@ -399,48 +399,9 @@ class FCNPartRunner(NetRunner):
                 will perform SelecSearch and BB errors..
         '''
         import ba.eval
-        self.forward_test(**kwargs)
-        scoreboxf = self.results[:-1] + '.scores.yaml'
-        # weightname = os.path.splitext(os.path.basename(self.net_weights))[0]
-        # iteration = weightname.split('_')[-1]
+        scores_path = self.forward_test(**kwargs)
         if slicefile is not None:
-            ba.eval.evalDect(scoreboxf, slicefile)
-            # ofile = ba.eval.evalYAML(
-            #     scoreboxf, slicefile, self.images, self.heatmaps)
-            # # ofile = '.'.join(scoreboxf.split('.')[:-2] + ['evals', 'yaml'])
-            # trainset = ba.SetList(self.dir + 'train.txt')
-            # _soltestset = list(self.testset.set - trainset.set)
-            # while(os.path.isfile(self.resultDB + '.lock')):
-            #     time.sleep(1)
-            # ba.utils.touch(self.resultDB + '.lock')
-            # db = ba.utils.load(self.resultDB)
-            # if db is None:
-            #     db = {}
-            # if self.name not in db:
-            #     db[self.name] = {}
-            # if trainset is not None and self.testset is not None:
-            #     v_iou, v_dist, v_scal, v_n = ba.eval.extract_mean_evals(
-            #         _soltestset, ofile)
-            #     v_mat = [['Network', self.name],
-            #              ['Weights', weightname],
-            #              ['Datums', v_n],
-            #              ['MeanIOU', v_iou],
-            #              ['MeanDistErr', v_dist],
-            #              ['MeanScalErr', v_scal]]
-            #     db[self.name][str(iteration + '_test')] = v_mat
-            #     self.notify(matrix=v_mat)
-            # if trainset is not None and len(trainset.list) > 0:
-            #     t_iou, t_dist, t_scal, t_n = ba.eval.extract_mean_evals(
-            #         trainset.list, ofile)
-            #     t_mat = [['Network', self.name],
-            #              ['Weights', weightname],
-            #              ['Datums', t_n],
-            #              ['MeanIOU', t_iou],
-            #              ['MeanDistErr', t_dist],
-            #              ['MeanScalErr', t_scal]]
-            #     db[self.name][str(iteration + '_train')] = t_mat
-            # ba.utils.save(self.resultDB, db)
-            # ba.utils.rm(self.resultDB + '.lock')
+            ba.eval.evalDect(scores_path, slicefile)
 
     def forward_batch(self, path_batch, mean=None):
         datas = []
@@ -473,11 +434,11 @@ class FCNPartRunner(NetRunner):
         return scoreboxes
 
     def _postprocess_single_output(self, bn, score, imshape):
-        bn_hm = self.heatmaps + bn
-        # bn_ov = self.heatmaps[:-1] + '_overlays/' + bn
-        imsave(bn_hm + '.png', score)
+        # bn_hm = self.heatmaps + bn
+        # imsave(bn_hm + '.png', score)
         score = imresize(score, imshape)
         score = skimage.img_as_float(score)
+        # bn_ov = self.heatmaps[:-1] + '_overlays/' + bn
         # ba.plt.apply_overlay(im, score, bn_ov + '.png')
         regions, rscores = ba.eval.scoreToRegion(score, imshape)
         return regions, rscores
@@ -509,12 +470,15 @@ class FCNPartRunner(NetRunner):
 
         Args:
             setlist (SetList): The set to put forward
+
+        Returns:
+            the filename of the ****scores.yaml File
         '''
-        def save_scoreboxes(path_score, scoreboxes):
+        def save_scoreboxes(scores_path, scoreboxes):
             for boxdict in scoreboxes.values():
                 boxdict['region'] = boxdict['region'].tolist()
                 boxdict['score'] = boxdict['score'].tolist()
-            ba.utils.save(path_score, scoreboxes)
+            ba.utils.save(scores_path, scoreboxes)
         self.prepare()
         if reset_net:
             self.create_net(self.dir + 'deploy.prototxt',
@@ -522,7 +486,10 @@ class FCNPartRunner(NetRunner):
                             self.gpu[0])
         mean, meanpath = self.get_mean()
         scoreboxes = {}
-        path_score = self.results[:-1] + '.scores.yaml'
+        tstr = time.strftime('%b%d_%H:%M_', time.localtime())
+        path_split = os.path.split(os.path.normpath(self.results))
+        scores_path = '{}/{}{}.scores.yaml'.format(path_split[0], tstr,
+                                                   path_split[1])
         weightname = os.path.splitext(os.path.basename(self.net_weights))[0]
 
         def forward_batch(x):
@@ -542,10 +509,11 @@ class FCNPartRunner(NetRunner):
             res = forward(idx)
             if res is not False:
                 scoreboxes.update(res)
-        save_scoreboxes(path_score, scoreboxes)
+        save_scoreboxes(scores_path, scoreboxes)
         self.notify('Forwarded {} for weights {} of {}'.format(setlist.source,
                                                                weightname,
                                                                self.name))
+        return scores_path
 
     def forward_val(self, **kwargs):
         '''Will forward the whole validation set through the network.'''
