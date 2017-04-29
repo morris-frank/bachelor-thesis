@@ -11,7 +11,6 @@ import os
 import random
 import re
 import shutil
-import signal
 import sys
 
 
@@ -42,9 +41,6 @@ class Experiment(ba.utils.NotifierClass):
         if self.cnn is not None:
             self.cnn.clear()
 
-    def init_worker(self):
-        signal.signal(signal.SIGINT, signal.SIG_IGN)
-
     def parse_arguments(self):
         '''Parse the arguments for an experiment script'''
         parser = argparse.ArgumentParser(description='Runs a experiment')
@@ -57,6 +53,9 @@ class Experiment(ba.utils.NotifierClass):
         parser.add_argument('--test', action='store_true')
         parser.add_argument('--tofcn', action='store_true')
         parser.add_argument('--train', action='store_true')
+        parser.add_argument('--repeat', type=int, nargs=1, default=1,
+                            metavar='count',
+                            help='How often to repeat this experiment.')
         parser.add_argument('--bs', type=int, nargs=1, default=1,
                             metavar='count',
                             help='The batch size for training or testing.')
@@ -68,7 +67,7 @@ class Experiment(ba.utils.NotifierClass):
         parser.add_argument('conf', type=str, nargs='?',
                             help='The YAML conf file')
         self.sysargs = parser.parse_args(args=self.argv)
-        for item in ['conf', 'bs', 'threads']:
+        for item in ['conf', 'bs', 'threads', 'repeat']:
             if isinstance(self.sysargs.__dict__[item], list):
                 self.sysargs.__dict__[item] = self.sysargs.__dict__[item][0]
         self.threaded = self.sysargs.threads > 1
@@ -170,24 +169,30 @@ class Experiment(ba.utils.NotifierClass):
                              negatives=2, augment=2)
 
     def prepare(self):
-        assert(self.sysargs.conf is not None)
-        self._multi_or_single_scale_exec(self._prepare)
+        self._call_method(self._prepare)
 
     def test(self):
-        assert(self.sysargs.conf is not None)
-        self._multi_or_single_scale_exec(self._test)
+        '''Tests the given experiment, Normally depends on user input.
+        If --default flag is set will test EVERY snapshot previously saved.
+        '''
+        for _ in self.sysargs.repreat:
+            self._call_method(self._test)
 
     def conv_test(self):
-        assert(self.sysargs.conf is not None)
-        self._multi_or_single_scale_exec(self._conv_test)
+        '''Converts the network online into an FCN and tests the given
+        experiment, Normally depends on user input. If --default flag is set
+        will test EVERY snapshot previously saved.
+        '''
+        for _ in self.sysargs.repreat:
+            self._call_method(self._conv_test)
 
     def train(self):
-        assert(self.sysargs.conf is not None)
-        self._multi_or_single_scale_exec(self._train)
+        '''Trains the given experiment'''
+        self._call_method(self._train)
 
     def convert_to_FCN(self):
-        assert(self.sysargs.conf is not None)
-        self._multi_or_single_scale_exec(self._convert_to_FCN)
+        '''Converts the source weights to an FCN and saves them.'''
+        self._call_method(self._convert_to_FCN)
 
     def _prepare(self):
         print('Preparing all phases for {}.'.format(self.conf['tag']))
@@ -216,7 +221,9 @@ class Experiment(ba.utils.NotifierClass):
             for param_name in fc_net.params:
                 if any([param_name == param for param in old_params]):
                     continue
-                self.cnn.net.params[param_name] = fc_net.params[param_name]
+                for mat_idx in range(len(fc_net.params[param_name])):
+                    copied = fc_net.params[param_name][mat_idx].data
+                    self.cnn.net.params[param_name][mat_idx].data[...] = copied
 
             self.cnn.net = ba.caffeine.surgery.convert_to_FCN(
                 self.cnn.net, fc_net, new_params, old_params)
@@ -225,48 +232,11 @@ class Experiment(ba.utils.NotifierClass):
 
         self._meta_test(callback=inline_convert_to_fcn)
 
-    def _test(self):
-        '''Tests the given experiment, Normally depends on user input. If --default
-        flag is set will test EVERY snapshot previously saved.
-        '''
-        self._meta_test()
-
-    def _meta_test(self, callback=(lambda: True)):
-        snapdir = self.conf['snapshot_dir'].format(self.conf['tag'])
-        if self.sysargs.tofcn:
-            snapdir = snapdir.replace('FCN_', '')
-        weights = glob('{}*caffemodel'.format(snapdir))
-        if len(weights) < 1:
-            print('No weights found for {}'.format(self.conf['tag']))
-            self.prepare_network()
-            self.cnn.write('deploy')
-            return False
-        for w in weights:
-            bn = os.path.basename(w)
-            question = 'You want to test {}?'.format(bn)
-            if not ba.utils.query_boolean(question, default='yes',
-                                          defaulting=self.sysargs.default):
-                continue
-            print('TESTING {} for {}'.format(bn, self.conf['tag']))
-            self.prepare_network()
-            self.cnn.net_weights = w
-            if self.conf['test_images'] != '':
-                self.cnn.images = self.conf['test_images']
-            reset_net = callback()
-            if 'slicefile' in self.conf:
-                self.cnn.test(self.conf['slicefile'], reset_net=reset_net)
-            else:
-                self.cnn.test(reset_net=reset_net)
-            self.cnn.clear()
-            return True
-
     def _train(self):
-        '''Trains the given experiment'''
         self.prepare_network()
         return self.cnn.train()
 
     def _convert_to_FCN(self, new_tag=None):
-        '''Converts the source weights to an FCN'''
         import caffe
         caffe.set_mode_cpu()
         caffe.set_device(self.sysargs.gpu[0])
@@ -305,17 +275,46 @@ class Experiment(ba.utils.NotifierClass):
                 new_net, old_net, new_params, old_params, new_weights)
             converted_net.save(new_weights)
 
-    def _multi_or_single_scale_exec(self, fptr):
+    def _meta_test(self, callback=(lambda: True)):
+        snapdir = self.conf['snapshot_dir'].format(self.conf['tag'])
+        if self.sysargs.tofcn:
+            snapdir = snapdir.replace('FCN_', '')
+        weights = glob('{}*caffemodel'.format(snapdir))
+        if len(weights) < 1:
+            print('No weights found for {}'.format(self.conf['tag']))
+            self.prepare_network()
+            self.cnn.write('deploy')
+            return False
+        for w in weights:
+            bn = os.path.basename(w)
+            question = 'You want to test {}?'.format(bn)
+            if not ba.utils.query_boolean(question, default='yes',
+                                          defaulting=self.sysargs.default):
+                continue
+            print('TESTING {} for {}'.format(bn, self.conf['tag']))
+            self.prepare_network()
+            self.cnn.net_weights = w
+            if self.conf['test_images'] != '':
+                self.cnn.images = self.conf['test_images']
+            reset_net = callback()
+            if 'slicefile' in self.conf:
+                self.cnn.test(self.conf['slicefile'], reset_net=reset_net)
+            else:
+                self.cnn.test(reset_net=reset_net)
+            self.cnn.clear()
+
+    def _call_method(self, fptr):
+        assert(self.sysargs.conf is not None)
         if 'train_sizes' in self.conf:
-            self._multi_scale_exec(fptr, self.conf['train_sizes'])
+            self._call_multi_scaled(fptr, self.conf['train_sizes'])
         else:
             fptr()
 
-    def _thread_exec(self, fname, sema):
-        with sema:
-            self.__getattribute__(fname)()
+    def _call_multi_scaled(self, fptr, set_sizes):
+        def _exec_threaded(self, fname, sema):
+            with sema:
+                self.__getattribute__(fname)()
 
-    def _multi_scale_exec(self, fptr, set_sizes):
         from ba import SetList
         old_train_conf = self.conf['train']
         hyper_set = SetList(self.conf['train'])
@@ -323,14 +322,13 @@ class Experiment(ba.utils.NotifierClass):
         bname = self.conf['tag']
         fname = fptr.__name__
         if self.threaded:
-            # worker_pool = mp.Pool(self.sysargs.threads, self.init_worker)
             threads = []
             sema = mp.BoundedSemaphore(value=self.sysargs.threads)
         try:
             for set_size in set_sizes:
                 self.conf['tag'] = '{}_{}samples'.format(bname, set_size)
-                question = 'You want to run {} for {}?'.format(fptr.__name__,
-                                                               set_size)
+                question = 'You want to run {} for {}?'.format(
+                    fptr.__name__, set_size)
                 if not ba.utils.query_boolean(question, default='yes',
                                               defaulting=self.sysargs.default):
                     continue
@@ -345,7 +343,7 @@ class Experiment(ba.utils.NotifierClass):
                     worker = copy.deepcopy(self)
                     worker.conf['net'] = orig_net
                     self.conf['net'] = orig_net
-                    threads.append(mp.Process(target=worker._thread_exec,
+                    threads.append(mp.Process(target=worker._exec_threaded,
                                               args=(fname, sema,)))
                     threads[-1].start()
                 else:
@@ -353,7 +351,7 @@ class Experiment(ba.utils.NotifierClass):
                     if return_code is not None and return_code < 0:
                         break
         except KeyboardInterrupt:
-            print('\n\n_multi_scale_exec for {} was interrupted'.format(
+            print('\n\n_call_multi_scaled for {} was interrupted'.format(
                 fptr.__name__))
             if self.threaded:
                 for thread in threads:
