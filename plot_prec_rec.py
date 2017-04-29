@@ -7,7 +7,10 @@ from tqdm import tqdm
 import os
 import seaborn as sns
 
-ROOT = './data/results/Person_Head_FCN_*/classifier_train_iter_500.prec_rec.mp'
+obj = 'Person_Head'
+obj = 'Person_Torso'
+
+ROOT = './data/results/' + obj + '_FCN_*/classifier_train_iter_500.prec_rec.mp'
 
 with sns.color_palette("Set2", 10):
     fig, ax = ba.plt.newfig()
@@ -15,10 +18,10 @@ with sns.color_palette("Set2", 10):
         # it = str(os.path.basename(path))
         # it = it[len('classifier_train_iter_'):-len('.prec_rec.mp')]
         sp = os.path.dirname(path)
-        sp = sp[len('./data/results/Person_Head_FCN_'):]
+        sp = sp[len('./data/results/' + obj + '_FCN_'):]
         content = ba.utils.load(path)
         ax.plot(content[b'recall'], content[b'precision'], label=sp)
     plt.xlabel('recall')
-    plt.xlabel('precision')
+    plt.ylabel('precision')
     ax.legend()
-    ba.plt.savefig('./precs_recs')
+    ba.plt.savefig('./' + obj + '_precs_recs')
