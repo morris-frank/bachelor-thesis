@@ -175,7 +175,7 @@ class Experiment(ba.utils.NotifierClass):
         '''Tests the given experiment, Normally depends on user input.
         If --default flag is set will test EVERY snapshot previously saved.
         '''
-        for _ in self.sysargs.repreat:
+        for _ in range(self.sysargs.repeat):
             self._call_method(self._test)
 
     def conv_test(self):
@@ -183,7 +183,7 @@ class Experiment(ba.utils.NotifierClass):
         experiment, Normally depends on user input. If --default flag is set
         will test EVERY snapshot previously saved.
         '''
-        for _ in self.sysargs.repreat:
+        for _ in range(self.sysargs.repeat):
             self._call_method(self._conv_test)
 
     def train(self):
@@ -287,6 +287,8 @@ class Experiment(ba.utils.NotifierClass):
             return False
         for w in weights:
             bn = os.path.basename(w)
+            if '500' not in bn:
+                continue
             question = 'You want to test {}?'.format(bn)
             if not ba.utils.query_boolean(question, default='yes',
                                           defaulting=self.sysargs.default):
