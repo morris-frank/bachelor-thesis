@@ -97,7 +97,8 @@ class NetRunner(ba.utils.NotifierClass):
             'testset': '',
             'trainset': '',
             'valset': '',
-            'meanarray': None
+            'meanarray': None,
+            'quiet': False
             }
         self.__dict__.update(defaults)
         for (attr, value) in kwargs.items():
@@ -386,7 +387,7 @@ class FCNPartRunner(NetRunner):
                 self.solver_weights,
                 ','.join(str(x) for x in self.gpu),
                 self.dir + logf), shell=True)
-        if return_code >= 0:
+        if return_code >= 0 and not self.quiet:
             self.notifier._send_telegram_photo(self.notifier.lossgraph(logf),
                                                logf)
         return return_code
@@ -510,9 +511,9 @@ class FCNPartRunner(NetRunner):
             if res is not False:
                 scoreboxes.update(res)
         save_scoreboxes(scores_path, scoreboxes)
-        self.notify('Forwarded {} for weights {} of {}'.format(setlist.source,
-                                                               weightname,
-                                                               self.name))
+        if not self.quiet:
+            self.notify('Forwarded {} for weights {} of {}'.format(
+                setlist.source, weightname, self.name))
         return scores_path
 
     def forward_val(self, **kwargs):

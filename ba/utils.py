@@ -10,19 +10,6 @@ sys.path.append('../telenotify')
 notifier_config = '../telenotify/config.yaml'
 
 
-def static_vars(**kwargs):
-    '''A decorator with which it is possible to give functions static
-    variables. Use:
-        @static_vars(static_var=None)
-        def function(arg1, arg2):
-    '''
-    def decorate(func):
-        for k in kwargs:
-            setattr(func, k, kwargs[k])
-        return func
-    return decorate
-
-
 class NotifierClass(object):
     '''A class containing an notifer'''
     def __init__(self, *args, **kwargs):
@@ -301,6 +288,30 @@ def rm(path):
         print('Tried deleting {}, but that does not even exist'.format(path))
     else:
         os.system('rm -r {}'.format(path))
+
+
+def format_meter(n, total, elapsed):
+    def format_interval(t):
+        mins, s = divmod(int(t), 60)
+        h, m = divmod(mins, 60)
+        if h:
+            return '%d:%02d:%02d' % (h, m, s)
+        else:
+            return '%02d:%02d' % (m, s)
+    elapsed_str = format_interval(elapsed)
+    rate = '%5.2f' % (n / elapsed) if elapsed else '?'
+    frac = float(n) / total
+
+    N_BARS = 10
+    bar_length = int(frac * N_BARS)
+    bar = '#' * bar_length + '-' * (N_BARS - bar_length)
+
+    percentage = '%3d%%' % (frac * 100)
+
+    left_str = format_interval(elapsed / n * (total - n)) if n else '?'
+
+    return '|%s| %d/%d %s [elapsed: %s left: %s, %s iters/sec]' % (
+        bar, n, total, percentage, elapsed_str, left_str, rate)
 
 
 def grouper(iterable, n, fillvalue=None):

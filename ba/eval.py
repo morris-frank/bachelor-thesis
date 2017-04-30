@@ -5,7 +5,6 @@ import copy
 from matplotlib import pyplot as plt
 import numpy as np
 import skimage.transform as tf
-import sklearn.metrics
 from scipy.ndimage import distance_transform_cdt
 from scipy.misc import imread
 from tqdm import tqdm
@@ -48,7 +47,7 @@ def evalDect(predf, gtf):
 
     predicted_slices = ba.utils.load(predf)
     ground_truth_slices = ba.utils.load(gtf)
-    outputfile = '.'.join(predf.split('.')[:-2] + ['prec_rec', 'mp'])
+    outputfile = '.'.join(predf.split('.')[:-2] + ['results', 'mp'])
     print('Evaluating detection {}'.format(predf))
     hitted_labels = []
     pred_labels = []
@@ -64,15 +63,9 @@ def evalDect(predf, gtf):
         # Evaluate it:
         hitted_labels.extend([int(hits(rect, gt_rects)) for rect in rects])
         pred_labels.extend(scores)
-
-    pr, rc, th = sklearn.metrics.precision_recall_curve(hitted_labels,
-                                                        pred_labels,
-                                                        pos_label=1)
     ba.utils.save(outputfile,
-                  {'precision': pr.tolist(),
-                   'recall': rc.tolist(),
-                   'thresholds': th.tolist()})
-    return pr, rc, th
+                  {'hitted_labels': hitted_labels.tolist(),
+                   'pred_labels': pred_labels.tolist()})
 
 
 def evalYAML(predf, gtf, images, heatmaps=None):
@@ -191,7 +184,6 @@ def intersectArea(a, b):
         return 0.0
 
 
-# @static_vars(boxsets={})
 @cache(maxsize=32)
 def _generic_box(shape, scales=(2, 7, 15,), cache=True):
     '''Returns a generic grid of boxes for an image. A little bit like done
@@ -310,11 +302,11 @@ def scoreToRegion(hm, imshape):
 
     # Add distance base negative penalty:
     # TODO: DOES DIS MAKE ANY DIFFERENCE??
-    thres = 0.01
-    negative_hm = distance_transform_cdt(hm < thres).astype(float)
-    if negative_hm.any():
-        negative_hm /= negative_hm.max()
-        hm -= negative_hm
+    # thres = 0.01
+    # negative_hm = distance_transform_cdt(hm < thres).astype(float)
+    # if negative_hm.any():
+    #    negative_hm /= negative_hm.max()
+    #    hm -= negative_hm
 
     # Construct the integral image
     for i in range(hm.ndim):

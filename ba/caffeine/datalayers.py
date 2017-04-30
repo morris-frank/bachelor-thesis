@@ -199,10 +199,6 @@ class SingleImageLayer(caffe.Layer):
             data_format='channels_first'
             ).flow(self.samples, self.labels, batch_size=self.batch_size)
 
-        top[0].reshape(
-            self.batch_size, 3, self.patch_size[0], self.patch_size[1])
-        top[1].reshape(self.batch_size, 1)
-
     def load_slices(self, splitfile, slicefile):
         with open(splitfile, 'r') as f:
             imlist = [l[:-1] for l in f.readlines() if l.strip()]
@@ -244,7 +240,9 @@ class SingleImageLayer(caffe.Layer):
         return samples
 
     def reshape(self, bottom, top):
-        pass
+        top[0].reshape(
+            self.batch_size, 3, self.patch_size[0], self.patch_size[1])
+        top[1].reshape(self.batch_size, 1)
 
     def forward(self, bottom, top):
         # assign output
@@ -252,6 +250,7 @@ class SingleImageLayer(caffe.Layer):
         filled = x.shape[0]
         top[0].data[:filled, ...] = x
         top[1].data[:filled, ...] = y[..., np.newaxis]
+
         while filled < self.batch_size:
             x, y = next(self.flow)
             filling = x.shape[0]

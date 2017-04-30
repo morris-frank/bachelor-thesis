@@ -8,7 +8,7 @@ mean: 'data/models/resnet/ResNet_mean.npy'
 net: ba.caffeine.resnet.ResNet_Single(nconv3=4, nconv4=6).write
 slicefile: 'data/tmp/pascpart/patches/person_torso/seg.yaml'
 sliding_window: True
-snapshot: 100
+snapshot: 500
 stepsize: 500
 test_images: ''
 test_interval: 100

@@ -12,6 +12,11 @@ import random
 import re
 import shutil
 import sys
+import time
+
+DATASET = 'pascpart'
+DSSSOURCE = 'data/datasets/pascalparts/Annotations_Part/'
+MODELDIR = 'data/models/'
 
 
 class RunMode(Enum):
@@ -35,9 +40,58 @@ class Experiment(ba.utils.NotifierClass):
         self.cnn = None
         self.parse_arguments()
         if self.sysargs.conf is not None:
-            self.load_conf()
+            self.load_conf(self.sysargs.conf)
 
-    def exit(self):
+    def run(self):
+        if self.sysargs.repeat > 1:
+            for idx in range(self.sysargs.repeat):
+                start_time = time.time()
+                self._run_single()
+                end_time = time.time()
+                progres_str = ba.utils.format_meter(
+                    idx, self.sysargs.repeat, end_time - start_time)
+                self.notify('{}: {}'.format(self.conf['tag'], progres_str))
+        else:
+            self._run_single()
+
+    def _train_test_double(self):
+        fc_conf = self.sysargs.conf
+        fcn_conf = self.sysargs.conf[-5] + '_FCN.yaml'
+        self.load_conf(fc_conf)
+        self.prepare()
+        self.train()
+        self.load_conf(fcn_conf)
+        self.prepare()
+        self.conv_test()
+        self.clear()
+
+    def _run_single(self):
+        if self.sysargs.data_classes or self.sysargs.data_parts:
+            self.generate_data(
+                DATASET, DSSSOURCE,
+                classes=self.sysargs.data_classes,
+                parts=self.sysargs.data_parts)
+
+        if self.sysargs.train and self.sysargs.test and self.sysargs.tofcn:
+            return self._train_test_double()
+
+        if self.sysargs.prepare:
+            self.prepare()
+
+        if self.sysargs.train:
+            self.train()
+
+        if self.sysargs.test and not self.sysargs.tofcn:
+            self.test()
+
+        if self.sysargs.test and self.sysargs.tofcn:
+            self.conv_test()
+
+        if not self.sysargs.test and self.sysargs.tofcn:
+            self.convert_to_FCN()
+        self.clear()
+
+    def clear(self):
         if self.cnn is not None:
             self.cnn.clear()
 
@@ -56,7 +110,7 @@ class Experiment(ba.utils.NotifierClass):
         parser.add_argument('--repeat', type=int, nargs=1, default=1,
                             metavar='count',
                             help='How often to repeat this experiment.')
-        parser.add_argument('--bs', type=int, nargs=1, default=1,
+        parser.add_argument('--bs', type=int, nargs=1, default=0,
                             metavar='count',
                             help='The batch size for training or testing.')
         parser.add_argument('--threads', type=int, nargs=1, default=1,
@@ -71,14 +125,15 @@ class Experiment(ba.utils.NotifierClass):
             if isinstance(self.sysargs.__dict__[item], list):
                 self.sysargs.__dict__[item] = self.sysargs.__dict__[item][0]
         self.threaded = self.sysargs.threads > 1
+        self.quiet = self.sysargs.repeat > 1
 
-    def load_conf(self):
+    def load_conf(self, config_file):
         '''Open a YAML Configuration file and make a Bunch from it'''
         defaults = ba.utils.load('data/experiments/defaults.yaml')
-        self.conf = ba.utils.load(self.sysargs.conf)
+        self.conf = ba.utils.load(config_file)
         if 'tag' not in self.conf:
             self.conf['tag'] = os.path.basename(
-                os.path.splitext(self.sysargs.conf)[0])
+                os.path.splitext(config_file)[0])
         for key, value in defaults.items():
             if key not in self.conf:
                 self.conf[key] = value
@@ -100,8 +155,8 @@ class Experiment(ba.utils.NotifierClass):
                 else:
                     setattr(self, step + 'mode', RunMode.SINGLE)
             elif isinstance(self.conf[step], bool) and self.conf[step] is True:
-                self.conf[step] = 'data/models/{}/{}.txt'.format(
-                    self.conf['tag'], step)
+                self.conf[step] = '{}{}/{}.txt'.format(
+                    MODELDIR, self.conf['tag'], step)
             else:
                 print('''Stepfile for {} ({}) is not pointing to a
                       file or True.'''.format(step, self.conf[step]))
@@ -117,7 +172,6 @@ class Experiment(ba.utils.NotifierClass):
 
     def prepare_network(self):
         '''Prepares a NetRunner from the given configuration.'''
-        assert(self.sysargs.conf is not None)
         if self.conf['sliding_window']:
             runner = ba.netrunner.SlidingFCNPartRunner
         else:
@@ -130,7 +184,8 @@ class Experiment(ba.utils.NotifierClass):
                           net_generator=self.conf['net'],
                           images=self.conf['images'],
                           labels=self.conf['labels'],
-                          mean=self.conf['mean']
+                          mean=self.conf['mean'],
+                          quiet=self.quiet
                           )
 
         # Extra attributes for the cnn
@@ -175,16 +230,14 @@ class Experiment(ba.utils.NotifierClass):
         '''Tests the given experiment, Normally depends on user input.
         If --default flag is set will test EVERY snapshot previously saved.
         '''
-        for _ in range(self.sysargs.repeat):
-            self._call_method(self._test)
+        self._call_method(self._test)
 
     def conv_test(self):
         '''Converts the network online into an FCN and tests the given
         experiment, Normally depends on user input. If --default flag is set
         will test EVERY snapshot previously saved.
         '''
-        for _ in range(self.sysargs.repeat):
-            self._call_method(self._conv_test)
+        self._call_method(self._conv_test)
 
     def train(self):
         '''Trains the given experiment'''
@@ -208,8 +261,8 @@ class Experiment(ba.utils.NotifierClass):
         caffe.set_device(self.sysargs.gpu[0])
 
         def inline_convert_to_fcn():
-            modeldef = 'data/models/{}/deploy.prototxt'.format(
-                self.conf['tag'])
+            modeldef = '{}{}/deploy.prototxt'.format(
+                MODELDIR, self.conf['tag'])
             orig_modeldef = modeldef.replace('FCN_', '')
             fc_net = caffe.Net(orig_modeldef, self.cnn.net_weights, caffe.TEST)
             self.cnn.net = caffe.Net(modeldef, caffe.TEST)
@@ -244,8 +297,8 @@ class Experiment(ba.utils.NotifierClass):
         if new_tag is None:
             mgroups = re.match('(.*_)([0-9]+samples)', old_tag).groups()
             new_tag = '{}FCN_{}'.format(mgroups[0], mgroups[1])
-        old_model_dir = 'data/models/{}/'.format(old_tag)
-        new_model_dir = 'data/models/{}/'.format(new_tag)
+        old_model_dir = '{}{}/'.format(MODELDIR, old_tag)
+        new_model_dir = '{}{}/'.format(MODELDIR, new_tag)
         for f in ['train.txt', 'test.txt']:
             if os.path.isfile(old_model_dir + f):
                 shutil.copy(src=old_model_dir + f, dst=new_model_dir)
