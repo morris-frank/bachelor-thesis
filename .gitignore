@@ -20,6 +20,7 @@ data/datasets/
 data/models/
 data/results/
 data/log/
+data/tmp
 *snapshot*
 *.pkl
 *.mat

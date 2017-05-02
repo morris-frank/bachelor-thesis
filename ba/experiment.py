@@ -14,8 +14,6 @@ import shutil
 import sys
 import time
 
-DATASET = 'pascpart'
-DSSSOURCE = 'data/datasets/pascalparts/Annotations_Part/'
 MODELDIR = 'data/models/'
 
 
@@ -36,27 +34,26 @@ class Experiment(ba.utils.NotifierClass):
             argv (str): The options string
         '''
         super().__init__(**kwargs)
-        self.argv = argv
         self.cnn = None
-        self.parse_arguments()
-        if self.sysargs.conf is not None:
-            self.load_conf(self.sysargs.conf)
+        self.parse_arguments(argv)
+        if self.args.conf is not None:
+            self.load_conf(self.args.conf)
 
     def run(self):
-        if self.sysargs.repeat > 1:
-            for idx in range(self.sysargs.repeat):
+        if self.args.repeat > 1:
+            for idx in range(self.args.repeat):
                 start_time = time.time()
                 self._run_single()
                 end_time = time.time()
                 progres_str = ba.utils.format_meter(
-                    idx, self.sysargs.repeat, end_time - start_time)
+                    idx, self.args.repeat, end_time - start_time)
                 self.notify('{}: {}'.format(self.conf['tag'], progres_str))
         else:
             self._run_single()
 
     def _train_test_double(self):
-        fc_conf = self.sysargs.conf
-        fcn_conf = self.sysargs.conf[:-5] + '_FCN.yaml'
+        fc_conf = self.args.conf
+        fcn_conf = self.args.conf[:-5] + '_FCN.yaml'
         self.load_conf(fc_conf)
         self.prepare()
         self.train()
@@ -66,28 +63,22 @@ class Experiment(ba.utils.NotifierClass):
         self.clear()
 
     def _run_single(self):
-        if self.sysargs.data_classes or self.sysargs.data_parts:
-            self.generate_data(
-                DATASET, DSSSOURCE,
-                classes=self.sysargs.data_classes,
-                parts=self.sysargs.data_parts)
-
-        if self.sysargs.train and self.sysargs.test and self.sysargs.tofcn:
+        if self.args.train and self.args.test and self.args.tofcn:
             return self._train_test_double()
 
-        if self.sysargs.prepare:
+        if self.args.prepare:
             self.prepare()
 
-        if self.sysargs.train:
+        if self.args.train:
             self.train()
 
-        if self.sysargs.test and not self.sysargs.tofcn:
+        if self.args.test and not self.args.tofcn:
             self.test()
 
-        if self.sysargs.test and self.sysargs.tofcn:
+        if self.args.test and self.args.tofcn:
             self.conv_test()
 
-        if not self.sysargs.test and self.sysargs.tofcn:
+        if not self.args.test and self.args.tofcn:
             self.convert_to_FCN()
         self.clear()
 
@@ -95,13 +86,9 @@ class Experiment(ba.utils.NotifierClass):
         if self.cnn is not None:
             self.cnn.clear()
 
-    def parse_arguments(self):
+    def parse_arguments(self, argv):
         '''Parse the arguments for an experiment script'''
         parser = argparse.ArgumentParser(description='Runs a experiment')
-        parser.add_argument('--data_classes', type=str, nargs='+',
-                            metavar='class')
-        parser.add_argument('--data_parts', type=str, nargs='+',
-                            metavar='part')
         parser.add_argument('--default', action='store_true')
         parser.add_argument('--prepare', action='store_true')
         parser.add_argument('--test', action='store_true')
@@ -120,12 +107,12 @@ class Experiment(ba.utils.NotifierClass):
                             help='The GPU to use.', metavar='id')
         parser.add_argument('conf', type=str, nargs='?',
                             help='The YAML conf file')
-        self.sysargs = parser.parse_args(args=self.argv)
+        self.args = parser.parse_args(args=argv)
         for item in ['conf', 'bs', 'threads', 'repeat']:
-            if isinstance(self.sysargs.__dict__[item], list):
-                self.sysargs.__dict__[item] = self.sysargs.__dict__[item][0]
-        self.threaded = self.sysargs.threads > 1
-        self.quiet = self.sysargs.repeat > 1
+            if isinstance(self.args.__dict__[item], list):
+                self.args.__dict__[item] = self.args.__dict__[item][0]
+        self.threaded = self.args.threads > 1
+        self.quiet = self.args.repeat > 1
 
     def load_conf(self, config_file):
         '''Open a YAML Configuration file and make a Bunch from it'''
@@ -167,8 +154,8 @@ class Experiment(ba.utils.NotifierClass):
                 print('train_sizes shall be a list of integers.')
                 sys.exit()
 
-        if self.sysargs.bs > 0:
-            self.conf['batch_size'] = self.sysargs.bs
+        if self.args.bs > 0:
+            self.conf['batch_size'] = self.args.bs
 
     def prepare_network(self):
         '''Prepares a NetRunner from the given configuration.'''
@@ -214,15 +201,7 @@ class Experiment(ba.utils.NotifierClass):
             if switch in self.conf:
                 self.cnn.generator_switches[switch] = self.conf.get(switch,
                                                                     False)
-        self.cnn.gpu = self.sysargs.gpu
-
-    def generate_data(self, name, source, classes=None, parts=None):
-        '''Generates the training data for that experiment'''
-        ppset = ba.PascalPartSet(name, source, classes=classes, parts=parts,
-                                 defaulting=self.sysargs.default)
-        ppset.segmentations()
-        ppset.bounding_boxes('data/datasets/voc2010/JPEGImages/',
-                             negatives=2, augment=2)
+        self.cnn.gpu = self.args.gpu
 
     def prepare(self):
         self._call_method(self._prepare)
@@ -259,7 +238,7 @@ class Experiment(ba.utils.NotifierClass):
     def _conv_test(self):
         import caffe
         caffe.set_mode_gpu()
-        caffe.set_device(self.sysargs.gpu[0])
+        caffe.set_device(self.args.gpu[0])
 
         def inline_convert_to_fcn():
             modeldef = '{}{}/deploy.prototxt'.format(
@@ -293,7 +272,7 @@ class Experiment(ba.utils.NotifierClass):
     def _convert_to_FCN(self, new_tag=None):
         import caffe
         caffe.set_mode_cpu()
-        caffe.set_device(self.sysargs.gpu[0])
+        caffe.set_device(self.args.gpu[0])
         old_tag = self.conf['tag']
         if new_tag is None:
             mgroups = re.match('(.*_)([0-9]+samples)', old_tag).groups()
@@ -316,7 +295,7 @@ class Experiment(ba.utils.NotifierClass):
             new_weights = new_snap_dir + 'classifier_' + bn
             question = 'You want to convert {}?'.format(w)
             if not ba.utils.query_boolean(question, default='yes',
-                                          defaulting=self.sysargs.default):
+                                          defaulting=self.args.default):
                 continue
             print('CONVERTING ' + bn)
             old_net = caffe.Net(
@@ -331,7 +310,7 @@ class Experiment(ba.utils.NotifierClass):
 
     def _meta_test(self, callback=(lambda: True)):
         snapdir = self.conf['snapshot_dir'].format(self.conf['tag'])
-        if self.sysargs.tofcn:
+        if self.args.tofcn:
             snapdir = snapdir.replace('FCN_', '')
         weights = glob('{}*caffemodel'.format(snapdir))
         if len(weights) < 1:
@@ -345,7 +324,7 @@ class Experiment(ba.utils.NotifierClass):
                 continue
             question = 'You want to test {}?'.format(bn)
             if not ba.utils.query_boolean(question, default='yes',
-                                          defaulting=self.sysargs.default):
+                                          defaulting=self.args.default):
                 continue
             print('TESTING {} for {}'.format(bn, self.conf['tag']))
             self.prepare_network()
@@ -360,7 +339,7 @@ class Experiment(ba.utils.NotifierClass):
             self.cnn.clear()
 
     def _call_method(self, fptr):
-        assert(self.sysargs.conf is not None)
+        assert(self.args.conf is not None)
         if 'train_sizes' in self.conf:
             self._call_multi_scaled(fptr, self.conf['train_sizes'])
         else:
@@ -379,14 +358,14 @@ class Experiment(ba.utils.NotifierClass):
         fname = fptr.__name__
         if self.threaded:
             threads = []
-            sema = mp.BoundedSemaphore(value=self.sysargs.threads)
+            sema = mp.BoundedSemaphore(value=self.args.threads)
         try:
             for set_size in set_sizes:
                 self.conf['tag'] = '{}_{}samples'.format(bname, set_size)
                 question = 'You want to run {} for {}?'.format(
                     fptr.__name__, set_size)
                 if not ba.utils.query_boolean(question, default='yes',
-                                              defaulting=self.sysargs.default):
+                                              defaulting=self.args.default):
                     continue
                 if set_size == 0 or set_size > len(hyper_set.list):
                     self.conf['train'].list = hyper_set.list
