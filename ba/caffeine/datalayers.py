@@ -127,7 +127,7 @@ class SingleImageLayer(caffe.Layer):
         params = eval(self.param_str)
         self.images = params['images']
         self.ext = params.get('extension', 'jpg')
-        self.batch_size = params.get('batch_size', 20)
+        self.batch_size = params.get('batch_size', 15)
         self.patch_size = params.get('patch_size', (224, 224))
         self.ppI = params.get('ppI', None)
         self.slicefile = params['slicefile']

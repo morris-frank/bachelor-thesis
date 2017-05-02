@@ -140,13 +140,14 @@ class NetRunner(ba.utils.NotifierClass):
 
     def clear(self):
         '''Clears the nets and joins notifier threads'''
-        if self.net is not None:
-            del self.net
-        if self.solver is not None:
-            del self.solver
+        pass
+        # if self.net is not None:
+        #    del self.net
+        # if self.solver is not None:
+        #    del self.solver
         if len(self.notifier_threads) > 0:
-            for thread in self.notifier_threads:
-                thread.join(timeout=1.0)
+           for thread in self.notifier_threads:
+               thread.join(timeout=1.0)
 
     def create_net(self, model, weights, gpu):
         '''Creates the net inside the runner.

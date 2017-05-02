@@ -16,7 +16,8 @@ class PascalPartSet(object):
     _builddir = 'data/tmp/'
     _testtrain = 0.2
 
-    def __init__(self, name, root='.', parts=[], classes=[], dolists=True):
+    def __init__(self, name, root='.', parts=[], classes=[],
+                 dolists=True, defaulting=False):
         '''Constructs a new PascalPartSet
 
         Args:
@@ -32,6 +33,7 @@ class PascalPartSet(object):
         self.classlist = None
         self.parts = parts
         self.partslist = None
+        self.defaulting = defaulting
         if dolists:
             self.generate_lists()
 
@@ -102,7 +104,8 @@ class PascalPartSet(object):
             }
         overwrite = {}
         for name in ['source', 'class', 'parts']:
-            overwrite[name] = ba.utils.query_overwrite(f[name], default='no')
+            overwrite[name] = ba.utils.query_overwrite(
+                f[name], default='no', defaulting=self.defaulting)
             self.__dict__[name + 'list'] = SetList(f[name])
             self.__dict__[name + 'list'].add_pre_suffix(self.source,
                                                         self.extension)
@@ -124,6 +127,7 @@ class PascalPartSet(object):
                 if len(set(self.classes) &
                        item.classnames) > 0 or len(self.classes) < 1:
                     self.classlist.list.append(row)
+                    # print(item.classnames)
                     contains_any_parts = False
                     for classname in self.classes:
                         if contains_any_parts:
@@ -131,6 +135,7 @@ class PascalPartSet(object):
                         for parts_dict in item.parts[classname]:
                             if len(set(self.parts) &
                                    set(parts_dict.keys())) > 0:
+                                # print(parts_dict.keys())
                                 self.partslist.list.append(row)
                                 contains_any_parts = True
                                 break
@@ -144,8 +149,10 @@ class PascalPartSet(object):
             'parts': '{}segmentations/{}/'.format(self.build, self.tag)
             }
         overwrite = {
-            'classes': ba.utils.query_overwrite(d['classes'], default='no'),
-            'parts': ba.utils.query_overwrite(d['parts'], default='no')
+            'classes': ba.utils.query_overwrite(d['classes'], default='yes',
+                                                defaulting=self.defaulting),
+            'parts': ba.utils.query_overwrite(d['parts'], default='yes',
+                                              defaulting=self.defaulting)
             }
         if not sum(overwrite.values()):
             return True
@@ -182,7 +189,8 @@ class PascalPartSet(object):
             'class_img': ba.utils.touch(class_patches_base_dir + 'img/'),
             'class_seg': ba.utils.touch(class_patches_base_dir + 'seg/')
             }
-        if ba.utils.query_overwrite(part_patches_base_dir, default='yes'):
+        if ba.utils.query_overwrite(part_patches_base_dir, default='yes',
+                                    defaulting=self.defaulting):
             ext = ba.utils.prevalent_extension(imgdir)
 
             class_db = {}
@@ -231,7 +239,7 @@ class PascalPartSet(object):
 
     def augment_and_lmdb(self, part_patches_base_dir, augment):
         if ba.utils.query_overwrite(part_patches_base_dir + 'img_augmented/',
-                                    default='yes'):
+                                    default='yes', defaulting=self.defaulting):
             naugment = len(self.classlist) * augment
             self.augment_single(part_patches_base_dir + 'img/pos/', naugment)
             self.augment_single(part_patches_base_dir + 'img/neg/', naugment)

@@ -64,8 +64,8 @@ def evalDect(predf, gtf):
         hitted_labels.extend([int(hits(rect, gt_rects)) for rect in rects])
         pred_labels.extend(scores)
     ba.utils.save(outputfile,
-                  {'hitted_labels': hitted_labels.tolist(),
-                   'pred_labels': pred_labels.tolist()})
+                  {'hitted_labels': hitted_labels,
+                   'pred_labels': pred_labels})
 
 
 def evalYAML(predf, gtf, images, heatmaps=None):
@@ -301,12 +301,11 @@ def scoreToRegion(hm, imshape):
     starts, ends, areas = _generic_box(imshape, scales=scales)
 
     # Add distance base negative penalty:
-    # TODO: DOES DIS MAKE ANY DIFFERENCE??
-    # thres = 0.01
-    # negative_hm = distance_transform_cdt(hm < thres).astype(float)
-    # if negative_hm.any():
-    #    negative_hm /= negative_hm.max()
-    #    hm -= negative_hm
+    thres = 0.01
+    negative_hm = distance_transform_cdt(hm < thres).astype(float)
+    if negative_hm.any():
+      negative_hm /= negative_hm.max()
+      hm -= negative_hm
 
     # Construct the integral image
     for i in range(hm.ndim):

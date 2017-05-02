@@ -56,7 +56,7 @@ class Experiment(ba.utils.NotifierClass):
 
     def _train_test_double(self):
         fc_conf = self.sysargs.conf
-        fcn_conf = self.sysargs.conf[-5] + '_FCN.yaml'
+        fcn_conf = self.sysargs.conf[:-5] + '_FCN.yaml'
         self.load_conf(fc_conf)
         self.prepare()
         self.train()
@@ -218,7 +218,8 @@ class Experiment(ba.utils.NotifierClass):
 
     def generate_data(self, name, source, classes=None, parts=None):
         '''Generates the training data for that experiment'''
-        ppset = ba.PascalPartSet(name, source, classes=classes, parts=parts)
+        ppset = ba.PascalPartSet(name, source, classes=classes, parts=parts,
+                                 defaulting=self.sysargs.default)
         ppset.segmentations()
         ppset.bounding_boxes('data/datasets/voc2010/JPEGImages/',
                              negatives=2, augment=2)
