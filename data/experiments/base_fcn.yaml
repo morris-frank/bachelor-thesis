@@ -1,0 +1,12 @@
+images: 'data/datasets/voc2010/JPEGImages/'
+labels: 'data/tmp/pascpart/patches/person_torso/seg.yaml'
+mean: False
+net: ba.caffeine.resnet.ResNet_FCN(nconv3=4, nconv4=6).write
+slicefile: 'data/tmp/pascpart/patches/person_torso/seg.yaml'
+test_interval: 100
+test_images: 'data/tmp/mean_substracted_voc/'
+test: 'data/tmp/pascpart/person_torso.txt'
+tofcn: True
+train: True
+train_sizes: [1, 10, 25, 50, 100]
+val: True

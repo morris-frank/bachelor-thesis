@@ -1,4 +1,4 @@
-baselr: 1
+baselr: ''
 images: ''
 labels: ''
 mean: []

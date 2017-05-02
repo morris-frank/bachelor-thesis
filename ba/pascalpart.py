@@ -86,14 +86,12 @@ class PascalPartSet(object):
         self.build = self._builddir + '/' + self.__name + '/'
         ba.utils.touch(self.build)
 
-    def write(self):
-        '''Writes the generated lists to disk'''
-        for name in ['source', 'class', 'parts']:
-            self.__dict__[name + 'list'].rm_pre_suffix(self.source,
-                                                       self.extension)
-            self.__dict__[name + 'list'].write()
-            self.__dict__[name + 'list'].add_pre_suffix(self.source,
-                                                        self.extension)
+    def write(self, listn):
+        self.__dict__[listn + 'list'].rm_pre_suffix(self.source,
+                                                    self.extension)
+        self.__dict__[listn + 'list'].write()
+        self.__dict__[listn + 'list'].add_pre_suffix(self.source,
+                                                     self.extension)
 
     def generate_lists(self):
         '''Generates the *.txt lists for this set.'''
@@ -102,10 +100,15 @@ class PascalPartSet(object):
             'class': self.build + '_'.join(self.classes) + '.txt',
             'parts': self.build + self.tag + '.txt'
             }
-        overwrite = {}
+        overwrite = {
+            'source': ba.utils.query_overwrite(f['source'], default='no',
+                                               defaulting=self.defaulting),
+            'class': ba.utils.query_overwrite(f['class'], default='yes',
+                                              defaulting=self.defaulting),
+            'parts': ba.utils.query_overwrite(f['parts'], default='yes',
+                                              defaulting=self.defaulting)
+            }
         for name in ['source', 'class', 'parts']:
-            overwrite[name] = ba.utils.query_overwrite(
-                f[name], default='no', defaulting=self.defaulting)
             self.__dict__[name + 'list'] = SetList(f[name])
             self.__dict__[name + 'list'].add_pre_suffix(self.source,
                                                         self.extension)
@@ -117,6 +120,7 @@ class PascalPartSet(object):
             print('Generating List {}'.format(f['source']))
             self.sourcelist.load_directory(self.source)
             self.sourcelist.add_pre_suffix(self.source, self.extension)
+            self.write('source')
 
         if overwrite['class'] or overwrite['parts']:
             self.classlist.list = []
@@ -128,18 +132,12 @@ class PascalPartSet(object):
                        item.classnames) > 0 or len(self.classes) < 1:
                     self.classlist.list.append(row)
                     # print(item.classnames)
-                    contains_any_parts = False
-                    for classname in self.classes:
-                        if contains_any_parts:
-                            break
-                        for parts_dict in item.parts[classname]:
-                            if len(set(self.parts) &
-                                   set(parts_dict.keys())) > 0:
-                                # print(parts_dict.keys())
-                                self.partslist.list.append(row)
-                                contains_any_parts = True
-                                break
-        self.write()
+                    nrest = item.reduce(keep_parts=self.parts,
+                                        keep_classes=self.classes)
+                    if nrest > 0:
+                        self.partslist.list.append(row)
+        self.write('class')
+        self.write('parts')
 
     def segmentations(self, combine=True):
         '''Saves the segmentations for selected classes or parts.
@@ -154,9 +152,9 @@ class PascalPartSet(object):
             'parts': '{}segmentations/{}/'.format(self.build, self.tag)
             }
         overwrite = {
-            'classes': ba.utils.query_overwrite(d['classes'], default='no',
+            'classes': ba.utils.query_overwrite(d['classes'], default='yes',
                                                 defaulting=self.defaulting),
-            'parts': ba.utils.query_overwrite(d['parts'], default='no',
+            'parts': ba.utils.query_overwrite(d['parts'], default='yes',
                                               defaulting=self.defaulting)
             }
         if not any(overwrite.values()):
@@ -218,9 +216,8 @@ class PascalPartSet(object):
                 class_bound_boxes = item.bounding_box(mode='class')
                 item.target = d['patch_seg'] + idx
                 part_bound_boxes = item.bounding_box(mode='parts')
-                class_db[idx] = []
-                patch_db[idx] = []
                 patch_bb_list = []
+                class_bb_list = []
                 for classname in self.classes:
                     class_target = d['class_img'] + idx
                     patch_target = d['patch_pos'] + idx
@@ -228,14 +225,16 @@ class PascalPartSet(object):
                         class_target += '_' + classname
                         patch_target += '_' + classname
                     for it, bb in enumerate(class_bound_boxes[classname]):
-                        class_db[idx].append(bb)
+                        class_bb_list.append(bb)
                         imsave(class_target + '_' + str(it) + '.png', im[bb])
                     for it, bb in enumerate(part_bound_boxes[classname]):
-                        patch_db[idx].append(bb)
                         patch_bb_list.append(bb)
                         imsave(patch_target + '_' + str(it) + '.png', im[bb])
 
+                if len(class_bb_list) > 0:
+                    class_db[idx] = class_bb_list
                 if len(patch_bb_list) > 0:
+                    patch_db[idx] = patch_bb_list
                     self._generate_negatives(d['patch_neg'] + idx, im,
                                              patch_bb_list, negatives)
 
@@ -435,7 +434,7 @@ class PascalPart(object):
                     patch, bb = self._singularize(source.astype(int))
                     self.itemsave(target + '_' + str(it), patch)
                     bbs[classname].append(bb)
-            return bbs
+        return bbs
 
     def reduce(self, keep_parts=[], keep_classes=None, combine=True):
         '''Removes all object and all parts that are not given as keep..
@@ -452,15 +451,21 @@ class PascalPart(object):
         self.classnames &= keep_classes
         new_parts = collections.defaultdict(list)
         # Iterate over objects in image that we will keep
+        nrest = 0
         for classname in self.classnames:
             # Iterate over their parts
             for parts_dict in self.parts[classname]:
                 new_parts_dict = {}
-                for partname in set(parts_dict.keys()) & keep_parts:
-                    new_parts_dict[partname] = parts_dict[partname]
-                new_parts[classname].append(new_parts_dict)
+                # print(parts_dict.keys())
+                for partname in parts_dict.keys():
+                    if partname.split('_')[0] in keep_parts:
+                        new_parts_dict[partname] = parts_dict[partname]
+                        nrest += 1
+                if(len(new_parts_dict)) > 0:
+                    new_parts[classname].append(new_parts_dict)
         self.parts = new_parts
         self.unionize(combine=combine)
+        return nrest
 
     def unionize(self, combine=True):
         '''Generate the sum of the parts or the union of segmentations.

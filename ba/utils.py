@@ -110,7 +110,7 @@ def query_boolean(question, default='yes', defaulting=False):
                   '(or "y" or "n").')
 
 
-def query_overwrite(path, default='yes', defaulting=False):
+def query_overwrite(path, default='yes', defaulting=False, dotouch=True):
     '''Checks with the user if a file shall be overwritten
 
     Args:
@@ -121,7 +121,8 @@ def query_overwrite(path, default='yes', defaulting=False):
     '''
 
     if not os.path.exists(path):
-        touch(path)
+        if dotouch:
+            touch(path)
         return True
     else:
         question = ('File {} does exist.\n'

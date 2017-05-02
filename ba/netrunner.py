@@ -381,7 +381,8 @@ class FCNPartRunner(NetRunner):
         logf = '{}_{}_train.log'.format(
             datetime.datetime.now().strftime('%y_%m_%d_'), self.name)
         ba.utils.touch(self.dir + logf, clear=True)
-        self.LOGNotifiy(self.dir + logf)
+        if not self.quiet:
+            self.LOGNotifiy(self.dir + logf)
         return_code = subprocess.call(
             'caffe train -solver {} -weights {} -gpu {} 2>&1 | tee {}'.format(
                 self.dir + 'solver.prototxt',

@@ -1,4 +1,3 @@
-from ba import utils
 from scipy.misc import imread
 from tqdm import tqdm
 import numpy as np
@@ -50,14 +49,17 @@ class SetList(object):
         '''Loads the contents of self.source into the list. If source is a dir
         it will list all files in it without extensions. It does replace the
         whole content and does not append to it.'''
-        utils.touch(self.source)
+        # utils.touch(self.source)
         if os.path.isdir(self.source):
             self.load_directory(self.source)
             self.source = ''
             self.target = ''
         else:
-            with open(self.source) as f:
-                self.list = [l[:-1] for l in f.readlines() if l.strip()]
+            if not os.path.exists(self.source):
+                self.list = []
+            else:
+                with open(self.source) as f:
+                    self.list = [l[:-1] for l in f.readlines() if l.strip()]
 
     def load_directory(self, dir):
         '''Loads the contents of a dirctory into the list

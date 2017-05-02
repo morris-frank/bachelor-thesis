@@ -12,7 +12,6 @@ import random
 import re
 import shutil
 import sys
-import time
 
 MODELDIR = 'data/models/'
 
@@ -40,31 +39,32 @@ class Experiment(ba.utils.NotifierClass):
             self.load_conf(self.args.conf)
 
     def run(self):
-        if self.args.repeat > 1:
-            for idx in range(self.args.repeat):
-                start_time = time.time()
-                self._run_single()
-                end_time = time.time()
-                progres_str = ba.utils.format_meter(
-                    idx, self.args.repeat, end_time - start_time)
-                self.notify('{}: {}'.format(self.conf['tag'], progres_str))
+        if self.args.repeat:
+            self._run_single([1, 10, 25, 50, 100])
+            self._run_single([1, 10, 25, 50])
+            for _ in range(2):
+                self._run_single([1, 10, 25])
+            for _ in range(6):
+                self._run_single([1, 10])
         else:
             self._run_single()
 
-    def _train_test_double(self):
+    def _train_test_double(self, train_sizes):
         fc_conf = self.args.conf
         fcn_conf = self.args.conf[:-5] + '_FCN.yaml'
         self.load_conf(fc_conf)
+        self.conf['train_sizes'] = train_sizes
         self.prepare()
         self.train()
         self.load_conf(fcn_conf)
+        self.conf['train_sizes'] = train_sizes
         self.prepare()
         self.conv_test()
         self.clear()
 
-    def _run_single(self):
+    def _run_single(self, train_sizes=None):
         if self.args.train and self.args.test and self.args.tofcn:
-            return self._train_test_double()
+            return self._train_test_double(train_sizes)
 
         if self.args.prepare:
             self.prepare()
@@ -94,9 +94,7 @@ class Experiment(ba.utils.NotifierClass):
         parser.add_argument('--test', action='store_true')
         parser.add_argument('--tofcn', action='store_true')
         parser.add_argument('--train', action='store_true')
-        parser.add_argument('--repeat', type=int, nargs=1, default=1,
-                            metavar='count',
-                            help='How often to repeat this experiment.')
+        parser.add_argument('--repeat', action='store_true')
         parser.add_argument('--bs', type=int, nargs=1, default=0,
                             metavar='count',
                             help='The batch size for training or testing.')
@@ -108,11 +106,11 @@ class Experiment(ba.utils.NotifierClass):
         parser.add_argument('conf', type=str, nargs='?',
                             help='The YAML conf file')
         self.args = parser.parse_args(args=argv)
-        for item in ['conf', 'bs', 'threads', 'repeat']:
+        for item in ['conf', 'bs', 'threads']:
             if isinstance(self.args.__dict__[item], list):
                 self.args.__dict__[item] = self.args.__dict__[item][0]
         self.threaded = self.args.threads > 1
-        self.quiet = self.args.repeat > 1
+        self.quiet = self.args.repeat
 
     def load_conf(self, config_file):
         '''Open a YAML Configuration file and make a Bunch from it'''

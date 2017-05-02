@@ -20,11 +20,12 @@ data/datasets/
 data/models/
 data/results/
 data/log/
-data/tmp
+data/tmp*
+data/tmp/
 *snapshot*
 *.pkl
 *.mat
-*tmp/
+*tmp*
 *log*
 *lossgraph.png
 *.tags_swap

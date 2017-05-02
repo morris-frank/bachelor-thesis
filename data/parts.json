@@ -1,0 +1,122 @@
+[
+    {
+        "classes": ["cow", "sheep"],
+        "parts": ["left horn", "right horn"],
+        "shortparts": ["lhorn", "rhorn"]
+    },
+    {
+        "classes": ["aeroplane"],
+        "parts": ["left wing", "right wing"],
+        "shortparts": ["lwing", "rwing"]
+    },
+    {
+        "classes": ["bird"],
+        "parts": ["head"],
+        "shortparts": ["head"]
+    },
+    {
+        "classes": ["bottle"],
+        "parts": ["body"],
+        "shortparts": ["body"]
+    },
+    {
+        "classes": ["person"],
+        "parts": ["neck"],
+        "shortparts": ["neck"]
+    },
+    {
+        "classes": ["person"],
+        "parts": ["torso"],
+        "shortparts": ["torso"]
+    },
+    {
+        "classes": ["pottedplant"],
+        "parts": ["plant"],
+        "shortparts": ["plant"]
+    },
+    {
+        "classes": ["car"],
+        "parts": ["door"],
+        "shortparts": ["door"]
+    },
+    {
+        "classes": ["train"],
+        "parts": ["head front side"],
+        "shortparts": ["hfrontside"]
+    },
+    {
+        "classes": ["bird"],
+        "parts": ["beak"],
+        "shortparts": ["beak"]
+    },
+    {
+        "classes": ["person"],
+        "parts": ["left ear, right ear"],
+        "shortparts": ["lear", "rear"]
+    },
+    {
+        "classes": ["train"],
+        "parts": ["coach"],
+        "shortparts": ["coach"]
+    },
+    {
+        "classes": ["train"],
+        "parts": ["head"],
+        "shortparts": ["head"]
+    },
+    {
+        "classes": ["bird"],
+        "parts": ["tail"],
+        "shortparts": ["tail"]
+    },
+    {
+        "classes": ["aeroplane"],
+        "parts": ["stern"],
+        "shortparts": ["stern"]
+    },
+    {
+        "classes": ["aeroplane"],
+        "parts": ["engine"],
+        "shortparts": ["engine"]
+    },
+    {
+        "classes": ["person"],
+        "parts": ["left foot", "right foot"],
+        "shortparts": ["lfoot", "rfoot"]
+    },
+    {
+        "classes": ["person"],
+        "parts": ["left hand", "right hand"],
+        "shortparts": ["lhand", "rhand"]
+    },
+    {
+        "classes": ["person"],
+        "parts": ["hair"],
+        "shortparts": ["hair"]
+    },
+    {
+        "classes": ["motorbike"],
+        "parts": ["back wheel", "front wheel"],
+        "shortparts": ["bwheel", "fwheel"]
+    },
+    {
+        "classes": ["bicycle"],
+        "parts": ["backwheel", "frontwheel"],
+        "shortparts": ["bwheel", "fwheel"]
+    },
+    {
+        "classes": ["bird"],
+        "parts": ["left wing", "right wing"],
+        "shortparts": ["lwing", "rwing"]
+    },
+    {
+        "classes": ["person"],
+        "parts": ["head"],
+        "shortparts": ["head"]
+    },
+    {
+        "classes": ["bus", "car"],
+        "parts": ["back license plate", "front license plate"],
+        "shortparts": ["bliplate", "fliplate"]
+    }
+]
