@@ -2,6 +2,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import seaborn as sns
+from tqdm import tqdm
+import ba.utils
+import sklearn.metrics
+from glob import glob
 
 SEQUENTIAL_CMAP = sns.cubehelix_palette(start=0.5, rot=0.2, as_cmap=True)
 
@@ -126,3 +130,46 @@ def apply_rect(image, rects, path=None, colors='black', labels='', fig=None):
         _fig.savefig(path, pad_inches=0, dpi=_fig.dpi)
         plt.close(_fig)
     return _fig
+
+
+def plt_results_for_tag(tag, mode):
+    ITER = '500'
+
+    root = './data/results/' + tag + '_FCN_*/'
+    results = '*iter_' + ITER + '*results.mp'
+
+    sns.set_palette("Set2", 5)
+    fig, ax = newfig()
+    roots = glob(root)
+    roots.sort()
+    for path in tqdm(roots, desc=tag):
+        sp = path[len('./data/results/' + tag + '_FCN_'):-1]
+
+        hitted_labels = []
+        pred_labels = []
+        for rmppath in tqdm(glob(path + results), desc=sp):
+            rmp = ba.utils.load(rmppath)
+            hitted_labels.extend(rmp[b'hitted_labels'])
+            pred_labels.extend(rmp[b'pred_labels'])
+
+        if mode == 'AUC':
+            auc = sklearn.metrics.roc_auc_score(hitted_labels, pred_labels)
+            tqdm.write('{}; {}'.format(sp, auc))
+        elif mode == 'PR':
+            pr, rc, th = sklearn.metrics.precision_recall_curve(
+                hitted_labels, pred_labels, pos_label=1)
+            ax.plot(rc, pr, label=sp)
+        elif mode == 'ROC':
+            fpr, tpr, th = sklearn.metrics.roc_curve(
+                hitted_labels, pred_labels, pos_label=1)
+            ax.plot(fpr, tpr, label=sp)
+    if mode == 'PR':
+        plt.xlabel('recall')
+        plt.ylabel('precision')
+        ax.legend()
+        savefig('./build/' + tag + '_precs_recs')
+    elif mode == 'ROC':
+        plt.xlabel('false positive rate')
+        plt.ylabel('true positive rate')
+        ax.legend()
+        savefig('./build/' + tag + '_roc')

@@ -5,7 +5,7 @@ from ba.experiment import Experiment
 import multiprocessing as mp
 from itertools import count
 
-GPUS = [2, 3]
+GPUS = [0]
 TMPEXP = './data/tmp/experiments/'
 PPTMP = 'data/tmp/pascpart/'
 
@@ -22,9 +22,12 @@ def run(fpath):
     with open(fpath) as f:
         parts = json.load(f)
 
-    for idx, partschunk in zip(count(), chunks(parts, int(len(parts) / 3))):
-        p = mp.Process(target=runIter, args=(partschunk, GPUS[idx]))
-        p.start()
+    parts_per_gpu = int(len(parts) / len(GPUS))
+
+    for idx, partschunk in zip(count(), chunks(parts, parts_per_gpu)):
+        runIter(partschunk, GPUS[idx])
+        # p = mp.Process(target=runIter, args=(partschunk, GPUS[idx]))
+        # p.start()
 
 
 def runIter(parts, gpu):
@@ -71,4 +74,4 @@ def runSingle(classes, parts, gpu):
 
 
 if __name__ == '__main__':
-    run('./data/parts.json')
+    run('./data/parts_second_run_3.json')
