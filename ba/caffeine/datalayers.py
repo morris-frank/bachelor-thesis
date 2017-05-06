@@ -4,13 +4,10 @@
 '''
 import ba.utils
 import caffe
-from itertools import count
-from glob import glob
 import numpy as np
 from PIL import Image
 import random
 from scipy.misc import imread
-import skimage.transform as tf
 import yaml
 
 
@@ -123,7 +120,6 @@ class SingleImageLayer(caffe.Layer):
     '''
     '''
     def setup(self, bottom, top):
-        from keras.preprocessing.image import ImageDataGenerator
         params = eval(self.param_str)
         self.images = params['images']
         self.ext = params.get('extension', 'jpg')
@@ -140,47 +136,18 @@ class SingleImageLayer(caffe.Layer):
         else:
             self.mean = np.array(params['mean'])
 
-        # Load slices
-        if not isinstance(self.slicefile, list):
-            self.slicefile = [self.slicefile]
-        self.slices = []
-        n = 0
-        for slicefile in self.slicefile:
-            add_slices, n_slices = self.load_slices(self.splitfile, slicefile)
-            n += n_slices
-            if add_slices != {}:
-                self.slices.append(add_slices)
+        with open(self.splitfile, 'r') as f:
+            imlist = [l[:-1] for l in f.readlines() if l.strip()]
 
-        if self.ppI is None:
-            if n >= 100:
-                self.ppI = 2
-            elif n >= 50:
-                self.ppI = 4
-            else:
-                self.ppI = 16
-
-        self.samples = np.zeros((n * self.ppI * 2, 3,
-                                 self.patch_size[0], self.patch_size[1]))
-        it = 0
-        for slices in self.slices:
-            for path, bblist in slices.items():
-                im = self.imread('{}{}.{}'.format(self.images, path, self.ext))
-                for bb in bblist:
-                    subslice = slice(it, n * self.ppI, n)
-                    self.samples[subslice, ...] = self.generate_samples(im, bb)
-                    it += 1
-        self.labels = np.append(np.ones(n * self.ppI),
-                                np.zeros(n * self.ppI))
-        negs = glob(self.negatives + '/*png')
-        negs = random.sample(negs, n * self.ppI)
-        for it, neg in zip(range(1, len(negs) + 1), negs):
-            im = self.imread(neg)
-            im /= 255
-            im = tf.resize(im, (self.patch_size[0], self.patch_size[1], 3),
-                           mode='reflect')
-            im *= 255
-            im -= self.mean
-            self.samples[-it, ...] = im.transpose((2, 0, 1))
+        self.flow = ba.utils.SamplesGenerator(
+            self.slicefile,
+            imlist,
+            self.images,
+            self.negatives,
+            ppI=self.ppI,
+            patch_size=self.patch_size,
+            ext=self.ext,
+            mean=self.mean).flow(self.batch_size)
 
         # two tops: data and label
         if len(top) != 2:
@@ -188,56 +155,6 @@ class SingleImageLayer(caffe.Layer):
         # data layers have no bottoms
         if len(bottom) != 0:
             raise Exception("Do not define a bottom.")
-
-        self.flow = ImageDataGenerator(
-            rotation_range=15,
-            shear_range=0.2,
-            zoom_range=0.2,
-            width_shift_range=0.05,
-            height_shift_range=0.05,
-            horizontal_flip=True,
-            data_format='channels_first'
-            ).flow(self.samples, self.labels, batch_size=self.batch_size)
-
-    def load_slices(self, splitfile, slicefile):
-        with open(splitfile, 'r') as f:
-            imlist = [l[:-1] for l in f.readlines() if l.strip()]
-        slicelist = ba.utils.load(slicefile)
-        slice_dict = {im: slicelist[im] for im in imlist if im in slicelist}
-        n_slices = sum([len(sl) for sl in slice_dict.values()])
-        return slice_dict, n_slices
-
-    def bounding_box_shape(self, bb):
-        return (bb[0].stop - bb[0].start,
-                bb[1].stop - bb[1].start)
-
-    def generate_samples(self, im, bb, shiftfactor=0.25, nsamples=None):
-        if nsamples is None:
-            nsamples = self.ppI
-        if nsamples % 2 != 0:
-            raise ValueError('Count in SingleImageLayer is not divisble by 2.')
-        bbshape = self.bounding_box_shape(bb)
-        padded_im = np.pad(im, ((bbshape[0], bbshape[0]),
-                                (bbshape[1], bbshape[1]), (0, 0),),
-                           mode='reflect')
-
-        rands = (2 * np.random.random((2, nsamples)) - 1) * shiftfactor + 1
-        xsamples = (bbshape[0] * rands[0]).astype(np.int)
-        ysamples = (bbshape[1] * rands[1]).astype(np.int)
-
-        samples = np.zeros((nsamples, 3,
-                            self.patch_size[0], self.patch_size[1]))
-        for it, xsample, ysample in zip(count(), xsamples, ysamples):
-            _x = [bb[0].start, bb[0].stop] + xsample
-            _y = [bb[1].start, bb[1].stop] + ysample
-            patch = np.copy(padded_im[_x[0]:_x[1], _y[0]:_y[1], :])
-            patch /= 255
-            sized_patch = tf.resize(patch, (self.patch_size[0],
-                                            self.patch_size[1], 3))
-            sized_patch *= 255
-            sized_patch -= self.mean
-            samples[it, ...] = sized_patch.transpose((2, 0, 1))
-        return samples
 
     def reshape(self, bottom, top):
         top[0].reshape(
@@ -265,9 +182,3 @@ class SingleImageLayer(caffe.Layer):
 
     def backward(self, top, propagate_down, bottom):
         pass
-
-    def imread(self, path):
-        im = imread(path)
-        im = np.array(im, dtype=np.float32)
-        im = im[:, :, ::-1]
-        return im

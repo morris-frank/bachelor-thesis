@@ -57,7 +57,7 @@ def _prepareImagePlot(image):
     ax.set_axis_off()
     fig.add_axes(ax)
     plt.imshow(image, interpolation='none')
-    return fig
+    return fig, ax
 
 
 def apply_overlay(image, overlay, path=None, label='', fig=None):
@@ -87,7 +87,7 @@ def apply_overlay(image, overlay, path=None, label='', fig=None):
     return _fig
 
 
-def apply_rect(image, rects, path=None, colors='black', labels='', fig=None):
+def apply_rect(image, rects, path=None, colors='black', labels=''):
     '''Overlay rectangle onto image and save to path
     (full path with extension!)
 
@@ -99,12 +99,7 @@ def apply_rect(image, rects, path=None, colors='black', labels='', fig=None):
         labels (str, list[str], optional): The for the rectangles
         fig (plt.figure, optional): An optional figure to work on
     '''
-    if path is None and fig is None:
-        raise RuntimeError
-    if fig is None:
-        _fig = _prepareImagePlot(image)
-    else:
-        _fig = fig
+    fig, ax = _prepareImagePlot(image)
     if not isinstance(rects, list):
         rects = [rects]
     if not isinstance(colors, list):
@@ -118,18 +113,17 @@ def apply_rect(image, rects, path=None, colors='black', labels='', fig=None):
     for rect, color, label in zip(rects, colors, labels):
         height = rect[2] - rect[0]
         width = rect[3] - rect[1]
-        ca = plt.gca()
-        ca.add_patch(mpatches.Rectangle((rect[1], rect[0]), width, height,
+        ax.add_patch(mpatches.Rectangle((rect[1], rect[0]), width, height,
                                         fill=None, alpha=1, ec=color,
                                         label=label))
         if label != '':
             bbox_props = dict(boxstyle='square', fc='w', ec='w')
-            ca.text(rect[3] - 3, rect[0] + 5, label, ha='right', va='top',
+            ax.text(rect[3] - 3, rect[0] + 5, label, ha='right', va='top',
                     size='xx-small', bbox=bbox_props)
-    if fig is None:
-        _fig.savefig(path, pad_inches=0, dpi=_fig.dpi)
-        plt.close(_fig)
-    return _fig
+    if path:
+        fig.savefig(path, pad_inches=0, dpi=fig.dpi)
+        plt.close(fig)
+    return fig
 
 
 def plt_results_for_tag(tag, mode):

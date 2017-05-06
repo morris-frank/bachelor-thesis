@@ -5,6 +5,11 @@ import os.path
 import sys
 import threading
 import yaml
+from itertools import count
+import numpy as np
+import skimage.transform as tf
+import scipy.misc
+import random
 
 sys.path.append('../telenotify')
 notifier_config = '../telenotify/config.yaml'
@@ -329,3 +334,121 @@ def grouper(iterable, n, fillvalue=None):
     '''
     args = [iter(iterable)] * n
     return zip_longest(*args, fillvalue=fillvalue)
+
+
+def bounding_box_shape(self, bb):
+    return (bb[0].stop - bb[0].start,
+            bb[1].stop - bb[1].start)
+
+
+class SamplesGenerator(object):
+    def __init__(self, slicefiles, imlist, images_path, negatives_path,
+                 ppI=None, patch_size=(100, 100), ext='jpg', mean=0):
+        '''
+        Args:
+            slicefiles (str or list of str)
+            imlist (list of str)
+            images_path (str)
+            negatives_path (str)
+            ppI (int, optionale)
+            patch_size (tupel, optional)
+            ext (str, optional)
+            mean (ndarray, optional)
+        '''
+        self.patch_size = patch_size
+        self.ext = ext
+        self.mean = mean
+        self.imlist = imlist
+
+        if not isinstance(slicefiles, list):
+            slicefiles = [slicefiles]
+        list_of_slice_dicts = []
+        n = 0
+        for slicefile in slicefiles:
+            add_slices, n_slices = self.load_slice_dict(slicefile)
+            n += n_slices
+            if add_slices != {}:
+                list_of_slice_dicts.append(add_slices)
+
+        if ppI is None:
+            if n >= 100:
+                self.ppI = 2
+            elif n >= 50:
+                self.ppI = 4
+            else:
+                self.ppI = 16
+        if self.ppI % 2 != 0:
+            raise ValueError('Count in SingleImageLayer is not divisble by 2.')
+
+        self.samples = np.zeros((n * self.ppI * 2, 3,
+                                 patch_size[0], patch_size[1]))
+        it = 0
+        for slice_dict in list_of_slice_dicts:
+            for path, bblist in slice_dict.items():
+                im = self.imread('{}{}.{}'.format(images_path, path, ext))
+                for bb in bblist:
+                    subslice = slice(it, n * self.ppI, n)
+                    self.samples[subslice, ...] = self.sample_image(
+                        im, bb, mean=mean, patch_size=patch_size,
+                        nsamples=self.ppI)
+                    it += 1
+        self.labels = np.append(np.ones(n * self.ppI), np.zeros(n * self.ppI))
+        negs = glob(negatives_path + '/*png')
+        negs = random.sample(negs, n * self.ppI)
+        for it, neg in zip(range(1, len(negs) + 1), negs):
+            im = self.imread(neg)
+            im /= 255
+            im = tf.resize(im, (patch_size[0], patch_size[1], 3),
+                           mode='reflect')
+            im *= 255
+            im -= mean
+            self.samples[-it, ...] = im.transpose((2, 0, 1))
+
+    def imread(self, path):
+        im = scipy.misc.imread(path)
+        im = np.array(im, dtype=np.float32)
+        im = im[:, :, ::-1]
+        return im
+
+    def sample_image(self, im, bb, shiftfactor=0.25):
+        bbshape = bounding_box_shape(bb)
+        padded_im = np.pad(im, ((bbshape[0], bbshape[0]),
+                                (bbshape[1], bbshape[1]), (0, 0),),
+                           mode='reflect')
+
+        rands = (2 * np.random.random((2, self.ppI)) - 1) * shiftfactor + 1
+        xsamples = (bbshape[0] * rands[0]).astype(np.int)
+        ysamples = (bbshape[1] * rands[1]).astype(np.int)
+
+        samples = np.zeros((self.ppI, 3,
+                            self.patch_size[0], self.patch_size[1]))
+        for it, xsample, ysample in zip(count(), xsamples, ysamples):
+            _x = [bb[0].start, bb[0].stop] + xsample
+            _y = [bb[1].start, bb[1].stop] + ysample
+            patch = np.copy(padded_im[_x[0]:_x[1], _y[0]:_y[1], :])
+            patch /= 255
+            sized_patch = tf.resize(patch, (self.patch_size[0],
+                                            self.patch_size[1], 3))
+            sized_patch *= 255
+            sized_patch -= self.mean
+            samples[it, ...] = sized_patch.transpose((2, 0, 1))
+        return samples
+
+    def load_slice_dict(self, slicefile):
+        slicedict = load(slicefile)
+        cut_slice_dict = {i: slicedict[i] for i in self.imlist
+                          if i in slicedict}
+        n_slices = sum([len(sl) for sl in cut_slice_dict.values()])
+        return cut_slice_dict, n_slices
+
+    def flow(self, batch_size=10):
+        from keras.preprocessing.image import ImageDataGenerator
+        return ImageDataGenerator(
+            rotation_range=15,
+            shear_range=0.2,
+            zoom_range=0.2,
+            width_shift_range=0.05,
+            height_shift_range=0.05,
+            horizontal_flip=True,
+            data_format='channels_first'
+            ).flow(self.samples, self.labels, batch_size=batch_size)
