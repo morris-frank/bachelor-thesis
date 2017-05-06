@@ -443,7 +443,7 @@ class FCNPartRunner(NetRunner):
         score = skimage.img_as_float(score)
         # bn_ov = self.heatmaps[:-1] + '_overlays/' + bn
         # ba.plt.apply_overlay(im, score, bn_ov + '.png')
-        regions, rscores = ba.eval.scoreToRegion(score, imshape)
+        regions, rscores = ba.eval.scoreToRegion(score)
         return regions, rscores
 
     def forward_single(self, path, mean=None):

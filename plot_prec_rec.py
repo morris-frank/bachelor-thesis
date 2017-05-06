@@ -6,6 +6,12 @@ tags = ['bird_head', 'cow_sheep_lhorn_rhorn', 'train_hfrontside',
         'bottle_body', 'train_coach', 'person_neck', 'train_head', 'bird_tail',
         'person_torso', 'aeroplane_stern', 'pottedplant_plant']
 
+tags = ['bicycle_bwheel_fwheel', 'bird_lwing_rwing', 'person_torso',
+        'car_door', 'person_head', 'bird_beak']
+
+tags = ['person_lfoot_rfoot', 'person_lhand_rhand', 'person_hair',
+        'motorbike_bwheel_fwheel']
+
 for mode in ['PR', 'ROC', 'AUC']:
     for tag in tags:
         ba.plt.plt_results_for_tag(tag, mode)

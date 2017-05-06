@@ -5,7 +5,7 @@ from ba.experiment import Experiment
 import multiprocessing as mp
 from itertools import count
 
-GPUS = [0]
+GPUS = [3]
 TMPEXP = './data/tmp/experiments/'
 PPTMP = 'data/tmp/pascpart/'
 
@@ -66,12 +66,13 @@ def writeYAMLS(tag):
 def runSingle(classes, parts, gpu):
     tag = buildTag(classes, parts)
     writeYAMLS(tag)
-    argv = ['--gpu', str(gpu), '--repeat', '--train', '--test', '--tofcn',
-            TMPEXP + tag + '.yaml', '--default']
-    e = Experiment(argv)
-    e.run()
-    noti.notify('Run ' + tag)
+    print(tag)
+    # argv = ['--gpu', str(gpu), '--repeat', '--train', '--test', '--tofcn',
+    #         TMPEXP + tag + '.yaml', '--default']
+    # e = Experiment(argv)
+    # e.run()
+    # noti.notify('Run ' + tag)
 
 
 if __name__ == '__main__':
-    run('./data/parts_second_run_3.json')
+    run('./data/parts.json')

@@ -208,7 +208,7 @@ class Experiment(ba.utils.NotifierClass):
         '''Tests the given experiment, Normally depends on user input.
         If --default flag is set will test EVERY snapshot previously saved.
         '''
-        self._call_method(self._test)
+        self._call_method(self._meta_test)
 
     def conv_test(self):
         '''Converts the network online into an FCN and tests the given
@@ -265,7 +265,12 @@ class Experiment(ba.utils.NotifierClass):
 
     def _train(self):
         self.prepare_network()
-        return self.cnn.train()
+        import time
+        stime = time.time()
+        self.cnn.train()
+        etime = time.time()
+        print('Trained in {}'.format(etime - stime))
+        # return self.cnn.train()
 
     def _convert_to_FCN(self, new_tag=None):
         import caffe

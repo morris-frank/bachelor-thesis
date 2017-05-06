@@ -336,7 +336,7 @@ def grouper(iterable, n, fillvalue=None):
     return zip_longest(*args, fillvalue=fillvalue)
 
 
-def bounding_box_shape(self, bb):
+def bounding_box_shape(bb):
     return (bb[0].stop - bb[0].start,
             bb[1].stop - bb[1].start)
 
@@ -356,9 +356,9 @@ class SamplesGenerator(object):
             mean (ndarray, optional)
         '''
         self.patch_size = patch_size
-        self.ext = ext
         self.mean = mean
         self.imlist = imlist
+        self.ppI = ppI
 
         if not isinstance(slicefiles, list):
             slicefiles = [slicefiles]
@@ -388,9 +388,7 @@ class SamplesGenerator(object):
                 im = self.imread('{}{}.{}'.format(images_path, path, ext))
                 for bb in bblist:
                     subslice = slice(it, n * self.ppI, n)
-                    self.samples[subslice, ...] = self.sample_image(
-                        im, bb, mean=mean, patch_size=patch_size,
-                        nsamples=self.ppI)
+                    self.samples[subslice, ...] = self.sample_image(im, bb)
                     it += 1
         self.labels = np.append(np.ones(n * self.ppI), np.zeros(n * self.ppI))
         negs = glob(negatives_path + '/*png')
@@ -428,7 +426,8 @@ class SamplesGenerator(object):
             patch = np.copy(padded_im[_x[0]:_x[1], _y[0]:_y[1], :])
             patch /= 255
             sized_patch = tf.resize(patch, (self.patch_size[0],
-                                            self.patch_size[1], 3))
+                                            self.patch_size[1], 3),
+                                    mode='reflect')
             sized_patch *= 255
             sized_patch -= self.mean
             samples[it, ...] = sized_patch.transpose((2, 0, 1))

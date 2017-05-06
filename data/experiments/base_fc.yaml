@@ -10,7 +10,7 @@ sliding_window: True
 snapshot: 500
 stepsize: 500
 test_images: ''
-test_interval: 500
+test_interval: 1000
 test: 'data/tmp/pascpart/person_torso.txt'
 train_sizes: [1, 10, 25, 50, 100]
 train: 'data/tmp/pascpart/person_torso.txt'
