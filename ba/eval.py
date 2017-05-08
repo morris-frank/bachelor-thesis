@@ -48,7 +48,7 @@ def evalDect(predf, gtf):
     predicted_slices = ba.utils.load(predf)
     ground_truth_slices = ba.utils.load(gtf)
     outputfile = '.'.join(predf.split('.')[:-2] + ['results', 'mp'])
-    print('Evaluating detection {}'.format(predf))
+    tqdm.write('Evaluating detection {}'.format(predf))
     hitted_labels = []
     pred_labels = []
     for idx, pred in tqdm(predicted_slices.items()):
@@ -302,18 +302,18 @@ def scoreToRegion(hm):
     # Add distance base negative penalty:
     thres = 0.01
     negative_hm = distance_transform_cdt(hm < thres).astype(float)
-    if negative_hm.any():
+    if negative_hm.max() > 0:
       negative_hm /= negative_hm.max()
-      hm -= negative_hm
+    ii = hm - negative_hm
 
     # Construct the integral image
-    for i in range(hm.ndim):
-        hm = hm.cumsum(axis=i)
+    for i in range(ii.ndim):
+        ii = ii.cumsum(axis=i)
 
     # Calculates the sum of an box
     def bbscore(s, e):
-        return hm[s[0], s[1]] + hm[e[0],
-                                   e[1]] - hm[s[0], e[1]] - hm[e[0], s[1]]
+        return ii[s[0], s[1]] + ii[e[0],
+                                   e[1]] - ii[s[0], e[1]] - ii[e[0], s[1]]
     bbscores = np.array([bbscore(s, e) for s, e in zip(starts, ends)])
 
     # Get the score densities

@@ -9,6 +9,8 @@ from itertools import count
 import numpy as np
 import skimage.transform as tf
 import scipy.misc
+import skimage.color
+from threading import Thread
 import random
 
 sys.path.append('../telenotify')
@@ -243,7 +245,7 @@ def sliding_window(image, stride=None, kernel_size=(10, 10)):
     '''Slides a quadratic window over an image.
 
     Args:
-        image (image): The image to use
+        image (image): The image to use, channels_last orderin!!!
         stride (int): The step size for the sliding window
         kernel_size (int): Width of the window
     '''
@@ -343,7 +345,8 @@ def bounding_box_shape(bb):
 
 class SamplesGenerator(object):
     def __init__(self, slicefiles, imlist, images_path, negatives_path,
-                 ppI=None, patch_size=(100, 100), ext='jpg', mean=0):
+                 ppI=None, patch_size=(100, 100), ext='jpg', mean=0,
+                 batch_size=10):
         '''
         Args:
             slicefiles (str or list of str)
@@ -357,8 +360,12 @@ class SamplesGenerator(object):
         '''
         self.patch_size = patch_size
         self.mean = mean
+        if isinstance(self.mean, np.ndarray) and self.mean.ndim == 3:
+            self.mean = self.mean.transpose((2, 0, 1))
         self.imlist = imlist
         self.ppI = ppI
+        self.batch_size = batch_size
+        self.negatives_path = negatives_path
 
         if not isinstance(slicefiles, list):
             slicefiles = [slicefiles]
@@ -391,16 +398,43 @@ class SamplesGenerator(object):
                     self.samples[subslice, ...] = self.sample_image(im, bb)
                     it += 1
         self.labels = np.append(np.ones(n * self.ppI), np.zeros(n * self.ppI))
-        negs = glob(negatives_path + '/*png')
+        self.gen_negs(n)
+        self.gen_flow()
+        self.reset_threads()
+
+    def gen_negs(self, n):
+        negs = glob(self.negatives_path + '/*png')
         negs = random.sample(negs, n * self.ppI)
         for it, neg in zip(range(1, len(negs) + 1), negs):
             im = self.imread(neg)
             im /= 255
-            im = tf.resize(im, (patch_size[0], patch_size[1], 3),
+            im = tf.resize(im, (self.patch_size[0], self.patch_size[1], 3),
                            mode='reflect')
-            im *= 255
-            im -= mean
             self.samples[-it, ...] = im.transpose((2, 0, 1))
+
+    def gen_flow(self, batch_size=None):
+        from keras.preprocessing.image import ImageDataGenerator
+        if batch_size is None:
+            batch_size = self.batch_size
+        self.flow = ImageDataGenerator(
+            rotation_range=15,
+            shear_range=0.2,
+            zoom_range=0.2,
+            width_shift_range=0.05,
+            height_shift_range=0.05,
+            horizontal_flip=True,
+            data_format='channels_first',
+            preprocessing_function=self.preprocess_image
+            ).flow(self.samples, self.labels, batch_size=batch_size)
+
+    def reset_threads(self):
+        self.thread_count = 10
+        self.x_res = [None] * self.thread_count
+        self.y_res = [None] * self.thread_count
+        self.threads = [None] * self.thread_count
+        self.focus = 0
+        for n in range(self.thread_count):
+            self._rethread(n)
 
     def imread(self, path):
         im = scipy.misc.imread(path)
@@ -428,8 +462,7 @@ class SamplesGenerator(object):
             sized_patch = tf.resize(patch, (self.patch_size[0],
                                             self.patch_size[1], 3),
                                     mode='reflect')
-            sized_patch *= 255
-            sized_patch -= self.mean
+            # sized_patch *= 255
             samples[it, ...] = sized_patch.transpose((2, 0, 1))
         return samples
 
@@ -440,14 +473,37 @@ class SamplesGenerator(object):
         n_slices = sum([len(sl) for sl in cut_slice_dict.values()])
         return cut_slice_dict, n_slices
 
-    def flow(self, batch_size=10):
-        from keras.preprocessing.image import ImageDataGenerator
-        return ImageDataGenerator(
-            rotation_range=15,
-            shear_range=0.2,
-            zoom_range=0.2,
-            width_shift_range=0.05,
-            height_shift_range=0.05,
-            horizontal_flip=True,
-            data_format='channels_first'
-            ).flow(self.samples, self.labels, batch_size=batch_size)
+    def _rethread(self, n):
+        self.threads[n] = Thread(target=self._next, args=(n, ))
+        self.threads[n].start()
+
+    def _next(self, n):
+        x, y = next(self.flow)
+        self.x_res[n] = x
+        self.y_res[n] = y
+
+    def preprocess_image(self, im):
+        hsv_im = skimage.color.rgb2hsv(im.transpose(1, 2, 0))
+        power_s = random.uniform(0.25, 4)
+        power_v = random.uniform(0.25, 4)
+        factor_s = random.uniform(0.7, 1.4)
+        factor_v = random.uniform(0.7, 1.4)
+        value_s = random.uniform(-0.1, 0.1)
+        value_v = random.uniform(-0.1, 0.1)
+        hsv_im[:, :, 1] = np.power(hsv_im[:, :, 1], power_s)
+        hsv_im[:, :, 1] = hsv_im[:, :, 1] * factor_s + value_s
+        hsv_im[:, :, 2] = np.power(hsv_im[:, :, 2], power_v)
+        hsv_im[:, :, 2] = hsv_im[:, :, 2] * factor_v + value_v
+        im = skimage.color.hsv2rgb(hsv_im).transpose(2, 0, 1)
+        im *= 255
+        im -= self.mean
+        return im
+
+    def next(self):
+        if self.threads[self.focus].isAlive():
+            self.threads[self.focus].join()
+        x = self.x_res[self.focus]
+        y = self.y_res[self.focus]
+        self._rethread(self.focus)
+        self.focus = (self.focus + 1) % self.thread_count
+        return x, y

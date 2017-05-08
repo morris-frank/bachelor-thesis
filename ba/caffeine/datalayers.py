@@ -147,7 +147,8 @@ class SingleImageLayer(caffe.Layer):
             ppI=self.ppI,
             patch_size=self.patch_size,
             ext=self.ext,
-            mean=self.mean).flow(self.batch_size)
+            mean=self.mean,
+            batch_size=self.batch_size)
 
         # two tops: data and label
         if len(top) != 2:
@@ -163,13 +164,13 @@ class SingleImageLayer(caffe.Layer):
 
     def forward(self, bottom, top):
         # assign output
-        x, y = next(self.flow)
+        x, y = self.flow.next()
         filled = x.shape[0]
         top[0].data[:filled, ...] = x
         top[1].data[:filled, ...] = y[..., np.newaxis]
 
         while filled < self.batch_size:
-            x, y = next(self.flow)
+            x, y = self.flow.next()
             filling = x.shape[0]
             if filling + filled >= self.batch_size:
                 rem = self.batch_size - filled

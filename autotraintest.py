@@ -5,7 +5,7 @@ from ba.experiment import Experiment
 import multiprocessing as mp
 from itertools import count
 
-GPUS = [3]
+GPUS = [2, 3]
 TMPEXP = './data/tmp/experiments/'
 PPTMP = 'data/tmp/pascpart/'
 
@@ -25,9 +25,9 @@ def run(fpath):
     parts_per_gpu = int(len(parts) / len(GPUS))
 
     for idx, partschunk in zip(count(), chunks(parts, parts_per_gpu)):
-        runIter(partschunk, GPUS[idx])
-        # p = mp.Process(target=runIter, args=(partschunk, GPUS[idx]))
-        # p.start()
+        # runIter(partschunk, GPUS[idx])
+        p = mp.Process(target=runIter, args=(partschunk, GPUS[idx]))
+        p.start()
 
 
 def runIter(parts, gpu):
@@ -66,12 +66,11 @@ def writeYAMLS(tag):
 def runSingle(classes, parts, gpu):
     tag = buildTag(classes, parts)
     writeYAMLS(tag)
-    print(tag)
-    # argv = ['--gpu', str(gpu), '--repeat', '--train', '--test', '--tofcn',
-    #         TMPEXP + tag + '.yaml', '--default']
-    # e = Experiment(argv)
-    # e.run()
-    # noti.notify('Run ' + tag)
+    argv = ['--gpu', str(gpu), '--repeat', '--train', '--test', '--tofcn',
+            TMPEXP + tag + '.yaml', '--default']
+    e = Experiment(argv)
+    e.run()
+    noti.notify('Run ' + tag)
 
 
 if __name__ == '__main__':

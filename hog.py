@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
+import sys
 import ba.utils
 from ba.baseline import Baseline
+from glob import glob
 
 noti = ba.utils.NotifierClass()
+
+rd = 'data/tmp/baseline/'
 
 tags = [
     'pottedplant_plant',
@@ -15,19 +19,26 @@ tags = [
     ]
 
 
+def get_count(tag, n):
+    return len(glob('{}*{}samples*yaml'.format(tag, n)))
+
+
 def run(tag):
+    if tag not in tags:
+        return False
     baseline = Baseline(tag)
-    for _ in range(10):
+    for _ in range(max(0, 10 - get_count(tag, 1))):
         baseline.run(1)
+    for _ in range(max(0, 10 - get_count(tag, 10))):
         baseline.run(10)
-    for _ in range(4):
+    for _ in range(max(0, 4 - get_count(tag, 25))):
         baseline.run(25)
-    for _ in range(2):
+    for _ in range(max(0, 2 - get_count(tag, 50))):
         baseline.run(50)
-    baseline.run(100)
+    for _ in range(max(0, 1 - get_count(tag, 100))):
+        baseline.run(100)
     noti.notify('Finished baseline for {}'.format(tag))
 
 
 if __name__ == '__main__':
-    for tag in tags:
-        run(tag)
+    run(sys.argv[1])

@@ -33,3 +33,4 @@ data/tmp/
 *.prof
 *.mp
 *~
+*.save

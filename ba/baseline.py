@@ -36,6 +36,7 @@ class Baseline(object):
 
     def features(self, image, feature_vector=True):
         # Images are in BGR order !!
+        # And channels_first ndims...
         greyscale = 0.2125 * image[2] + 0.7154 * image[1] + 0.0721 * image[0]
         hog_array = skimage.feature.hog(greyscale, block_norm='L2-Hys',
                                         feature_vector=feature_vector)
@@ -46,22 +47,22 @@ class Baseline(object):
 
     def test_single_scale(self, im, scale):
         width = int(224 / scale)
-        PpC = 8 / scale
+        PpC = int(8 / scale)
         padded_im = np.pad(im, ((width, width),
                                 (width, width), (0, 0)), mode='reflect')
         padded_hm = np.zeros(padded_im.shape[:-1])
-        padded_im = padded_im.transpose((2, 0, 1))
         slider = ba.utils.sliding_window(
             padded_im, stride=int(width / 2), kernel_size=(width, width))
-        full_hog = self.features(padded_im, feature_vector=False)
+        full_hog = self.features(padded_im.transpose((2, 0, 1)),
+                                 feature_vector=False)
         for x1, y1, window in slider:
             # Image coordinate to hog coordniates:
             hx1 = int(max(x1 // PpC - 3 + 1, 0))
             hy1 = int(max(y1 // PpC - 3 + 1, 0))
 
-            if hx1 > full_hog.shape[0] - 26:
+            if hx1 + 26 > full_hog.shape[0]:
                 continue
-            if hy1 > full_hog.shape[1] - 26:
+            if hy1 + 26 > full_hog.shape[1]:
                 continue
 
             window_features = full_hog[hx1:hx1 + 26, hy1:hy1 + 26, ...]
@@ -69,8 +70,7 @@ class Baseline(object):
 
             score = self.model.predict(window_features)
             padded_hm[x1:x1 + width, y1:y1 + width] += max(0, score)
-        hm = padded_hm[width:-width, width:-width]
-        return hm
+        return padded_hm[width:-width, width:-width]
 
     def test(self, middlestr=''):
         slicedict = ba.utils.load(self.slicefile)
@@ -78,7 +78,7 @@ class Baseline(object):
         for img_bn, slicelist in tqdm(slicedict.items()):
             im = self.imread(self.images + img_bn + '.jpg')
             hm = np.zeros(im.shape[:-1])
-            for scale in [1, 2]:
+            for scale in [1, 8 / 6, 2]:
                 hm += self.test_single_scale(im, scale)
             regions, rscores = ba.eval.scoreToRegion(hm)
             scoreboxes.update({img_bn: {'region': regions, 'score': rscores}})
@@ -98,8 +98,9 @@ class Baseline(object):
             ppI=self.ppI,
             patch_size=self.patch_size,
             ext=self.ext,
-            mean=self.mean).flow(1000)
-        samples, labels = next(flow)
+            mean=self.mean,
+            batch_size=1000)
+        samples, labels = flow.next()
         features = [self.features(sample) for sample in samples]
         labels = [int(i) for i in labels]
         self.model.fit(features, labels)
