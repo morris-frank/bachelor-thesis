@@ -9,12 +9,13 @@ sns.set_style('whitegrid')
 
 # mpl.use('pgf')
 pgf_with_latex = {
-    "pgf.texsystem": "pdflatex",
-    "pgf.rcfonts": False,
-    "text.usetex": False,
-    "pgf.preamble": [
-        r"\usepackage[utf8x]{inputenc}",
-        r"\usepackage[T1]{fontenc}",
-        ]
+    'pgf.texsystem': 'pdflatex',
+    'pgf.rcfonts': False,
+    'text.usetex': False,
+    'pgf.preamble': [
+        r'\usepackage[utf8x]{inputenc}',
+        r'\usepackage[T1]{fontenc}',
+        ],
+    'figure.autolayout': True
     }
 mpl.rcParams.update(pgf_with_latex)

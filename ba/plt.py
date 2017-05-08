@@ -20,19 +20,19 @@ def plt_hm(hm):
     return fig
 
 
-def figsize(scale):
+def figsize(width, height):
     fig_width_pt = 395.452
     inches_per_pt = 1.0 / 72.27
     golden_mean = (np.sqrt(5.0) - 1.0) / 2.0
-    fig_width = fig_width_pt * inches_per_pt * scale
-    fig_height = fig_width * golden_mean
+    fig_width = fig_width_pt * inches_per_pt * width
+    fig_height = fig_width * golden_mean * height
     fig_size = [fig_width, fig_height]
     return fig_size
 
 
-def newfig(width=0.9):
+def newfig(width=0.9, height=1.0):
     plt.clf()
-    fig = plt.figure(figsize=figsize(width))
+    fig = plt.figure(figsize=figsize(width, height))
     ax = fig.add_subplot(111)
     return fig, ax
 
@@ -126,6 +126,28 @@ def apply_rect(image, rects, path=None, colors='black', labels=''):
     return fig
 
 
+def _plt_results(tag, mode, results_glob, nsamples, ax=None):
+    hitted_labels = []
+    pred_labels = []
+    for rmppath in tqdm(glob(results_glob), desc=nsamples):
+        rmp = ba.utils.load(rmppath)
+        hitted_labels.extend(rmp[b'hitted_labels'])
+        pred_labels.extend(rmp[b'pred_labels'])
+    if len(hitted_labels) == 0:
+        return False
+    if mode == 'AUC':
+        auc = sklearn.metrics.roc_auc_score(hitted_labels, pred_labels)
+        tqdm.write('{}; {}'.format(nsamples, auc))
+    elif mode == 'PR':
+        pr, rc, th = sklearn.metrics.precision_recall_curve(
+            hitted_labels, pred_labels, pos_label=1)
+        ax.plot(rc, pr, label=nsamples)
+    elif mode == 'ROC':
+        fpr, tpr, th = sklearn.metrics.roc_curve(
+            hitted_labels, pred_labels, pos_label=1)
+        ax.plot(fpr, tpr, label=nsamples)
+
+
 def plt_results_for_tag(tag, mode):
     ITER = '500'
 
@@ -137,26 +159,8 @@ def plt_results_for_tag(tag, mode):
     roots = glob(root)
     roots.sort()
     for path in tqdm(roots, desc=tag):
-        sp = path[len('./data/results/' + tag + '_FCN_'):-1]
-
-        hitted_labels = []
-        pred_labels = []
-        for rmppath in tqdm(glob(path + results), desc=sp):
-            rmp = ba.utils.load(rmppath)
-            hitted_labels.extend(rmp[b'hitted_labels'])
-            pred_labels.extend(rmp[b'pred_labels'])
-
-        if mode == 'AUC':
-            auc = sklearn.metrics.roc_auc_score(hitted_labels, pred_labels)
-            tqdm.write('{}; {}'.format(sp, auc))
-        elif mode == 'PR':
-            pr, rc, th = sklearn.metrics.precision_recall_curve(
-                hitted_labels, pred_labels, pos_label=1)
-            ax.plot(rc, pr, label=sp)
-        elif mode == 'ROC':
-            fpr, tpr, th = sklearn.metrics.roc_curve(
-                hitted_labels, pred_labels, pos_label=1)
-            ax.plot(fpr, tpr, label=sp)
+        nsamples = path[len('./data/results/' + tag + '_FCN_'):-1]
+        _plt_results(tag, mode, path + results, nsamples, ax=ax)
     if mode == 'PR':
         plt.xlabel('recall')
         plt.ylabel('precision')
