@@ -5,9 +5,12 @@ import seaborn as sns
 from tqdm import tqdm
 import ba.utils
 import sklearn.metrics
+import re
+import datetime
 from glob import glob
 
-SEQUENTIAL_CMAP = sns.cubehelix_palette(start=0.5, rot=0.2, as_cmap=True)
+SEQUENTIAL_CMAP = sns.cubehelix_palette(100, start=2.1, rot=-0.2, gamma=0.6,
+                                        as_cmap=True)
 
 
 def plt_hm(hm):
@@ -40,6 +43,7 @@ def newfig(width=0.9, height=1.0):
 def savefig(filename):
     plt.gcf().savefig('{}.pgf'.format(filename), dpi=200)
     plt.gcf().savefig('{}.pdf'.format(filename), dpi=200)
+    plt.clf()
 
 
 def _prepareImagePlot(image):
@@ -51,7 +55,9 @@ def _prepareImagePlot(image):
     Returns:
         the figure
     '''
-    fig, ax = newfig(0.9)
+    aspect_ratio = image.shape[0] / image.shape[1]
+    golden_mean = (np.sqrt(5.0) - 1.0) / 2.0
+    fig, ax = newfig(0.9, 0.9 * aspect_ratio / golden_mean)
     plt.axis('off')
     ax = plt.Axes(fig, [0., 0., 1., 1.])
     ax.set_axis_off()
@@ -74,10 +80,12 @@ def apply_overlay(image, overlay, path=None, label='', fig=None):
     if path is None and fig is None:
         raise RuntimeError
     if fig is None:
-        _fig = _prepareImagePlot(image)
+        _fig, ax = _prepareImagePlot(image)
     else:
         _fig = fig
-    plt.imshow(overlay, cmap='viridis', alpha=0.5, interpolation='none')
+    # overlay = overlay[..., np.newaxis]
+    plt.imshow(overlay,
+               cmap=SEQUENTIAL_CMAP, alpha=0.5, interpolation='bilinear')
     if label != '':
         patch = mpatches.Patch(color='yellow', label=label)
         plt.legend(handles=[patch])
@@ -123,21 +131,36 @@ def apply_rect(image, rects, path=None, colors='black', labels=''):
     if path:
         fig.savefig(path, pad_inches=0, dpi=fig.dpi)
         plt.close(fig)
-    return fig
+    return fig, ax
 
 
-def _plt_results(tag, mode, results_glob, nsamples, ax=None):
+def _plt_results(tag, mode, results_glob, nsamples, ax=None, startdate=None,
+                 enddate=None):
     hitted_labels = []
     pred_labels = []
-    for rmppath in tqdm(glob(results_glob), desc=nsamples):
+    auc = []
+    datere = 'May([0-9]{2})_([0-9]{2}):([0-9]{2})'
+    for rmppath in tqdm(glob(results_glob), desc=str(nsamples)):
+        if startdate is not None or enddate is not None:
+            day, _, _ = re.findall(datere, rmppath)[0]
+            day = int(day)
+            exec_date = datetime.date(2017, 5, day)
+            if startdate is not None and exec_date < startdate:
+                continue
+            if enddate is not None and exec_date > enddate:
+                continue
+        hitted_labels = []
+        pred_labels = []
         rmp = ba.utils.load(rmppath)
         hitted_labels.extend(rmp[b'hitted_labels'])
         pred_labels.extend(rmp[b'pred_labels'])
+        auc.append(sklearn.metrics.roc_auc_score(hitted_labels, pred_labels))
     if len(hitted_labels) == 0:
         return False
     if mode == 'AUC':
-        auc = sklearn.metrics.roc_auc_score(hitted_labels, pred_labels)
-        tqdm.write('{}; {}'.format(nsamples, auc))
+        # auc = sklearn.metrics.roc_auc_score(hitted_labels, pred_labels)
+        # tqdm.write('{} with {}: {}'.format(tag, nsamples, auc))
+        return np.var(auc)
     elif mode == 'PR':
         pr, rc, th = sklearn.metrics.precision_recall_curve(
             hitted_labels, pred_labels, pos_label=1)
@@ -148,26 +171,43 @@ def _plt_results(tag, mode, results_glob, nsamples, ax=None):
         ax.plot(fpr, tpr, label=nsamples)
 
 
-def plt_results_for_tag(tag, mode):
+def plt_results_for_tag(tag, mode, startdate=None, enddate=None):
     ITER = '500'
 
     root = './data/results/' + tag + '_FCN_*/'
     results = '*iter_' + ITER + '*results.mp'
-
-    sns.set_palette("Set2", 5)
-    fig, ax = newfig()
+    sns.set_context('paper')
+    sns.set_palette('Set2', 5)
+    ax = None
+    if mode != 'AUC':
+        fig, ax = newfig()
     roots = glob(root)
-    roots.sort()
-    for path in tqdm(roots, desc=tag):
-        nsamples = path[len('./data/results/' + tag + '_FCN_'):-1]
-        _plt_results(tag, mode, path + results, nsamples, ax=ax)
+    nsamples = [int(p[len('./data/results/' + tag + '_FCN_'):-8])
+                for p in roots]
+    nsamples, roots = zip(*sorted(zip(nsamples, roots)))
+    any_good = False
+    auc_ret = {}
+    for n, path in zip(tqdm(nsamples, desc=tag), roots):
+        pltres = _plt_results(tag, mode, path + results, n, ax=ax,
+                              startdate=startdate, enddate=enddate)
+        if pltres is not False:
+            any_good = True
+            auc_ret[str(n)] = pltres
+    if not any_good:
+        return False
     if mode == 'PR':
+        plt.title(r'\texttt{' + tag.replace('_', '\_') + '}')
         plt.xlabel('recall')
         plt.ylabel('precision')
-        ax.legend()
+        l = ax.legend(loc=1)
+        l.set_title('samples')
         savefig('./build/' + tag + '_precs_recs')
     elif mode == 'ROC':
+        plt.title(r'\texttt{' + tag.replace('_', '\_') + '}')
         plt.xlabel('false positive rate')
         plt.ylabel('true positive rate')
-        ax.legend()
+        l = ax.legend(loc=4)
+        l.set_title('samples')
         savefig('./build/' + tag + '_roc')
+    elif mode == 'AUC':
+        return auc_ret
