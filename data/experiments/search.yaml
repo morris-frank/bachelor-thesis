@@ -1,0 +1,19 @@
+base_lr: 10e-6
+images: /net/hciserver03/storage/mfrank/src/ba/data/datasets/voc2010/JPEGImages/
+learn_fc: true
+lr_policy: step
+max_iter: 500
+mean: /net/hciserver03/storage/mfrank/src/ba/data/models/resnet/ResNet_mean.npy
+net: ba.caffeine.resnet.ResNet_Single(nconv3=4, nconv4=6).write
+slicefile: /net/hciserver03/storage/mfrank/src/ba/data/tmp/search_seg.yaml
+sliding_window: true
+snapshot: 500
+stepsize: 500
+test: /net/hciserver03/storage/mfrank/src/ba/data/tmp/pascpart/person.txt
+test_images: ''
+test_interval: 1000
+train: /net/hciserver03/storage/mfrank/src/ba/data/tmp/search_list.txt
+train_sizes: [1]
+val: /net/hciserver03/storage/mfrank/src/ba/data/tmp/pascpart/patches/person_torso/img_augmented_lmdb_test.txt
+weight_decay: 0.0005
+weights: /net/hciserver03/storage/mfrank/src/ba/data/models/resnet/ResNet-50-model.caffemodel

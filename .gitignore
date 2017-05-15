@@ -34,3 +34,6 @@ data/tmp/
 *.mp
 *~
 *.save
+*.swp
+*csv
+.nfs*

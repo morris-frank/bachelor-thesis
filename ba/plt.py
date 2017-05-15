@@ -1,3 +1,4 @@
+from ba import BA_ROOT
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
@@ -85,7 +86,7 @@ def apply_overlay(image, overlay, path=None, label='', fig=None):
         _fig = fig
     # overlay = overlay[..., np.newaxis]
     plt.imshow(overlay,
-               cmap=SEQUENTIAL_CMAP, alpha=0.5, interpolation='bilinear')
+               cmap='binary_r', alpha=0.7, interpolation='bilinear')
     if label != '':
         patch = mpatches.Patch(color='yellow', label=label)
         plt.legend(handles=[patch])
@@ -122,7 +123,7 @@ def apply_rect(image, rects, path=None, colors='black', labels=''):
         height = rect[2] - rect[0]
         width = rect[3] - rect[1]
         ax.add_patch(mpatches.Rectangle((rect[1], rect[0]), width, height,
-                                        fill=None, alpha=1, ec=color,
+                                        fill=None, alpha=1, ec=color, lw=2.5,
                                         label=label))
         if label != '':
             bbox_props = dict(boxstyle='square', fc='w', ec='w')
@@ -158,9 +159,10 @@ def _plt_results(tag, mode, results_glob, nsamples, ax=None, startdate=None,
     if len(hitted_labels) == 0:
         return False
     if mode == 'AUC':
-        # auc = sklearn.metrics.roc_auc_score(hitted_labels, pred_labels)
+        auc = sklearn.metrics.roc_auc_score(hitted_labels, pred_labels)
         # tqdm.write('{} with {}: {}'.format(tag, nsamples, auc))
-        return np.var(auc)
+        return auc
+        # return np.var(auc)
     elif mode == 'PR':
         pr, rc, th = sklearn.metrics.precision_recall_curve(
             hitted_labels, pred_labels, pos_label=1)
@@ -174,7 +176,7 @@ def _plt_results(tag, mode, results_glob, nsamples, ax=None, startdate=None,
 def plt_results_for_tag(tag, mode, startdate=None, enddate=None):
     ITER = '500'
 
-    root = './data/results/' + tag + '_FCN_*/'
+    root = 'data/results/' + tag + '_FCN_*/'
     results = '*iter_' + ITER + '*results.mp'
     sns.set_context('paper')
     sns.set_palette('Set2', 5)
@@ -182,7 +184,7 @@ def plt_results_for_tag(tag, mode, startdate=None, enddate=None):
     if mode != 'AUC':
         fig, ax = newfig()
     roots = glob(root)
-    nsamples = [int(p[len('./data/results/' + tag + '_FCN_'):-8])
+    nsamples = [int(p[len('data/results/' + tag + '_FCN_'):-8])
                 for p in roots]
     nsamples, roots = zip(*sorted(zip(nsamples, roots)))
     any_good = False
@@ -201,13 +203,13 @@ def plt_results_for_tag(tag, mode, startdate=None, enddate=None):
         plt.ylabel('precision')
         l = ax.legend(loc=1)
         l.set_title('samples')
-        savefig('./build/' + tag + '_precs_recs')
+        savefig('build/' + tag + '_precs_recs')
     elif mode == 'ROC':
         plt.title(r'\texttt{' + tag.replace('_', '\_') + '}')
         plt.xlabel('false positive rate')
         plt.ylabel('true positive rate')
         l = ax.legend(loc=4)
         l.set_title('samples')
-        savefig('./build/' + tag + '_roc')
+        savefig('build/' + tag + '_roc')
     elif mode == 'AUC':
         return auc_ret

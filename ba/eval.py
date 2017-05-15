@@ -323,6 +323,7 @@ def scoreToRegion(hm):
         bbscores = bbscores[picks]
         starts = starts[picks]
         ends = ends[picks]
+        # from os import _exit as e; import ipdb; ipdb.set_trace()
         picks = nms(starts, ends, bbscores)
         bbscores = bbscores[picks]
         starts = starts[picks]

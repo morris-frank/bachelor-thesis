@@ -1,3 +1,4 @@
+from ba import BA_ROOT
 from ba.set import SetList
 import ba.utils
 from ba.utils import grouper
@@ -65,9 +66,9 @@ class SolverSpec(ba.utils.Bunch):
 
 class NetRunner(ba.utils.NotifierClass):
     '''A Wrapper for a caffe Network'''
-    buildroot = 'data/models/'
-    resultroot = 'data/results/'
-    resultDB = 'data/results/experimentDB.yaml'
+    buildroot = BA_ROOT + 'data/models/'
+    resultroot = BA_ROOT + 'data/results/'
+    resultDB = BA_ROOT + 'data/results/experimentDB.yaml'
 
     def __init__(self, name, **kwargs):
         '''Constructs a new NetRunner
@@ -437,8 +438,8 @@ class FCNPartRunner(NetRunner):
         return scoreboxes
 
     def _postprocess_single_output(self, bn, score, imshape):
-        # bn_hm = self.heatmaps + bn
-        # imsave(bn_hm + '.png', score)
+        bn_hm = self.heatmaps + bn
+        imsave(bn_hm + '.png', score)
         score = imresize(score, imshape)
         score = skimage.img_as_float(score)
         # bn_ov = self.heatmaps[:-1] + '_overlays/' + bn
@@ -467,7 +468,7 @@ class FCNPartRunner(NetRunner):
                                                            data.shape[1:])
         return {bn: {'region': regions, 'score': rscores}}
 
-    def forward_list(self, setlist, reset_net=True):
+    def forward_list(self, setlist, reset_net=True, shout=False):
         '''Will forward a whole setlist through the network. Will default to the
         validation set.
 
@@ -477,11 +478,25 @@ class FCNPartRunner(NetRunner):
         Returns:
             the filename of the ****scores.yaml File
         '''
+        def append_finds(res):
+            with open(BA_ROOT + 'current_finds.csv', 'a') as f:
+                for bn, fd in res.items():
+                    for region, score in zip(fd['region'], fd['score']):
+                        if score > 0.9999:
+                            f.write('{};{};{}\n'.format(bn, score, region))
+
         def save_scoreboxes(scores_path, scoreboxes):
             for boxdict in scoreboxes.values():
                 boxdict['region'] = boxdict['region'].tolist()
                 boxdict['score'] = boxdict['score'].tolist()
             ba.utils.save(scores_path, scoreboxes)
+
+        def forward_batch(x):
+            return self.forward_batch(x, mean=mean)
+
+        def forward_single(x):
+            return self.forward_single(x[0], mean=mean)
+
         self.prepare()
         if reset_net:
             self.create_net(self.dir + 'deploy.prototxt',
@@ -495,16 +510,12 @@ class FCNPartRunner(NetRunner):
                                                    path_split[1])
         weightname = os.path.splitext(os.path.basename(self.net_weights))[0]
 
-        def forward_batch(x):
-            return self.forward_batch(x, mean=mean)
-
-        def forward_single(x):
-            return self.forward_single(x[0], mean=mean)
-
         if self.batch_size > 1:
             forward = forward_batch
         else:
             forward = forward_single
+
+        ba.utils.rm(BA_ROOT + 'current_finds.csv')
 
         print('Forwarding for {} at {} list {}'.format(
             self.name, weightname, setlist.source))
@@ -512,6 +523,8 @@ class FCNPartRunner(NetRunner):
             res = forward(idx)
             if res is not False:
                 scoreboxes.update(res)
+                if shout:
+                    append_finds(res)
         save_scoreboxes(scores_path, scoreboxes)
         if not self.quiet:
             self.notify('Forwarded {} for weights {} of {}'.format(

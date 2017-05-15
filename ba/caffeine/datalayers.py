@@ -2,6 +2,7 @@
     Based on code from Evan Shelhamer
     fcn.berkeleyvision.org
 '''
+from ba import BA_ROOT
 import ba.utils
 import caffe
 import numpy as np
@@ -130,7 +131,7 @@ class SingleImageLayer(caffe.Layer):
         self.splitfile = params['splitfile']
         self.negatives = params.get(
             'negatives',
-            'data/tmp/var_neg/')
+            BA_ROOT + 'data/tmp/var_neg/')
         if isinstance(params['mean'], str):
             self.mean = np.load(params['mean'])
         else:

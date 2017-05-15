@@ -4,6 +4,7 @@ import ba.utils
 from ba.experiment import Experiment
 import multiprocessing as mp
 from itertools import count
+import time
 
 GPUS = [2, 3]
 TMPEXP = './data/tmp/experiments/'
@@ -28,6 +29,7 @@ def run(fpath):
         # runIter(partschunk, GPUS[idx])
         p = mp.Process(target=runIter, args=(partschunk, GPUS[idx]))
         p.start()
+        time.sleep(10)
 
 
 def runIter(parts, gpu):

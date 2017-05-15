@@ -1,3 +1,4 @@
+from ba import BA_ROOT
 import argparse
 import ba
 import ba.caffeine
@@ -11,9 +12,10 @@ import os
 import random
 import re
 import shutil
+import time
 import sys
 
-MODELDIR = 'data/models/'
+MODELDIR = BA_ROOT + 'data/models/'
 
 
 class RunMode(Enum):
@@ -63,6 +65,8 @@ class Experiment(ba.utils.NotifierClass):
         self.clear()
 
     def _run_single(self, train_sizes=None):
+        if train_sizes is None:
+            train_sizes = self.conf['train_sizes']
         if self.args.train and self.args.test and self.args.tofcn:
             return self._train_test_double(train_sizes)
 
@@ -95,6 +99,7 @@ class Experiment(ba.utils.NotifierClass):
         parser.add_argument('--tofcn', action='store_true')
         parser.add_argument('--train', action='store_true')
         parser.add_argument('--repeat', action='store_true')
+        parser.add_argument('--quiet', action='store_true')
         parser.add_argument('--bs', type=int, nargs=1, default=0,
                             metavar='count',
                             help='The batch size for training or testing.')
@@ -110,11 +115,11 @@ class Experiment(ba.utils.NotifierClass):
             if isinstance(self.args.__dict__[item], list):
                 self.args.__dict__[item] = self.args.__dict__[item][0]
         self.threaded = self.args.threads > 1
-        self.quiet = self.args.repeat
+        self.quiet = self.args.repeat or self.args.quiet
 
     def load_conf(self, config_file):
         '''Open a YAML Configuration file and make a Bunch from it'''
-        defaults = ba.utils.load('data/experiments/defaults.yaml')
+        defaults = ba.utils.load(BA_ROOT + 'data/experiments/defaults.yaml')
         self.conf = ba.utils.load(config_file)
         if 'tag' not in self.conf:
             self.conf['tag'] = os.path.basename(
@@ -201,31 +206,31 @@ class Experiment(ba.utils.NotifierClass):
                                                                     False)
         self.cnn.gpu = self.args.gpu
 
-    def prepare(self):
-        self._call_method(self._prepare)
+    def prepare(self, **kwargs):
+        self._call_method(self._prepare, **kwargs)
 
-    def test(self):
+    def test(self, **kwargs):
         '''Tests the given experiment, Normally depends on user input.
         If --default flag is set will test EVERY snapshot previously saved.
         '''
-        self._call_method(self._meta_test)
+        self._call_method(self._meta_test, **kwargs)
 
-    def conv_test(self):
+    def conv_test(self, **kwargs):
         '''Converts the network online into an FCN and tests the given
         experiment, Normally depends on user input. If --default flag is set
         will test EVERY snapshot previously saved.
         '''
-        self._call_method(self._conv_test)
+        self._call_method(self._conv_test, **kwargs)
 
-    def train(self):
+    def train(self, **kwargs):
         '''Trains the given experiment'''
-        self._call_method(self._train)
+        self._call_method(self._train, **kwargs)
 
-    def convert_to_FCN(self):
+    def convert_to_FCN(self, **kwargs):
         '''Converts the source weights to an FCN and saves them.'''
-        self._call_method(self._convert_to_FCN)
+        self._call_method(self._convert_to_FCN, **kwargs)
 
-    def _prepare(self):
+    def _prepare(self, **kwargs):
         print('Preparing all phases for {}.'.format(self.conf['tag']))
         old_weights = self.conf.get('weights', '')
         self.conf['weights'] = ''
@@ -233,7 +238,7 @@ class Experiment(ba.utils.NotifierClass):
         self.cnn.prepare()
         self.conf['weights'] = old_weights
 
-    def _conv_test(self):
+    def _conv_test(self, **kwargs):
         import caffe
         caffe.set_mode_gpu()
         caffe.set_device(self.args.gpu[0])
@@ -261,16 +266,11 @@ class Experiment(ba.utils.NotifierClass):
 
             return False
 
-        self._meta_test(callback=inline_convert_to_fcn)
+        self._meta_test(callback=inline_convert_to_fcn, **kwargs)
 
-    def _train(self):
+    def _train(self, **kwargs):
         self.prepare_network()
-        import time
-        stime = time.time()
-        self.cnn.train()
-        etime = time.time()
-        print('Trained in {}'.format(etime - stime))
-        # return self.cnn.train()
+        return self.cnn.train(**kwargs)
 
     def _convert_to_FCN(self, new_tag=None):
         import caffe
@@ -311,7 +311,7 @@ class Experiment(ba.utils.NotifierClass):
                 new_net, old_net, new_params, old_params, new_weights)
             converted_net.save(new_weights)
 
-    def _meta_test(self, callback=(lambda: True)):
+    def _meta_test(self, callback=(lambda: True), **kwargs):
         snapdir = self.conf['snapshot_dir'].format(self.conf['tag'])
         if self.args.tofcn:
             snapdir = snapdir.replace('FCN_', '')
@@ -336,19 +336,20 @@ class Experiment(ba.utils.NotifierClass):
                 self.cnn.images = self.conf['test_images']
             reset_net = callback()
             if 'slicefile' in self.conf:
-                self.cnn.test(self.conf['slicefile'], reset_net=reset_net)
+                self.cnn.test(self.conf['slicefile'], reset_net=reset_net,
+                              **kwargs)
             else:
-                self.cnn.test(reset_net=reset_net)
+                self.cnn.test(reset_net=reset_net, **kwargs)
             self.cnn.clear()
 
-    def _call_method(self, fptr):
+    def _call_method(self, fptr, **kwargs):
         assert(self.args.conf is not None)
         if 'train_sizes' in self.conf:
-            self._call_multi_scaled(fptr, self.conf['train_sizes'])
+            self._call_multi_scaled(fptr, self.conf['train_sizes'], **kwargs)
         else:
-            fptr()
+            fptr(**kwargs)
 
-    def _call_multi_scaled(self, fptr, set_sizes):
+    def _call_multi_scaled(self, fptr, set_sizes, **kwargs):
         def _exec_threaded(self, fname, sema):
             with sema:
                 self.__getattribute__(fname)()
@@ -385,7 +386,14 @@ class Experiment(ba.utils.NotifierClass):
                                               args=(fname, sema,)))
                     threads[-1].start()
                 else:
-                    return_code = fptr()
+                    st = time.time()
+                    return_code = fptr(**kwargs)
+                    et = time.time()
+                    log_str = '{};{};{};{};{}\n'.format(
+                        int(st), int(et - st), self.conf['tag'], set_size,
+                        fptr.__name__)
+                    with open('timings.csv', 'a') as f:
+                        f.write(log_str)
                     if return_code is not None and return_code < 0:
                         break
         except KeyboardInterrupt:

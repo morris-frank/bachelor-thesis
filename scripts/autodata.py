@@ -20,9 +20,8 @@ def runSingle(d):
     parts = ' '.join(d['shortparts'])
     classes = ' '.join(d['classes'])
     argv = ['--classes', classes, '--parts', parts, '--default']
-    print('cd ~/src/ba; ./data.py ' + ' '.join(argv))
-    # gen = Generator(argv)
-    # gen.run()
+    gen = Generator(argv)
+    gen.run()
 
 
 if __name__ == '__main__':

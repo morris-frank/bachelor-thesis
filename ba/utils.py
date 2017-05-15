@@ -1,3 +1,4 @@
+from ba import BA_ROOT
 from itertools import zip_longest
 from glob import glob
 import msgpack
@@ -13,8 +14,8 @@ import skimage.color
 from threading import Thread
 import random
 
-sys.path.append('../telenotify')
-notifier_config = '../telenotify/config.yaml'
+sys.path.append(BA_ROOT + '../telenotify')
+notifier_config = BA_ROOT + '../telenotify/config.yaml'
 
 
 class NotifierClass(object):

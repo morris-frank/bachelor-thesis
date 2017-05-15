@@ -8,24 +8,12 @@ noti = ba.utils.NotifierClass()
 
 rd = 'data/tmp/baseline/'
 
-tags = [
-    'pottedplant_plant',
-    'bottle_body',
-    'aeroplane_lwing_rwing',
-    'person_head',
-    'train_hfrontside',
-    'train_head',
-    'person_hair'
-    ]
-
 
 def get_count(tag, n):
     return len(glob('{}*{}samples*yaml'.format(tag, n)))
 
 
 def run(tag):
-    if tag not in tags:
-        return False
     baseline = Baseline(tag)
     for _ in range(max(0, 10 - get_count(tag, 1))):
         baseline.run(1)

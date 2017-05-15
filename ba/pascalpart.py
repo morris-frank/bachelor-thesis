@@ -1,3 +1,4 @@
+from ba import BA_ROOT
 from ba.set import SetList
 import ba.utils
 import copy
@@ -13,7 +14,7 @@ import random
 
 
 class PascalPartSet(object):
-    _builddir = 'data/tmp/'
+    _builddir = BA_ROOT + 'data/tmp/'
     _testtrain = 0.2
 
     def __init__(self, name, root='.', parts=[], classes=[],

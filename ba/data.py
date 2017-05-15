@@ -1,10 +1,11 @@
+from ba import BA_ROOT
 import argparse
 from ba.pascalpart import PascalPartSet
 import ba.utils
 
 DATASET = 'pascpart'
-PARTPATH = 'data/datasets/pascalparts/Annotations_Part/'
-IMGPATH = 'data/datasets/voc2010/JPEGImages/'
+PARTPATH = BA_ROOT + 'data/datasets/pascalparts/Annotations_Part/'
+IMGPATH = BA_ROOT + 'data/datasets/voc2010/JPEGImages/'
 
 
 class Generator(ba.utils.NotifierClass):

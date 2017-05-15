@@ -1,3 +1,4 @@
+from ba import BA_ROOT
 import caffe
 from caffe import layers as L
 from caffe import params as P
@@ -323,6 +324,7 @@ class ResNet_Single(ResNet):
                 )
         elif self.params['split'] == 'val':
             bs = self.params.get('batch_size', 18)
+            mf = BA_ROOT + 'data/models/resnet/ResNet_mean.binaryproto'
             self.n.data, self.n.label = L.Data(
                 batch_size=bs,
                 source=self.params['lmdb'],
@@ -330,7 +332,7 @@ class ResNet_Single(ResNet):
                 ntop=2, transform_param=dict(
                     crop_size=224,
                     mirror=True,
-                    mean_file="data/models/resnet/ResNet_mean.binaryproto"
+                    mean_file=mf
                     ))
         else:
             self.n.data = L.Input(shape=[dict(dim=[1, 3, 224, 224])])

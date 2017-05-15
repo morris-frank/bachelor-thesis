@@ -78,7 +78,7 @@ class Baseline(object):
         for img_bn, slicelist in tqdm(slicedict.items()):
             im = self.imread(self.images + img_bn + '.jpg')
             hm = np.zeros(im.shape[:-1])
-            for scale in [1, 8 / 6, 2]:
+            for scale in [8 / 14, 1, 8 / 6, 2]:
                 hm += self.test_single_scale(im, scale)
             regions, rscores = ba.eval.scoreToRegion(hm)
             scoreboxes.update({img_bn: {'region': regions, 'score': rscores}})

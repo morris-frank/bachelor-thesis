@@ -1,3 +1,4 @@
+BA_ROOT = '/net/hciserver03/storage/mfrank/src/ba/'
 from ba import utils
 from ba.set import SetList
 from ba.pascalpart import PascalPart
@@ -11,7 +12,7 @@ sns.set_style('whitegrid')
 pgf_with_latex = {
     'pgf.texsystem': 'pdflatex',
     'pgf.rcfonts': False,
-    'text.usetex': False,
+    'text.usetex': True,
     'pgf.preamble': [
         r'\usepackage[utf8x]{inputenc}',
         r'\usepackage[T1]{fontenc}',
