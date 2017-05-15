@@ -12,15 +12,22 @@ from glob import glob
 
 SEQUENTIAL_CMAP = sns.cubehelix_palette(100, start=2.1, rot=-0.2, gamma=0.6,
                                         as_cmap=True)
+DIVERGING_CMAP = sns.diverging_palette(280, 145, s=85, l=25, n=100,
+                                       as_cmap=True)
 
 
-def plt_hm(hm):
-    fig, ax = newfig(0.9)
+def plt_hm(hm, diverg=False, **kwargs):
+    aspect_ratio = hm.shape[0] / hm.shape[1]
+    golden_mean = (np.sqrt(5.0) - 1.0) / 2.0
+    fig, ax = newfig(0.9, 0.9 * aspect_ratio / golden_mean)
     plt.axis('off')
     ax = plt.Axes(fig, [0., 0., 1., 1.])
     ax.set_axis_off()
     fig.add_axes(ax)
-    plt.imshow(hm, cmap=SEQUENTIAL_CMAP)
+    if diverg:
+        plt.imshow(hm, cmap=DIVERGING_CMAP, **kwargs)
+    else:
+        plt.imshow(hm, cmap=SEQUENTIAL_CMAP, **kwargs)
     return fig
 
 

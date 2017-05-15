@@ -15,7 +15,6 @@ pythonstartup
 
 # Extra thesis stuff
 *.caffemodel
-*.npy
 data/datasets/
 data/models/
 data/results/
