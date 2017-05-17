@@ -192,8 +192,16 @@ class NetRunner(ba.utils.NotifierClass):
             return (data, False)
         else:
             im = imread(path)
-            data = np.array(im, dtype=np.float32)
-            data = data[:, :, ::-1]
+            if im.ndim == 2:
+                w, h = im.shape
+                _im = np.empty((w, h, 3), dtype=np.float32)
+                _im[:, :, 0] = im
+                _im[:, :, 1] = im
+                _im[:, :, 2] = im
+                im = _im
+            else:
+                im = np.array(im, dtype=np.float32)
+            data = im[:, :, ::-1]
             if not isinstance(mean, bool) or mean:
                 if mean.shape == (224, 224, 3):
                     mean = imresize(mean, data.shape)
@@ -416,10 +424,10 @@ class FCNPartRunner(NetRunner):
                 continue
             data, im = self.load_img(path, mean=mean)
             # ADAPTIVE VERSION
-            # if data.shape[1] > max_h:
-            #     max_h = data.shape[1]
-            # if data.shape[2] > max_w:
-            #     max_w = data.shape[2]
+            if data.shape[1] > max_h:
+                max_h = data.shape[1]
+            if data.shape[2] > max_w:
+                max_w = data.shape[2]
             datas.append(data)
 
         bs = len(datas)
@@ -438,8 +446,8 @@ class FCNPartRunner(NetRunner):
         return scoreboxes
 
     def _postprocess_single_output(self, bn, score, imshape):
-        bn_hm = self.heatmaps + bn
-        imsave(bn_hm + '.png', score)
+        # bn_hm = self.heatmaps + bn
+        # imsave(bn_hm + '.png', score)
         score = imresize(score, imshape)
         score = skimage.img_as_float(score)
         # bn_ov = self.heatmaps[:-1] + '_overlays/' + bn
@@ -478,12 +486,21 @@ class FCNPartRunner(NetRunner):
         Returns:
             the filename of the ****scores.yaml File
         '''
+        import ba.eval
+
         def append_finds(res):
             with open(BA_ROOT + 'current_finds.csv', 'a') as f:
                 for bn, fd in res.items():
-                    for region, score in zip(fd['region'], fd['score']):
-                        if score > 0.9999:
-                            f.write('{};{};{}\n'.format(bn, score, region))
+                    if len(fd['score']) == 0:
+                        continue
+                    if fd['score'].max() > 0.95:
+                        region = fd['region'][np.argmax(fd['score'])]
+                        score = fd['score'].max()
+                        f.write('{};{};{}\n'.format(bn, score, region))
+                    # Save all good patches:
+                    # for region, score in zip(fd['region'], fd['score']):
+                    #     if score > 0.95:
+                    #         f.write('{};{};{}\n'.format(bn, score, region))
 
         def save_scoreboxes(scores_path, scoreboxes):
             for boxdict in scoreboxes.values():

@@ -383,8 +383,10 @@ class SamplesGenerator(object):
                 self.ppI = 2
             elif n >= 50:
                 self.ppI = 4
-            else:
+            elif n >= 4:
                 self.ppI = 16
+            else:
+                self.ppI = 500
         if self.ppI % 2 != 0:
             raise ValueError('Count in SingleImageLayer is not divisble by 2.')
 
@@ -439,7 +441,15 @@ class SamplesGenerator(object):
 
     def imread(self, path):
         im = scipy.misc.imread(path)
-        im = np.array(im, dtype=np.float32)
+        if im.ndim == 2:
+            w, h = im.shape
+            _im = np.empty((w, h, 3), dtype=np.float32)
+            _im[:, :, 0] = im
+            _im[:, :, 1] = im
+            _im[:, :, 2] = im
+            im = _im
+        else:
+            im = np.array(im, dtype=np.float32)
         im = im[:, :, ::-1]
         return im
 

@@ -46,6 +46,8 @@ def evalDect(predf, gtf):
                     target in targets])
 
     predicted_slices = ba.utils.load(predf)
+    if predicted_slices is None:
+        return
     ground_truth_slices = ba.utils.load(gtf)
     outputfile = '.'.join(predf.split('.')[:-2] + ['results', 'mp'])
     tqdm.write('Evaluating detection {}'.format(predf))
@@ -209,9 +211,15 @@ def _generic_box(shape, scales=(2, 7, 15,), cache=True):
     areas = []
     starts = []
     ends = []
-    for scale in scales:
-        _h = int(h / scale)
-        _w = int(w / scale)
+    basel = 100
+    scales = np.mat([1, 1.5, 2])
+    ascpect_ratios = np.mat([1, 4 / 3, 1.6180, 2, 2.76])
+    widths = np.dot(scales.T, ascpect_ratios).flat
+    i = np.vstack(len(widths) * [widths])
+    sizes = (np.vstack(([i], [i.T])).T * basel).reshape(-1, 2).astype(int)
+    for _h, _w in sizes:
+        # _h = int(h / scale)
+        # _w = int(w / scale)
         _area = _h * _w
         for (x1, y1), (x2, y2) in generic_regions(shape, _w, _h, 0.5):
             rec = False
@@ -222,6 +230,7 @@ def _generic_box(shape, scales=(2, 7, 15,), cache=True):
                 rec = True
                 y2 = w - 1
             if rec:
+                continue
                 area = (x2 - x1) * (y2 - y1)
                 if area == 0:
                     continue
@@ -304,16 +313,16 @@ def scoreToRegion(hm):
     negative_hm = distance_transform_cdt(hm < thres).astype(float)
     if negative_hm.max() > 0:
       negative_hm /= negative_hm.max()
-    ii = hm - negative_hm
+    hm -= negative_hm
 
     # Construct the integral image
-    for i in range(ii.ndim):
-        ii = ii.cumsum(axis=i)
+    for i in range(hm.ndim):
+        hm = hm.cumsum(axis=i)
 
     # Calculates the sum of an box
     def bbscore(s, e):
-        return ii[s[0], s[1]] + ii[e[0],
-                                   e[1]] - ii[s[0], e[1]] - ii[e[0], s[1]]
+        return hm[s[0], s[1]] + hm[e[0],
+                                   e[1]] - hm[s[0], e[1]] - hm[e[0], s[1]]
     bbscores = np.array([bbscore(s, e) for s, e in zip(starts, ends)])
 
     # Get the score densities
@@ -328,10 +337,13 @@ def scoreToRegion(hm):
         bbscores = bbscores[picks]
         starts = starts[picks]
         ends = ends[picks]
-    else:
+    elif len(bbscores) > 0:
         picks = bbscores.argmax()
         bbscores = np.array([bbscores[picks]])
         starts = np.array([starts[picks]])
         ends = np.array([ends[picks]])
 
-    return np.concatenate((starts, ends), axis=1), bbscores
+    if len(bbscores) > 0:
+        return np.concatenate((starts, ends), axis=1), bbscores
+    else:
+        return np.array([]), np.array([])

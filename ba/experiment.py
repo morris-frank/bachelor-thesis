@@ -311,7 +311,7 @@ class Experiment(ba.utils.NotifierClass):
                 new_net, old_net, new_params, old_params, new_weights)
             converted_net.save(new_weights)
 
-    def _meta_test(self, callback=(lambda: True), **kwargs):
+    def _meta_test(self, callback=(lambda: True), doEval=True, **kwargs):
         snapdir = self.conf['snapshot_dir'].format(self.conf['tag'])
         if self.args.tofcn:
             snapdir = snapdir.replace('FCN_', '')
@@ -335,11 +335,11 @@ class Experiment(ba.utils.NotifierClass):
             if self.conf['test_images'] != '':
                 self.cnn.images = self.conf['test_images']
             reset_net = callback()
-            if 'slicefile' in self.conf:
+            if doEval and 'slicefile' in self.conf:
                 self.cnn.test(self.conf['slicefile'], reset_net=reset_net,
                               **kwargs)
             else:
-                self.cnn.test(reset_net=reset_net, **kwargs)
+                self.cnn.forward_test(reset_net=reset_net, **kwargs)
             self.cnn.clear()
 
     def _call_method(self, fptr, **kwargs):

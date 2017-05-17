@@ -5,6 +5,9 @@ import json
 
 pivotdate = datetime.date(2017, 5, 8)
 
+
+# tags = ['bird_head_precs_recs', 'bottle_body_precs_recs', 'cow_sheep_lhorn_rhorn_precs_recs', 'person_hair_precs_recs', 'person_neck_precs_recs', 'pottedplant_plant_precs_recs']
+
 tags = ['bird_head', 'cow_sheep_lhorn_rhorn', 'train_hfrontside',
         'aeroplane_lwing_rwing', 'person_lear_rear', 'bottle_body',
         'train_coach', 'person_neck', 'train_head', 'bird_tail',
