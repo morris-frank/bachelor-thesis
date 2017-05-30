@@ -1,0 +1,12 @@
+images: /net/hciserver03/storage/mfrank/src/ba/data/datasets/voc2010/JPEGImages/
+labels: /net/hciserver03/storage/mfrank/src/ba/data/tmp/search_seg.yaml
+mean: false
+net: ba.caffeine.resnet.ResNet_FCN_Precompute(nconv3=4, nconv4=6).write
+slicefile: /net/hciserver03/storage/mfrank/src/ba/data/tmp/search_seg.yaml
+test: /net/hciserver03/storage/mfrank/src/ba/data/tmp/pascpart/pascpart.txt
+test_images: /net/hciserver03/storage/mfrank/src/ba/data/tmp/mean_substracted_voc/
+test_interval: 100
+tofcn: true
+train: true
+train_sizes: [1]
+val: true

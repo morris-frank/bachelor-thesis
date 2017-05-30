@@ -307,27 +307,49 @@ def scoreToRegion(hm):
     '''
     scales = (2, 5, 7,)
     starts, ends, areas = _generic_box(hm.shape, scales=scales)
+    if len(starts) == 0:
+        return np.array([]), np.array([])
 
     # Add distance base negative penalty:
-    thres = 0.01
-    negative_hm = distance_transform_cdt(hm < thres).astype(float)
-    if negative_hm.max() > 0:
-      negative_hm /= negative_hm.max()
-    hm -= negative_hm
+    # thres = 0.3
+    # negative_hm = distance_transform_cdt(hm < thres).astype(float)
+    # if negative_hm.max() > 0:
+    #   negative_hm /= negative_hm.max()
+    #   negative_hm *= 1
+    # hm -= negative_hm
 
+    # import scipy.ndimage
+    # gradient = scipy.ndimage.gaussian_gradient_magnitude(hm, 1)
+    # gradient /= gradient.max()
     # Construct the integral image
-    for i in range(hm.ndim):
-        hm = hm.cumsum(axis=i)
+    # ii = gradient
+    # for i in range(ii.ndim):
+    #     ii = ii.cumsum(axis=i)
 
     # Calculates the sum of an box
-    def bbscore(s, e):
-        return hm[s[0], s[1]] + hm[e[0],
-                                   e[1]] - hm[s[0], e[1]] - hm[e[0], s[1]]
-    bbscores = np.array([bbscore(s, e) for s, e in zip(starts, ends)])
+    def ii_rect(s, e):
+        return ii[s[0], s[1]] + ii[e[0],
+                                   e[1]] - ii[s[0], e[1]] - ii[e[0], s[1]]
+    # gradient_volumes = np.array([ii_rect(s, e) for s, e in zip(starts, ends)])
 
-    # Get the score densities
-    bbscores = np.divide(bbscores, areas)
-    picks = bbscores > 0.2
+    # import scipy.ndimage
+    # sub_hm = ((hm < 0.3) * -1).astype(float)
+    # sub_hm = scipy.ndimage.filters.gaussian_filter(sub_hm, 8)
+    # hm += sub_hm
+
+    # Construct the integral image
+    ii = hm
+    for i in range(ii.ndim):
+        ii = ii.cumsum(axis=i)
+
+    # Calculates the sum of an box
+    volumes = np.array([ii_rect(s, e) for s, e in zip(starts, ends)])
+
+    # # Get the score densities
+    densities = np.divide(volumes, areas)
+    # gradient_densities = np.divide(gradient_volumes, areas)
+    bbscores = densities  # * gradient_densities
+    picks = bbscores > (0.2 * bbscores.max())
     if any(picks):
         bbscores = bbscores[picks]
         starts = starts[picks]

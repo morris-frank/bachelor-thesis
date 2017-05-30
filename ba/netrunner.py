@@ -16,6 +16,7 @@ from scipy.misc import imsave
 import skimage
 import subprocess
 import time
+import lmdb
 from tqdm import tqdm
 
 
@@ -80,6 +81,8 @@ class NetRunner(ba.utils.NotifierClass):
         super().__init__(**kwargs)
         self.name = name
         self._solver_attr = {}
+        self.stride = 25
+        self.kernel_size = 50
         defaults = {
             'batch_size': 1,
             'dir': './',
@@ -105,6 +108,23 @@ class NetRunner(ba.utils.NotifierClass):
         for (attr, value) in kwargs.items():
             if attr in defaults:
                 setattr(self, attr, value)
+
+    @property
+    def name(self):
+        return self.__name
+
+    @name.setter
+    def name(self, name):
+        '''Sets the name of this network and all Variables that depend on it
+
+        Args:
+            name (str): The new name
+        '''
+        self.__name = name
+        self.dir = self.buildroot + '/' + self.name + '/'
+        self.results = self.resultroot + '/' + self.name + '/'
+        self.snapshots = self.dir + 'snapshots/'
+        self.heatmaps = self.results + 'heatmaps/'
 
     @property
     def trainset(self):
@@ -216,7 +236,7 @@ class NetRunner(ba.utils.NotifierClass):
             data (np.array): The preprocessed image
 
         Returns:
-            The results from the score layer
+            The results the data of the first output
         '''
         if data.ndim == 3:
             self.net.blobs['data'].reshape(1, *data.shape)
@@ -226,7 +246,7 @@ class NetRunner(ba.utils.NotifierClass):
 
         # run net and take argmax for prediction
         self.net.forward()
-        return self.net.blobs[self.net.outputs[0]].data[0].argmax(axis=0)
+        return self.net.blobs[self.net.outputs[0]].data
 
     def split(self, count=0):
         '''Splits the train list self.trainset into samples that we will train on
@@ -280,37 +300,6 @@ class NetRunner(ba.utils.NotifierClass):
             return self.trainset.mean, False
         else:
             return self.calculate_mean(), False
-
-
-class FCNPartRunner(NetRunner):
-    '''A NetRunner specific for FCNs'''
-
-    def __init__(self, name, **kwargs):
-        '''Constructs a new FCNPartRunner
-
-        Args:
-            name (str): The name of this network (for saving paths...)
-            kwargs...
-        '''
-        super().__init__(name=name, **kwargs)
-        self.name = name
-
-    @property
-    def name(self):
-        return self.__name
-
-    @name.setter
-    def name(self, name):
-        '''Sets the name of this network and all Variables that depend on it
-
-        Args:
-            name (str): The new name
-        '''
-        self.__name = name
-        self.dir = self.buildroot + '/' + self.name + '/'
-        self.results = self.resultroot + '/' + self.name + '/'
-        self.snapshots = self.dir + 'snapshots/'
-        self.heatmaps = self.results + 'heatmaps/'
 
     @property
     def net_weights(self):
@@ -435,8 +424,8 @@ class FCNPartRunner(NetRunner):
         for i, data in enumerate(datas):
             shape = data.shape[1:]
             self.net.blobs['data'].data[i, :, 0:shape[0], 0:shape[1]] = data
-        self.net.forward()
-        scores = self.net.blobs[self.net.outputs[0]].data[:, 1, ...]
+        scores = self.net.forward()
+        scores = scores[:, 1, ...]
         scoreboxes = {}
         for path, score, data in zip(path_batch, scores, datas):
             bn = os.path.basename(os.path.splitext(path)[0])
@@ -444,16 +433,6 @@ class FCNPartRunner(NetRunner):
                                                                data.shape[1:])
             scoreboxes[bn] = {'region': regions, 'score': rscores}
         return scoreboxes
-
-    def _postprocess_single_output(self, bn, score, imshape):
-        # bn_hm = self.heatmaps + bn
-        # imsave(bn_hm + '.png', score)
-        score = imresize(score, imshape)
-        score = skimage.img_as_float(score)
-        # bn_ov = self.heatmaps[:-1] + '_overlays/' + bn
-        # ba.plt.apply_overlay(im, score, bn_ov + '.png')
-        regions, rscores = ba.eval.scoreToRegion(score)
-        return regions, rscores
 
     def forward_single(self, path, mean=None):
         '''Will forward one single path-image from the source set and saves the
@@ -469,12 +448,22 @@ class FCNPartRunner(NetRunner):
         if mean is None:
             mean, meanpath = self.get_mean()
         data, im = self.load_img(path, mean=mean)
-        self.forward(data)
-        score = self.net.blobs[self.net.outputs[0]].data[0][1, ...]
+        score = self.forward(data)
+        score = score[0][1, ...]
         bn = os.path.basename(os.path.splitext(path)[0])
         regions, rscores = self._postprocess_single_output(bn, score,
                                                            data.shape[1:])
         return {bn: {'region': regions, 'score': rscores}}
+
+    def _postprocess_single_output(self, bn, score, imshape):
+        # bn_hm = self.heatmaps + bn
+        # imsave(bn_hm + '.png', score)
+        score = imresize(score, imshape)
+        score = skimage.img_as_float(score)
+        # bn_ov = self.heatmaps[:-1] + '_overlays/' + bn
+        # ba.plt.apply_overlay(im, score, bn_ov + '.png')
+        regions, rscores = ba.eval.scoreToRegion(score)
+        return regions, rscores
 
     def forward_list(self, setlist, reset_net=True, shout=False):
         '''Will forward a whole setlist through the network. Will default to the
@@ -499,8 +488,8 @@ class FCNPartRunner(NetRunner):
                         f.write('{};{};{}\n'.format(bn, score, region))
                     # Save all good patches:
                     # for region, score in zip(fd['region'], fd['score']):
-                    #     if score > 0.95:
-                    #         f.write('{};{};{}\n'.format(bn, score, region))
+                    #    if score > 0.98:
+                    #        f.write('{};{};{}\n'.format(bn, score, region))
 
         def save_scoreboxes(scores_path, scoreboxes):
             for boxdict in scoreboxes.values():
@@ -568,8 +557,28 @@ class FCNPartRunner(NetRunner):
         self.testset.rm_pre_suffix(self.images, imgext)
         return scores_path
 
+    def outputs_to_lmdb(self, setlist=None, maxlength=800, **kwargs):
+        if setlist is None:
+            setlist = self.testset
 
-class SlidingFCNPartRunner(FCNPartRunner):
+        db_path = os.path.splitext(setlist.source)[0] + '_lmdb'
+        map_size = 2048 * 25 * 25 * 2 * len(setlist)
+        env = lmdb.Environment(db_path, map_size=map_size)
+        txn = env.begin(write=True, buffers=True)
+
+        mean, meanpath = self.get_mean()
+        for idx in tqdm(setlist):
+            inputs, im = self.load_img(idx, mean=mean)
+            if inputs.shape[1] > maxlength:
+                inputs = imresize(inputs, (3, maxlength,
+                                           int(maxlength / inputs.shape[2])))
+            if inputs.shape[2] > maxlength:
+                inputs = imresize(inputs, (3, int(maxlength / inputs.shape[1],
+                                           maxlength)))
+            outputs = self.forward(inputs)
+
+
+class SlidingFCNPartRunner(NetRunner):
     '''A subclass of FCNPartRunner that forwards images in a sliding window kind
     of way'''
 

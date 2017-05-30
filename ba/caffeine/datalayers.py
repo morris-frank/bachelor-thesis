@@ -12,6 +12,11 @@ from scipy.misc import imread
 import yaml
 
 
+class DirDataLayer(caffe.Layer):
+    def setup(self, bottom, top):
+        pass
+
+
 class SegDataLayer(caffe.Layer):
     '''
     '''

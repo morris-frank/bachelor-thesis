@@ -165,7 +165,7 @@ class Experiment(ba.utils.NotifierClass):
         if self.conf['sliding_window']:
             runner = ba.netrunner.SlidingFCNPartRunner
         else:
-            runner = ba.netrunner.FCNPartRunner
+            runner = ba.netrunner.NetRunner
         self.cnn = runner(self.conf['tag'],
                           trainset=self.conf['train'],
                           valset=self.conf['val'],
@@ -186,7 +186,8 @@ class Experiment(ba.utils.NotifierClass):
 
         # Extra atrributes for the solver
         attrs = ['lr_policy', 'stepsize', 'weight_decay', 'base_lr',
-                 'test_iter', 'test_interval', 'max_iter', 'snapshot']
+                 'test_iter', 'test_interval', 'max_iter', 'snapshot',
+                 'momentum']
         for attr in attrs:
             if attr in self.conf:
                 self.cnn._solver_attr[attr] = self.conf[attr]
@@ -323,8 +324,6 @@ class Experiment(ba.utils.NotifierClass):
             return False
         for w in weights:
             bn = os.path.basename(w)
-            if '500' not in bn:
-                continue
             question = 'You want to test {}?'.format(bn)
             if not ba.utils.query_boolean(question, default='yes',
                                           defaulting=self.args.default):

@@ -336,3 +336,22 @@ class ResNet_Single(ResNet):
                     ))
         else:
             self.n.data = L.Input(shape=[dict(dim=[1, 3, 224, 224])])
+
+
+class ResNet_Single_Precompute(ResNet_Single):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def tail(self):
+        pass
+
+
+class ResNet_FCN_Precompute(ResNet_FCN):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def data(self):
+        self.n.data = L.Data(
+            batch_size=self.params.get('batch_size', 18),
+            source=self.params['lmdb'], backend=P.Data.LMDB,
+            ntop=1)
