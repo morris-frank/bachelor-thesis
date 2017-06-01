@@ -458,11 +458,17 @@ class NetRunner(ba.utils.NotifierClass):
     def _postprocess_single_output(self, bn, score, imshape):
         # bn_hm = self.heatmaps + bn
         # imsave(bn_hm + '.png', score)
-        score = imresize(score, imshape)
-        score = skimage.img_as_float(score)
+        # score = imresize(score, imshape)
+        # score = skimage.img_as_float(score)
         # bn_ov = self.heatmaps[:-1] + '_overlays/' + bn
         # ba.plt.apply_overlay(im, score, bn_ov + '.png')
-        regions, rscores = ba.eval.scoreToRegion(score)
+        upscore = np.zeros(imshape, dtype=float)
+        # ONLY WORKS AS SUCH WITH ResNet 50
+        score = imresize(score, 32.0)
+        x_stop = min(upscore.shape[0], score.shape[0])
+        y_stop = min(upscore.shape[1], score.shape[1])
+        upscore[0:x_stop, 0:y_stop] = score[0:x_stop, 0:y_stop]
+        regions, rscores = ba.eval.scoreToRegion(upscore)
         return regions, rscores
 
     def forward_list(self, setlist, reset_net=True, shout=False):
