@@ -314,11 +314,10 @@ class ResNet_Single(ResNet):
 
     def data(self):
         '''Adds the data layer'''
-        pylayer = 'SingleImageLayer'
         if self.params['split'] == 'train':
             self.n.data, self.n.label = L.Python(
                 module='ba.caffeine.datalayers',
-                layer=pylayer,
+                layer='SingleImageLayer',
                 ntop=2,
                 param_str=str(self.params)
                 )
@@ -342,6 +341,14 @@ class ResNet_Single_Precompute(ResNet_Single):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
+    # def data(self):
+    #     self.n.data = L.Python(
+    #         module='ba.caffeine.datalayers',
+    #         layer='TextListLayer',
+    #         ntop=1,
+    #         param_str=str(self.params)
+    #         )
+
     def tail(self):
         pass
 
@@ -351,7 +358,17 @@ class ResNet_FCN_Precompute(ResNet_FCN):
         super().__init__(**kwargs)
 
     def data(self):
-        self.n.data = L.Data(
-            batch_size=self.params.get('batch_size', 18),
+        self.n.res5c = L.Data(
+            batch_size=self.params.get('batch_size', 10),
             source=self.params['lmdb'], backend=P.Data.LMDB,
             ntop=1)
+
+    def base_net(self):
+        pass
+
+    def tail(self):
+        self.n.fc_conv = L.Convolution(
+            self.n.res5c, kernel_size=1, stride=1, num_output=self.nclasses,
+            pad=0, param=[dict(lr_mult=1, decay_mult=1),
+                          dict(lr_mult=2, decay_mult=0)])
+        self.n.prob = L.Softmax(self.n.fc_conv)

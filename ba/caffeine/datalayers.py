@@ -8,12 +8,120 @@ import caffe
 import numpy as np
 from PIL import Image
 import random
-from scipy.misc import imread
+import scipy.misc
 import yaml
 
 
-class DirDataLayer(caffe.Layer):
+class TextListLayer(caffe.Layer):
     def setup(self, bottom, top):
+        params = eval(self.param_str)
+        self.splitfile = params['splitfile']
+        self.images = params['images']
+        self.ext = params.get('extension', 'jpg')
+        self.batch_size = params.get('batch_size', 20)
+        self.patch_size = params.get('patch_size', 500)
+        self.idx = 0
+
+        with open(self.splitfile, 'r') as f:
+            self.imlist = [l[:-1] for l in f.readlines() if l.strip()]
+
+    def reshape(self, bottom, top):
+        top[0].reshape(self.batch_size, 3, self.patch_size[0],
+                       self.patch_size[1])
+
+    def backward(self, top, propagate_down, bottom):
+        pass
+
+    def imread(self, path):
+        _inp = np.empty((3, self.patch_size, self.patch_size),
+                        dtype=np.float32)
+        im = scipy.misc.imread(path)
+        scaling = self.patch_size / max(im.shape[:2])
+        im = scipy.misc.imresize(im, scaling).astype(np.float32)
+        if im.ndim == 2:
+            _inp[0, 0:im.shape[0], 0:im.shape[1]] = im
+            _inp[1, 0:im.shape[0], 0:im.shape[1]] = im
+            _inp[2, 0:im.shape[0], 0:im.shape[1]] = im
+        else:
+            _inp[:, 0:im.shape[0], 0:im.shape[1]] = im.transpose((2, 0, 1))
+        _inp = _inp[:, :, ::-1]
+        return _inp
+
+    def forward(self, bottom, top):
+        for i in range(self.batch_size):
+            im = self.imread(
+                self.images + self.imlist[self.idx] + '.' + self.ext)
+            top[0].data[i, ...] = im
+
+            self.idx += 1
+            if self.idx == len(self.indices):
+                self.idx = 0
+
+
+class SingleImageLayer(caffe.Layer):
+    def setup(self, bottom, top):
+        params = eval(self.param_str)
+        self.images = params['images']
+        self.ext = params.get('extension', 'jpg')
+        self.batch_size = params.get('batch_size', 20)
+        self.patch_size = params.get('patch_size', (224, 224))
+        self.ppI = params.get('ppI', None)
+        self.slicefile = params['slicefile']
+        self.splitfile = params['splitfile']
+        self.negatives = params.get(
+            'negatives',
+            BA_ROOT + 'data/tmp/var_neg/')
+        if isinstance(params['mean'], str):
+            self.mean = np.load(params['mean'])
+        else:
+            self.mean = np.array(params['mean'])
+
+        with open(self.splitfile, 'r') as f:
+            imlist = [l[:-1] for l in f.readlines() if l.strip()]
+
+        self.flow = ba.utils.SamplesGenerator(
+            self.slicefile,
+            imlist,
+            self.images,
+            self.negatives,
+            ppI=self.ppI,
+            patch_size=self.patch_size,
+            ext=self.ext,
+            mean=self.mean,
+            batch_size=self.batch_size)
+
+        # two tops: data and label
+        if len(top) != 2:
+            raise Exception("Need to define two tops: data and label.")
+        # data layers have no bottoms
+        if len(bottom) != 0:
+            raise Exception("Do not define a bottom.")
+
+    def reshape(self, bottom, top):
+        top[0].reshape(
+            self.batch_size, 3, self.patch_size[0], self.patch_size[1])
+        top[1].reshape(self.batch_size, 1)
+
+    def forward(self, bottom, top):
+        # assign output
+        x, y = self.flow.next()
+        filled = x.shape[0]
+        top[0].data[:filled, ...] = x
+        top[1].data[:filled, ...] = y[..., np.newaxis]
+
+        while filled < self.batch_size:
+            x, y = self.flow.next()
+            filling = x.shape[0]
+            if filling + filled >= self.batch_size:
+                rem = self.batch_size - filled
+                top[0].data[filled:, ...] = x[:rem, ...]
+                top[1].data[filled:, ...] = y[:rem, np.newaxis]
+            else:
+                top[0].data[filled:filled + filling, ...] = x[...]
+                top[1].data[filled:filled + filling, ...] = x[..., np.newaxis]
+            filled += filling
+
+    def backward(self, top, propagate_down, bottom):
         pass
 
 
@@ -100,7 +208,7 @@ class SegDataLayer(caffe.Layer):
         Load label image as 1 x height x width integer array of label indices.
         The leading singleton dimension is required by the loss.
         '''
-        label = imread('{}/{}.png'.format(self.labels, idx))
+        label = scipy.misc.imread('{}/{}.png'.format(self.labels, idx))
         label = (label / 255).astype(np.uint8)
         label = label[np.newaxis, ...]
         return label
@@ -120,72 +228,3 @@ class PosPatchDataLayer(SegDataLayer):
         label[self.slices[idx]].fill(1)
         label = label[np.newaxis, ...]
         return label
-
-
-class SingleImageLayer(caffe.Layer):
-    '''
-    '''
-    def setup(self, bottom, top):
-        params = eval(self.param_str)
-        self.images = params['images']
-        self.ext = params.get('extension', 'jpg')
-        self.batch_size = params.get('batch_size', 20)
-        self.patch_size = params.get('patch_size', (224, 224))
-        self.ppI = params.get('ppI', None)
-        self.slicefile = params['slicefile']
-        self.splitfile = params['splitfile']
-        self.negatives = params.get(
-            'negatives',
-            BA_ROOT + 'data/tmp/var_neg/')
-        if isinstance(params['mean'], str):
-            self.mean = np.load(params['mean'])
-        else:
-            self.mean = np.array(params['mean'])
-
-        with open(self.splitfile, 'r') as f:
-            imlist = [l[:-1] for l in f.readlines() if l.strip()]
-
-        self.flow = ba.utils.SamplesGenerator(
-            self.slicefile,
-            imlist,
-            self.images,
-            self.negatives,
-            ppI=self.ppI,
-            patch_size=self.patch_size,
-            ext=self.ext,
-            mean=self.mean,
-            batch_size=self.batch_size)
-
-        # two tops: data and label
-        if len(top) != 2:
-            raise Exception("Need to define two tops: data and label.")
-        # data layers have no bottoms
-        if len(bottom) != 0:
-            raise Exception("Do not define a bottom.")
-
-    def reshape(self, bottom, top):
-        top[0].reshape(
-            self.batch_size, 3, self.patch_size[0], self.patch_size[1])
-        top[1].reshape(self.batch_size, 1)
-
-    def forward(self, bottom, top):
-        # assign output
-        x, y = self.flow.next()
-        filled = x.shape[0]
-        top[0].data[:filled, ...] = x
-        top[1].data[:filled, ...] = y[..., np.newaxis]
-
-        while filled < self.batch_size:
-            x, y = self.flow.next()
-            filling = x.shape[0]
-            if filling + filled >= self.batch_size:
-                rem = self.batch_size - filled
-                top[0].data[filled:, ...] = x[:rem, ...]
-                top[1].data[filled:, ...] = y[:rem, np.newaxis]
-            else:
-                top[0].data[filled:filled + filling, ...] = x[...]
-                top[1].data[filled:filled + filling, ...] = x[..., np.newaxis]
-            filled += filling
-
-    def backward(self, top, propagate_down, bottom):
-        pass

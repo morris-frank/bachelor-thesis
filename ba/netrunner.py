@@ -3,6 +3,8 @@ from ba.set import SetList
 import ba.utils
 from ba.utils import grouper
 import caffe
+from caffe.proto import caffe_pb2
+from caffe.io import array_to_datum
 import copy
 import datetime
 import numpy as np
@@ -108,6 +110,7 @@ class NetRunner(ba.utils.NotifierClass):
         for (attr, value) in kwargs.items():
             if attr in defaults:
                 setattr(self, attr, value)
+        self.name = name
 
     @property
     def name(self):
@@ -434,6 +437,25 @@ class NetRunner(ba.utils.NotifierClass):
             scoreboxes[bn] = {'region': regions, 'score': rscores}
         return scoreboxes
 
+    def forward_lmdb(self):
+        import ba.eval
+        shapes = ba.utils.load(os.path.splitext(
+            self.testset.source)[0] + '_sizes.yaml')
+            
+        for idxs in grouper(tqdm(self.testset), self.batch_size, None):
+            scoreboxes = {}
+            self.net.forward()
+            scores = self.net.blobs[self.net.outputs[0]].data[:, 1, ...]
+            for i, bn in enumerate(idxs):
+                if bn is None:
+                    continue
+                shape = shapes[bn]
+                score = scores[i, ...]
+                regions, rscores = self._postprocess_single_output(
+                    bn, score, shape)
+                scoreboxes[bn] = {'region': regions, 'score': rscores}
+            self.append_finds(scoreboxes)
+
     def forward_single(self, path, mean=None):
         '''Will forward one single path-image from the source set and saves the
         scoring heatmaps and heatmaps to disk.
@@ -483,26 +505,6 @@ class NetRunner(ba.utils.NotifierClass):
         '''
         import ba.eval
 
-        def append_finds(res):
-            with open(BA_ROOT + 'current_finds.csv', 'a') as f:
-                for bn, fd in res.items():
-                    if len(fd['score']) == 0:
-                        continue
-                    if fd['score'].max() > 0.95:
-                        region = fd['region'][np.argmax(fd['score'])]
-                        score = fd['score'].max()
-                        f.write('{};{};{}\n'.format(bn, score, region))
-                    # Save all good patches:
-                    # for region, score in zip(fd['region'], fd['score']):
-                    #    if score > 0.98:
-                    #        f.write('{};{};{}\n'.format(bn, score, region))
-
-        def save_scoreboxes(scores_path, scoreboxes):
-            for boxdict in scoreboxes.values():
-                boxdict['region'] = boxdict['region'].tolist()
-                boxdict['score'] = boxdict['score'].tolist()
-            ba.utils.save(scores_path, scoreboxes)
-
         def forward_batch(x):
             return self.forward_batch(x, mean=mean)
 
@@ -536,8 +538,8 @@ class NetRunner(ba.utils.NotifierClass):
             if res is not False:
                 scoreboxes.update(res)
                 if shout:
-                    append_finds(res)
-        save_scoreboxes(scores_path, scoreboxes)
+                    self.append_finds(res)
+        self.save_scoreboxes(scores_path, scoreboxes)
         if not self.quiet:
             self.notify('Forwarded {} for weights {} of {}'.format(
                 setlist.source, weightname, self.name))
@@ -563,25 +565,56 @@ class NetRunner(ba.utils.NotifierClass):
         self.testset.rm_pre_suffix(self.images, imgext)
         return scores_path
 
+    def append_finds(self, res):
+        with open(BA_ROOT + 'current_finds.csv', 'a') as f:
+            for bn, fd in res.items():
+                if len(fd['score']) == 0:
+                    continue
+                if fd['score'].max() > 0.95:
+                    region = fd['region'][np.argmax(fd['score'])]
+                    score = fd['score'].max()
+                    f.write('{};{};{}\n'.format(bn, score, region))
+                # Save all good patches:
+                # for region, score in zip(fd['region'], fd['score']):
+                #    if score > 0.98:
+                #        f.write('{};{};{}\n'.format(bn, score, region))
+
+    def save_scoreboxes(self, scores_path, scoreboxes):
+        for boxdict in scoreboxes.values():
+            boxdict['region'] = boxdict['region'].tolist()
+            boxdict['score'] = boxdict['score'].tolist()
+        ba.utils.save(scores_path, scoreboxes)
+
     def outputs_to_lmdb(self, setlist=None, maxlength=800, **kwargs):
         if setlist is None:
             setlist = self.testset
-
+        self.create_net(
+            self.dir + 'deploy.prototxt', self.net_weights, self.gpu[0])
+        osize = int(maxlength / 32)
         db_path = os.path.splitext(setlist.source)[0] + '_lmdb'
-        map_size = 2048 * 25 * 25 * 2 * len(setlist)
-        env = lmdb.Environment(db_path, map_size=map_size)
-        txn = env.begin(write=True, buffers=True)
+        map_size = len(setlist) * 2048 * osize * osize * 100
+        datum = caffe_pb2.Datum()
+        env = lmdb.open(db_path, map_size=map_size)
 
         mean, meanpath = self.get_mean()
-        for idx in tqdm(setlist):
-            inputs, im = self.load_img(idx, mean=mean)
-            if inputs.shape[1] > maxlength:
-                inputs = imresize(inputs, (3, maxlength,
-                                           int(maxlength / inputs.shape[2])))
-            if inputs.shape[2] > maxlength:
-                inputs = imresize(inputs, (3, int(maxlength / inputs.shape[1],
-                                           maxlength)))
-            outputs = self.forward(inputs)
+        # i = 1
+        with env.begin(write=True) as txn:
+            for idx in tqdm(setlist):
+                _datum = np.zeros((2048, osize, osize), float)
+                inputs, _ = self.load_img(idx, mean=mean)
+                scaling = maxlength / max(inputs.shape[1:])
+                inputs = imresize(inputs, scaling)
+                inputs = inputs.transpose((2, 0, 1))
+                outputs = self.forward(inputs)
+                _datum[:, 0:outputs.shape[2], 0:outputs.shape[3]] = outputs[0]
+                datum = array_to_datum(_datum, 1)
+                txn.put(idx.encode('ascii'), datum.SerializeToString())
+                # if i % 1000 == 0:
+                #     txn.commit()
+                #     txn = env.begin(write=True, buffers=True)
+                # i += 1
+            # txn.commit()
+            # env.close()
 
 
 class SlidingFCNPartRunner(NetRunner):

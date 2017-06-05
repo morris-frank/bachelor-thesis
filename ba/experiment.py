@@ -119,6 +119,7 @@ class Experiment(ba.utils.NotifierClass):
 
     def load_conf(self, config_file):
         '''Open a YAML Configuration file and make a Bunch from it'''
+        self.args.conf = config_file
         defaults = ba.utils.load(BA_ROOT + 'data/experiments/defaults.yaml')
         self.conf = ba.utils.load(config_file)
         if 'tag' not in self.conf:
@@ -194,7 +195,7 @@ class Experiment(ba.utils.NotifierClass):
 
         # Extra attributes for the network generator
         attrs = ['batch_size', 'patch_size', 'ppI',
-                 'images', 'negatives', 'slicefile']
+                 'images', 'negatives', 'slicefile', 'lmdb']
         for attr in attrs:
             if attr in self.conf:
                 self.cnn.generator_attr[attr] = self.conf[attr]
@@ -258,6 +259,8 @@ class Experiment(ba.utils.NotifierClass):
             for param_name in fc_net.params:
                 if any([param_name == param for param in old_params]):
                     continue
+                if param_name not in self.cnn.net.params:
+                    continue
                 for mat_idx in range(len(fc_net.params[param_name])):
                     copied = fc_net.params[param_name][mat_idx].data
                     self.cnn.net.params[param_name][mat_idx].data[...] = copied
@@ -316,6 +319,7 @@ class Experiment(ba.utils.NotifierClass):
         snapdir = self.conf['snapshot_dir'].format(self.conf['tag'])
         if self.args.tofcn:
             snapdir = snapdir.replace('FCN_', '')
+        print(snapdir)
         weights = glob('{}*caffemodel'.format(snapdir))
         if len(weights) < 1:
             print('No weights found for {}'.format(self.conf['tag']))
@@ -337,6 +341,8 @@ class Experiment(ba.utils.NotifierClass):
             if doEval and 'slicefile' in self.conf:
                 self.cnn.test(self.conf['slicefile'], reset_net=reset_net,
                               **kwargs)
+            elif 'lmdb' in self.conf:
+                self.cnn.forward_lmdb()
             else:
                 self.cnn.forward_test(reset_net=reset_net, **kwargs)
             self.cnn.clear()
